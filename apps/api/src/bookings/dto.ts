@@ -1,0 +1,19 @@
+export type RequestBookingCodeDto = {
+  guestEmail?: string;
+  guestTimezone?: string;
+  startTimeUtc?: string;
+};
+
+export type CreatePublicBookingDto = {
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string | null;
+  guestTimezone?: string;
+  startTimeUtc?: string;
+  verificationId?: string;
+  verificationCode?: string;
+};
+
+export type CancelBookingDto = {
+  reason?: string | null;
+};

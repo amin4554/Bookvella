@@ -1,0 +1,21 @@
+# env/secrets
+.env
+.env.*
+!.env.example
+apps/api/.env
+
+# dependencies
+node_modules/
+apps/api/node_modules/
+
+# build output
+dist/
+apps/api/dist/
+coverage/
+.next/
+out/
+
+# logs/local
+*.log
+.DS_Store
+Thumbs.db
