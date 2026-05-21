@@ -81,7 +81,8 @@ export function localDayOfWeek(date: {
 
 export function formatZonedIso(date: Date, timeZone: string) {
   const parts = getZonedParts(date, timeZone);
-  const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+  const pad = (value: number, length = 2) =>
+    String(value).padStart(length, '0');
 
   return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}T${pad(
     parts.hour,

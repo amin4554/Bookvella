@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -87,8 +91,16 @@ function normalizeRule(
   options: { requireAll: boolean },
 ) {
   const dayOfWeek = normalizeDayOfWeek(dto.dayOfWeek, options.requireAll);
-  const startMinute = normalizeMinute(dto.startMinute, 'startMinute', options.requireAll);
-  const endMinute = normalizeMinute(dto.endMinute, 'endMinute', options.requireAll);
+  const startMinute = normalizeMinute(
+    dto.startMinute,
+    'startMinute',
+    options.requireAll,
+  );
+  const endMinute = normalizeMinute(
+    dto.endMinute,
+    'endMinute',
+    options.requireAll,
+  );
 
   if (
     startMinute !== undefined &&

@@ -1,3 +1,4 @@
+import { PrismaService } from '../prisma/prisma.service';
 import { SchedulingService } from './scheduling.service';
 
 describe('SchedulingService', () => {
@@ -46,7 +47,7 @@ describe('SchedulingService', () => {
         ]),
       },
     };
-    const service = new SchedulingService(prisma as any);
+    const service = new SchedulingService(prisma as unknown as PrismaService);
 
     const slots = await service.getAvailableSlots({
       hostSlug: 'host',

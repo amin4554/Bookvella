@@ -1,0 +1,88 @@
+export type BookingStatus = "confirmed" | "cancelled";
+
+export const bookings = [
+  {
+    id: "booking-1",
+    guestName: "Alex Morgan",
+    guestEmail: "alex@example.com",
+    eventTitle: "30-min Consultation",
+    startsAt: "Fri Jun 6 · 10:00 AM",
+    bookedOn: "May 28, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+  {
+    id: "booking-2",
+    guestName: "Sarah Kim",
+    guestEmail: "sarah@example.com",
+    eventTitle: "Strategy Session",
+    startsAt: "Fri Jun 6 · 2:00 PM",
+    bookedOn: "May 27, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+  {
+    id: "booking-3",
+    guestName: "Tom Brennan",
+    guestEmail: "tom@example.com",
+    eventTitle: "30-min Consultation",
+    startsAt: "Mon Jun 9 · 9:00 AM",
+    bookedOn: "May 26, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+  {
+    id: "booking-4",
+    guestName: "Leila Hassan",
+    guestEmail: "leila@example.com",
+    eventTitle: "Intro Call",
+    startsAt: "Mon Jun 9 · 11:00 AM",
+    bookedOn: "May 25, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+  {
+    id: "booking-5",
+    guestName: "Carlos Ruiz",
+    guestEmail: "carlos@example.com",
+    eventTitle: "30-min Consultation",
+    startsAt: "Tue Jun 10 · 3:00 PM",
+    bookedOn: "May 24, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+  {
+    id: "booking-6",
+    guestName: "Priya Nair",
+    guestEmail: "priya@example.com",
+    eventTitle: "Intro Call",
+    startsAt: "Wed Jun 11 · 1:00 PM",
+    bookedOn: "May 23, 2026",
+    status: "confirmed" as BookingStatus,
+  },
+];
+
+export const eventTypes = [
+  {
+    id: "event-1",
+    title: "30-min Consultation",
+    slug: "30-min-consultation",
+    url: "bookvella.com/amin/30-min-consultation",
+    duration: "30 minutes",
+    location: "Video call (Zoom)",
+    active: true,
+  },
+  {
+    id: "event-2",
+    title: "Strategy Session",
+    slug: "strategy-session",
+    url: "bookvella.com/amin/strategy-session",
+    duration: "60 minutes",
+    location: "Video call (Zoom)",
+    active: true,
+  },
+  {
+    id: "event-3",
+    title: "Quick Intro Call",
+    slug: "intro-call",
+    url: "bookvella.com/amin/intro-call",
+    duration: "15 minutes",
+    location: "Phone call",
+    active: false,
+  },
+];

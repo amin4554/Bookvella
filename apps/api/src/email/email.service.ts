@@ -54,28 +54,44 @@ async function sendSmtpMail(options: {
   text: string;
   html?: string;
 }) {
-  const client = await SmtpClient.connect(options.host, options.port, options.secure);
+  const client = await SmtpClient.connect(
+    options.host,
+    options.port,
+    options.secure,
+  );
 
   try {
     await client.expect(220);
-    await client.command(`EHLO ${process.env.SMTP_HELO_NAME ?? 'localhost'}`, 250);
+    await client.command(
+      `EHLO ${process.env.SMTP_HELO_NAME ?? 'localhost'}`,
+      250,
+    );
 
     if (!options.secure && process.env.SMTP_STARTTLS !== 'false') {
       await client.command('STARTTLS', 220);
       client.upgradeTls(options.host);
-      await client.command(`EHLO ${process.env.SMTP_HELO_NAME ?? 'localhost'}`, 250);
+      await client.command(
+        `EHLO ${process.env.SMTP_HELO_NAME ?? 'localhost'}`,
+        250,
+      );
     }
 
     if (options.username && options.password) {
       await client.command('AUTH LOGIN', 334);
-      await client.command(Buffer.from(options.username).toString('base64'), 334);
-      await client.command(Buffer.from(options.password).toString('base64'), 235);
+      await client.command(
+        Buffer.from(options.username).toString('base64'),
+        334,
+      );
+      await client.command(
+        Buffer.from(options.password).toString('base64'),
+        235,
+      );
     }
 
     await client.command(`MAIL FROM:<${extractAddress(options.from)}>`, 250);
     await client.command(`RCPT TO:<${extractAddress(options.to)}>`, [250, 251]);
     await client.command('DATA', 354);
-    await client.writeData(buildMessage(options));
+    client.writeData(buildMessage(options));
     await client.expect(250);
     await client.command('QUIT', 221);
   } finally {
@@ -114,7 +130,7 @@ class SmtpClient {
     return this.expect(expected);
   }
 
-  async writeData(message: string) {
+  writeData(message: string) {
     this.socket.write(`${message}\r\n.\r\n`);
   }
 
@@ -222,11 +238,17 @@ function buildMessage(options: {
 }
 
 function encodeHeader(value: string) {
-  if (/^[\x00-\x7F]*$/.test(value)) {
+  if (isAscii(value)) {
     return value;
   }
 
   return `=?UTF-8?B?${Buffer.from(value).toString('base64')}?=`;
+}
+
+function isAscii(value: string) {
+  return Array.from(value).every(
+    (character) => character.charCodeAt(0) <= 0x7f,
+  );
 }
 
 function escapeMessageBody(value: string) {

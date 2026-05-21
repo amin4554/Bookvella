@@ -2,12 +2,7 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
-import type {
-  LoginDto,
-  LogoutDto,
-  RefreshTokenDto,
-  RegisterDto,
-} from './dto';
+import type { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
 
 @Controller('auth')
 export class AuthController {

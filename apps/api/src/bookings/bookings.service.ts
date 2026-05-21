@@ -146,8 +146,7 @@ export class BookingsService {
       verificationId: verification.id,
       expiresAt: verification.expiresAt.toISOString(),
       delivery: process.env.SMTP_HOST ? 'smtp' : 'console',
-      devCode:
-        process.env.EMAIL_DEV_RETURN_CODE === 'true' ? code : undefined,
+      devCode: process.env.EMAIL_DEV_RETURN_CODE === 'true' ? code : undefined,
     };
   }
 
@@ -428,8 +427,7 @@ export class BookingsService {
         candidate.startTimeUtc.getTime() -
         candidate.bufferBeforeMinutes * 60_000,
       endMs:
-        candidate.endTimeUtc.getTime() +
-        candidate.bufferAfterMinutes * 60_000,
+        candidate.endTimeUtc.getTime() + candidate.bufferAfterMinutes * 60_000,
     };
     const nearbyBookings = await tx.booking.findMany({
       where: {
@@ -489,7 +487,9 @@ function createVerificationCode() {
 
 function hashVerificationCode(code: string) {
   return createHash('sha256')
-    .update(`${process.env.EMAIL_CODE_SECRET ?? process.env.JWT_PRIVATE_KEY ?? 'bookvella-dev'}:${code}`)
+    .update(
+      `${process.env.EMAIL_CODE_SECRET ?? process.env.JWT_PRIVATE_KEY ?? 'bookvella-dev'}:${code}`,
+    )
     .digest('base64url');
 }
 
@@ -497,7 +497,9 @@ function verifyCode(code: string, hash: string) {
   const candidate = Buffer.from(hashVerificationCode(code), 'base64url');
   const stored = Buffer.from(hash, 'base64url');
 
-  return candidate.length === stored.length && timingSafeEqual(candidate, stored);
+  return (
+    candidate.length === stored.length && timingSafeEqual(candidate, stored)
+  );
 }
 
 function formatForEmail(date: Date, timeZone: string) {

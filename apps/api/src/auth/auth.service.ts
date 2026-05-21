@@ -19,16 +19,8 @@ import {
 import { slugify } from '../common/slug';
 import { requireText } from '../common/validation';
 import { PrismaService } from '../prisma/prisma.service';
-import type {
-  AccessTokenPayload,
-  PublicUser,
-} from './auth.types';
-import type {
-  LoginDto,
-  LogoutDto,
-  RefreshTokenDto,
-  RegisterDto,
-} from './dto';
+import type { AccessTokenPayload, PublicUser } from './auth.types';
+import type { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 90;
@@ -48,6 +40,12 @@ export class AuthService {
       this.privateKeyPem = privateKey;
       this.publicKeyPem = publicKey;
       return;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'JWT_PRIVATE_KEY and JWT_PUBLIC_KEY are required in production',
+      );
     }
 
     const pair = generateKeyPairSync('rsa', {
@@ -84,7 +82,9 @@ export class AuthService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('A user with that email or slug already exists');
+        throw new ConflictException(
+          'A user with that email or slug already exists',
+        );
       }
 
       throw error;

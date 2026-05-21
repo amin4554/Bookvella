@@ -152,7 +152,8 @@ export class SchedulingService {
 
         for (
           let slotStartMs = alignToStep(windowStart.getTime());
-          slotStartMs + eventType.durationMinutes * 60_000 <= windowEnd.getTime();
+          slotStartMs + eventType.durationMinutes * 60_000 <=
+          windowEnd.getTime();
           slotStartMs += SLOT_STEP_MINUTES * 60_000
         ) {
           const slotEndMs = slotStartMs + eventType.durationMinutes * 60_000;
@@ -161,7 +162,9 @@ export class SchedulingService {
             endMs: slotEndMs + eventType.bufferAfterMinutes * 60_000,
           };
 
-          if (busyIntervals.some((busy) => intervalsOverlap(candidateBusy, busy))) {
+          if (
+            busyIntervals.some((busy) => intervalsOverlap(candidateBusy, busy))
+          ) {
             continue;
           }
 
@@ -191,7 +194,9 @@ function parseDateRange(startValue: string, endValue: string) {
   }
 
   if (end.getTime() - start.getTime() > MAX_RANGE_DAYS * 24 * 60 * 60 * 1000) {
-    throw new BadRequestException(`Date range cannot exceed ${MAX_RANGE_DAYS} days`);
+    throw new BadRequestException(
+      `Date range cannot exceed ${MAX_RANGE_DAYS} days`,
+    );
   }
 
   return { start, end };
@@ -207,7 +212,11 @@ function parseDateInput(value: string | undefined, field: string) {
 
   if (dateOnly) {
     return new Date(
-      Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])),
+      Date.UTC(
+        Number(dateOnly[1]),
+        Number(dateOnly[2]) - 1,
+        Number(dateOnly[3]),
+      ),
     );
   }
 

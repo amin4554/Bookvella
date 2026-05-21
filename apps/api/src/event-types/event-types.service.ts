@@ -63,7 +63,9 @@ export class EventTypesService {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException('You already have an event type with that slug');
+        throw new ConflictException(
+          'You already have an event type with that slug',
+        );
       }
 
       throw error;
@@ -129,7 +131,9 @@ export class EventTypesService {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException('You already have an event type with that slug');
+        throw new ConflictException(
+          'You already have an event type with that slug',
+        );
       }
 
       throw error;

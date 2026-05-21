@@ -29,7 +29,9 @@ export function requirePositiveInteger(
   }
 
   if (options.max !== undefined && value > options.max) {
-    throw new BadRequestException(`${field} cannot be greater than ${options.max}`);
+    throw new BadRequestException(
+      `${field} cannot be greater than ${options.max}`,
+    );
   }
 
   return value;
@@ -49,7 +51,9 @@ export function optionalNonNegativeInteger(
   }
 
   if (options.max !== undefined && value > options.max) {
-    throw new BadRequestException(`${field} cannot be greater than ${options.max}`);
+    throw new BadRequestException(
+      `${field} cannot be greater than ${options.max}`,
+    );
   }
 
   return value;
