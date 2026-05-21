@@ -17,14 +17,31 @@ import {
   verify,
 } from 'crypto';
 import { slugify } from '../common/slug';
-import { requireText } from '../common/validation';
+import { optionalText, requireText } from '../common/validation';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AccessTokenPayload, PublicUser } from './auth.types';
-import type { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
+import type {
+  GoogleAuthDto,
+  LoginDto,
+  LogoutDto,
+  RefreshTokenDto,
+  RegisterDto,
+  UpdateMeDto,
+} from './dto';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 90;
 const MAX_ACTIVE_SESSIONS = 2;
+
+type GoogleTokenInfo = {
+  aud?: string;
+  iss?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  name?: string;
+  picture?: string;
+};
 
 @Injectable()
 export class AuthService {
@@ -99,6 +116,51 @@ export class AuthService {
     if (!user || !verifyPassword(password, user.passwordHash)) {
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    return this.issueTokenPair(user);
+  }
+
+  async google(dto: GoogleAuthDto) {
+    const profile = await this.verifyGoogleCredential(dto.credential);
+    const email = normalizeEmail(profile.email);
+    const timezone = normalizeTimezone(dto.timezone);
+    const name = requireText(profile.name ?? email.split('@')[0], 'name');
+    const existingByGoogleSub = await this.prisma.user.findUnique({
+      where: { googleSub: profile.sub },
+    });
+
+    if (existingByGoogleSub) {
+      return this.issueTokenPair(existingByGoogleSub);
+    }
+
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingByEmail) {
+      const linked = await this.prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: {
+          googleSub: profile.sub,
+          profileImageUrl:
+            existingByEmail.profileImageUrl ?? optionalText(profile.picture),
+        },
+      });
+
+      return this.issueTokenPair(linked);
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash: hashPassword(createRefreshToken()),
+        googleSub: profile.sub,
+        name,
+        slug: await this.createUniqueSlug(name),
+        timezone,
+        profileImageUrl: optionalText(profile.picture),
+      },
+    });
 
     return this.issueTokenPair(user);
   }
@@ -188,6 +250,79 @@ export class AuthService {
     return toPublicUser(user);
   }
 
+  async updateMe(payload: AccessTokenPayload, dto: UpdateMeDto) {
+    const data: Prisma.UserUpdateInput = {};
+
+    if (dto.name !== undefined) {
+      data.name = requireText(dto.name, 'name');
+    }
+
+    if (dto.slug !== undefined) {
+      data.slug = slugify(dto.slug);
+    }
+
+    if (dto.timezone !== undefined) {
+      data.timezone = normalizeTimezone(dto.timezone);
+    }
+
+    if (dto.profileImageUrl !== undefined) {
+      data.profileImageUrl = optionalUrl(
+        dto.profileImageUrl,
+        'profileImageUrl',
+      );
+    }
+
+    if (dto.coverImageUrl !== undefined) {
+      data.coverImageUrl = optionalUrl(dto.coverImageUrl, 'coverImageUrl');
+    }
+
+    if (dto.headline !== undefined) {
+      data.headline = optionalText(dto.headline);
+    }
+
+    if (dto.businessCategory !== undefined) {
+      data.businessCategory = optionalText(dto.businessCategory);
+    }
+
+    if (dto.location !== undefined) {
+      data.location = optionalText(dto.location);
+    }
+
+    if (dto.about !== undefined) {
+      data.about = optionalText(dto.about);
+    }
+
+    if (dto.whatToExpect !== undefined) {
+      data.whatToExpect = optionalText(dto.whatToExpect);
+    }
+
+    if (dto.websiteUrl !== undefined) {
+      data.websiteUrl = optionalUrl(dto.websiteUrl, 'websiteUrl');
+    }
+
+    if (dto.instagramUrl !== undefined) {
+      data.instagramUrl = optionalUrl(dto.instagramUrl, 'instagramUrl');
+    }
+
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: payload.sub },
+        data,
+      });
+
+      return toPublicUser(user);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('That public link is already taken');
+      }
+
+      throw error;
+    }
+  }
+
   getJwks() {
     const publicKey = createPublicKey(this.publicKeyPem);
     const jwk = publicKey.export({ format: 'jwk' });
@@ -239,6 +374,46 @@ export class AuthService {
     }
 
     return payload;
+  }
+
+  private async verifyGoogleCredential(credential: string | undefined) {
+    const idToken = requireText(credential, 'credential');
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+
+    if (!clientId) {
+      throw new BadRequestException('GOOGLE_CLIENT_ID is not configured');
+    }
+
+    const response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+    );
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Google sign-in could not be verified');
+    }
+
+    const profile = (await response.json()) as GoogleTokenInfo;
+
+    if (profile.aud !== clientId) {
+      throw new UnauthorizedException('Google credential audience mismatch');
+    }
+
+    if (
+      profile.iss !== 'accounts.google.com' &&
+      profile.iss !== 'https://accounts.google.com'
+    ) {
+      throw new UnauthorizedException('Google credential issuer mismatch');
+    }
+
+    if (profile.email_verified !== 'true' && profile.email_verified !== true) {
+      throw new UnauthorizedException('Google email is not verified');
+    }
+
+    if (!profile.sub || !profile.email) {
+      throw new UnauthorizedException('Google profile is incomplete');
+    }
+
+    return profile;
   }
 
   private async issueTokenPair(user: User) {
@@ -339,6 +514,26 @@ function normalizePem(value?: string) {
   return value?.replace(/\\n/g, '\n').trim();
 }
 
+function optionalUrl(value: string | null | undefined, field: string) {
+  const text = optionalText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const url = new URL(text);
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error('Invalid protocol');
+    }
+
+    return url.toString();
+  } catch {
+    throw new BadRequestException(`${field} must be a valid URL`);
+  }
+}
+
 function normalizeEmail(value?: string) {
   const email = value?.trim().toLowerCase();
 
@@ -423,5 +618,14 @@ function toPublicUser(user: User): PublicUser {
     name: user.name,
     slug: user.slug,
     timezone: user.timezone,
+    profileImageUrl: user.profileImageUrl,
+    coverImageUrl: user.coverImageUrl,
+    headline: user.headline,
+    businessCategory: user.businessCategory,
+    location: user.location,
+    about: user.about,
+    whatToExpect: user.whatToExpect,
+    websiteUrl: user.websiteUrl,
+    instagramUrl: user.instagramUrl,
   };
 }

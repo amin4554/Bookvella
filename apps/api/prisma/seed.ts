@@ -23,6 +23,13 @@ async function main() {
       name: 'Marcus Williams',
       slug: demoSlug,
       timezone: 'America/New_York',
+      headline: 'Precision cuts in Shoreditch, London',
+      businessCategory: 'Barbering',
+      location: 'Shoreditch, London',
+      about:
+        '10 years of experience delivering precision cuts and fades in the heart of Shoreditch.',
+      whatToExpect:
+        'A relaxed, clean studio. Bring reference photos if you have them.',
       availabilityRules: {
         create: [
           weekdayAvailability(1, 9, 17),
@@ -37,7 +44,10 @@ async function main() {
           {
             title: 'Fresh Cut Session',
             slug: 'fresh-cut',
+            category: 'Barbering',
             description: 'A full haircut consultation, cut, and finish.',
+            whatIncluded: 'Precision cut, styling, and finish',
+            locationDetails: 'Shoreditch Studio',
             durationMinutes: 45,
             bufferBeforeMinutes: 5,
             bufferAfterMinutes: 10,
@@ -46,7 +56,10 @@ async function main() {
           {
             title: 'Beard Trim & Shape',
             slug: 'beard-trim',
+            category: 'Barbering',
             description: 'A precise beard trim with shape-up and cleanup.',
+            whatIncluded: 'Trim, shaping, and cleanup',
+            locationDetails: 'Shoreditch Studio',
             durationMinutes: 30,
             bufferBeforeMinutes: 0,
             bufferAfterMinutes: 10,
@@ -55,7 +68,10 @@ async function main() {
           {
             title: 'Quick Consultation',
             slug: 'consultation',
+            category: 'Consultation',
             description: 'A short video call before a first appointment.',
+            whatIncluded: 'Style planning and appointment guidance',
+            locationDetails: 'Video call',
             durationMinutes: 20,
             bufferBeforeMinutes: 0,
             bufferAfterMinutes: 5,

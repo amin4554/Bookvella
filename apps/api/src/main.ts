@@ -28,7 +28,9 @@ async function bootstrap() {
         '/auth/login',
         '/auth/register',
         '/auth/refresh',
+        '/auth/google',
         '/booking-codes',
+        '/public/reviews',
       ],
     }),
   );

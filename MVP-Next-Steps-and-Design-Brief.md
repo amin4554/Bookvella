@@ -34,15 +34,20 @@ Implemented:
 - Explicit `tslib` runtime dependency declared
 - API lint, build, and current Jest tests passing after hardening
 - Demo seed workflow for one realistic host, services, availability, and sample bookings
+- Public profile fields for host booking pages
+- `PATCH /auth/me` for editable host profile data
+- Google sign-in/sign-up backend route at `POST /auth/google`
+- Richer service metadata: category, included items, and location details
+- Prisma migration added for profile fields, Google account linkage, and service metadata
+- Local API dependencies were reinstalled cleanly and Prisma Client was regenerated
 
 Needs attention:
 
-- Production runtime install verification: `tslib` is declared in `package.json` and `pnpm-lock.yaml`, but the local `node_modules` store is currently mismatched and should be reinstalled cleanly before testing `node dist/main` or `npm run start:prod`
+- Production runtime verification on the deployment host
 - Clean production database migration workflow
 - Stronger end-to-end test coverage
 - Distributed production rate limiting if the API runs on multiple instances
 - Better production logging/error visibility
-- Production profile fields for personalized public pages
 - Friendlier service scheduling model beyond the current weekly availability rules
 
 ### Frontend
@@ -61,16 +66,21 @@ Implemented:
 - Booking success UI
 - Real API integration for core flows
 - New logo and redesigned visual direction
+- Google sign-in/sign-up button integrated into login and registration screens
+- Editable public profile page with live guest preview
+- Public booking flow redesigned with provider summary, service details, trust content, stepper, details, OTP, and success states
+- Services page updated to use guest-friendly service language and richer service fields
+- Booking schedule page updated with presets, schedule summary, and clearer product language
+- Mobile host navigation updated to a bottom navigation pattern
 
 Needs attention:
 
-- Settings page is still mostly static
-- Auth protection should redirect unauthenticated dashboard visitors to `/login`
+- Google OAuth needs real `GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` values before it can be used
+- Auth protection is client-side; server-side dashboard protection can still be hardened later
 - Loading and error states need final polish across every page
 - Mobile layouts need a full pass
-- Public booking page should include stronger provider personality, service information, and review/social-proof areas
-- Service setup should hide technical URL fields and generate public links automatically
-- Availability should become a friendly booking schedule system with presets and date overrides
+- Public booking page can still use more real provider content once profile data is filled in by hosts
+- Availability still uses weekly rules underneath; date overrides and reusable named schedules are still future work
 - Copywriting should be tightened for real launch
 
 ## MVP Completion Checklist
@@ -109,6 +119,158 @@ Recent backend hardening completed:
 - Cleaned the API lint/prettier issues that were blocking backend checks
 - Verified `eslint`, Nest build, and Jest all pass locally
 - Added `npm run db:seed` / Prisma seed support for a realistic demo account
+- Added profile and Google-auth migration: `20260521222000_profile_and_google_auth`
+- Verified API dependency reinstall, Prisma generate, Nest build, and Jest after the profile/Google changes
+
+## Local CMD Runbook
+
+These commands are written for Windows `cmd.exe`.
+
+### 1. Start PostgreSQL
+
+From the project root:
+
+```bat
+cd C:\Users\mehdi\Desktop\Bookvella
+docker compose up -d
+```
+
+### 2. Configure API environment
+
+From the project root:
+
+```bat
+cd apps\api
+copy .env.example .env
+```
+
+For normal local development, keep the default database URL:
+
+```txt
+DATABASE_URL="postgresql://bookvella:bookvella_dev@localhost:5433/bookvella?schema=public"
+```
+
+Google sign-in is optional locally. To enable it later, set:
+
+```txt
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+```
+
+### 3. Install and prepare the API
+
+From `apps\api`:
+
+```bat
+pnpm install
+npx prisma generate
+npx prisma migrate dev
+pnpm run db:seed
+```
+
+### 4. Run the API
+
+From `apps\api`:
+
+```bat
+pnpm run start:dev
+```
+
+The API runs at:
+
+```txt
+http://localhost:3000
+```
+
+Health checks:
+
+```txt
+http://localhost:3000/health
+http://localhost:3000/health/live
+http://localhost:3000/health/ready
+```
+
+### 5. Configure web environment
+
+Open a second `cmd.exe` window. From the project root:
+
+```bat
+cd C:\Users\mehdi\Desktop\Bookvella\apps\web
+copy .env.example .env.local
+```
+
+For normal local development:
+
+```txt
+NEXT_PUBLIC_API_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3001"
+```
+
+Google sign-in is optional locally. To enable it later, set the same Google client ID:
+
+```txt
+NEXT_PUBLIC_GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+```
+
+### 6. Install and run the web app
+
+From `apps\web`:
+
+```bat
+npm install
+npm run dev
+```
+
+The web app runs at:
+
+```txt
+http://localhost:3001
+```
+
+### 7. Demo login
+
+After seeding the API:
+
+```txt
+Email: demo@bookvella.local
+Password: bookvella-demo-123
+Public booking page: http://localhost:3001/marcus/fresh-cut
+```
+
+### 8. Useful local checks
+
+API:
+
+```bat
+cd C:\Users\mehdi\Desktop\Bookvella\apps\api
+pnpm run build
+pnpm run test
+```
+
+Web:
+
+```bat
+cd C:\Users\mehdi\Desktop\Bookvella\apps\web
+npm run build
+```
+
+### 9. Common local auth/database issue
+
+If login or registration fails with an error like this:
+
+```txt
+The column `users.google_sub` does not exist in the current database.
+```
+
+Your local database has not applied the latest migration. Stop the API dev server, then run:
+
+```bat
+cd C:\Users\mehdi\Desktop\Bookvella\apps\api
+npx prisma migrate dev
+npx prisma generate
+pnpm run start:dev
+```
+
+If `npx prisma generate` fails on Windows with an `EPERM` rename error, close any running API terminal or Node process and run it again. This usually means Windows is holding Prisma's query engine file open.
 
 ## 2. Full End-to-End Booking Flow
 
@@ -248,9 +410,9 @@ Required:
 
 - Replace starter READMEs
 - Add root README
-- Add setup instructions
+- Add setup instructions in this brief
 - Add environment variable list
-- Add local development instructions
+- Add local development instructions in this brief
 - Add architecture overview
 - Add screenshots
 - Add demo flow

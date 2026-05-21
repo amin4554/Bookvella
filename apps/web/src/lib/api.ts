@@ -9,6 +9,15 @@ export type PublicUser = {
   name: string;
   slug: string;
   timezone: string;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
+  headline: string | null;
+  businessCategory: string | null;
+  location: string | null;
+  about: string | null;
+  whatToExpect: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
 };
 
 export type AuthResponse = {
@@ -23,7 +32,10 @@ export type EventType = {
   userId: string;
   slug: string;
   title: string;
+  category: string | null;
   description: string | null;
+  whatIncluded: string | null;
+  locationDetails: string | null;
   durationMinutes: number;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
@@ -64,21 +76,60 @@ export type HostBooking = {
   };
 };
 
+export type PublicReview = {
+  id: string;
+  guestName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
+export type HostReview = PublicReview & {
+  bookingId: string;
+  hostUserId: string;
+  eventTypeId: string;
+  guestEmail: string;
+  isVisible: boolean;
+  updatedAt: string;
+  eventType: {
+    id: string;
+    title: string;
+    slug: string;
+  };
+};
+
 export type PublicEvent = {
   host: {
     name: string;
     slug: string;
     timezone: string;
+    profileImageUrl: string | null;
+    coverImageUrl: string | null;
+    headline: string | null;
+    businessCategory: string | null;
+    location: string | null;
+    about: string | null;
+    whatToExpect: string | null;
+    websiteUrl: string | null;
+    instagramUrl: string | null;
   };
   eventType: {
     id: string;
     slug: string;
     title: string;
+    category: string | null;
     description: string | null;
+    whatIncluded: string | null;
+    locationDetails: string | null;
     durationMinutes: number;
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     locationType: LocationType;
+  };
+  reviews: PublicReview[];
+  reviewSummary: {
+    averageRating: number | null;
+    reviewCount: number;
   };
 };
 
@@ -158,6 +209,10 @@ export function saveAuthSession(session: AuthResponse) {
   localStorage.setItem("bookvella.user", JSON.stringify(session.user));
 }
 
+export function updateStoredUser(user: PublicUser) {
+  localStorage.setItem("bookvella.user", JSON.stringify(user));
+}
+
 export function getAuthSession() {
   if (typeof window === "undefined") {
     return null;
@@ -187,6 +242,23 @@ export function clearAuthSession() {
   localStorage.removeItem("bookvella.accessToken");
   localStorage.removeItem("bookvella.refreshToken");
   localStorage.removeItem("bookvella.user");
+}
+
+export async function logoutAuthSession() {
+  const session = getAuthSession();
+
+  if (session?.refreshToken) {
+    try {
+      await apiRequest<{ success: boolean }>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: session.refreshToken }),
+      });
+    } catch {
+      // Local logout should still complete if the API session is already gone.
+    }
+  }
+
+  clearAuthSession();
 }
 
 export function publicBookingUrl(hostSlug: string, eventSlug: string) {

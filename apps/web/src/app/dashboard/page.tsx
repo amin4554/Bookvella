@@ -48,11 +48,21 @@ export default function DashboardPage() {
         ]);
 
         if (active) {
-          setData({ user, eventTypes, availability, bookings, loadedAt: Date.now() });
+          setData({
+            user,
+            eventTypes,
+            availability,
+            bookings,
+            loadedAt: Date.now(),
+          });
         }
       } catch (caught) {
         if (active) {
-          setError(caught instanceof Error ? caught.message : "Could not load dashboard");
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load dashboard",
+          );
         }
       }
     }
@@ -69,7 +79,11 @@ export default function DashboardPage() {
     return (data?.bookings ?? [])
       .filter((booking) => booking.status === "CONFIRMED")
       .filter((booking) => new Date(booking.startTimeUtc).getTime() >= now)
-      .sort((left, right) => new Date(left.startTimeUtc).getTime() - new Date(right.startTimeUtc).getTime());
+      .sort(
+        (left, right) =>
+          new Date(left.startTimeUtc).getTime() -
+          new Date(right.startTimeUtc).getTime(),
+      );
   }, [data]);
 
   if (error) {
@@ -83,13 +97,18 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <AppShell active="Dashboard" title="Dashboard">
-        <StateBlock title="Loading dashboard" text="Fetching your bookings, services, and availability." />
+        <StateBlock
+          title="Loading dashboard"
+          text="Fetching your bookings, services, and availability."
+        />
       </AppShell>
     );
   }
 
   const activeEvents = data.eventTypes.filter((event) => event.isActive);
-  const thisWeekCount = data.bookings.filter((booking) => isThisWeek(booking.startTimeUtc, data.loadedAt)).length;
+  const thisWeekCount = data.bookings.filter((booking) =>
+    isThisWeek(booking.startTimeUtc, data.loadedAt),
+  ).length;
   const firstPublicLink = activeEvents[0]
     ? publicBookingUrl(data.user.slug, activeEvents[0].slug)
     : null;
@@ -103,12 +122,12 @@ export default function DashboardPage() {
       <section>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-        <h2 className="text-[40px] font-bold leading-tight tracking-normal text-[#111827]">
-          Good morning, {data.user.name.split(" ")[0]}
-        </h2>
-        <p className="mt-1 text-lg text-[#6B7280]">
-          {formatLongDate(data.loadedAt)} - here is your day at a glance
-        </p>
+            <h2 className="text-[40px] font-bold leading-tight tracking-normal text-[#111827]">
+              Good morning, {data.user.name.split(" ")[0]}
+            </h2>
+            <p className="mt-1 text-lg text-[#6B7280]">
+              {formatLongDate(data.loadedAt)} - here is your day at a glance
+            </p>
           </div>
           <div className="flex gap-3">
             <Link
@@ -123,7 +142,7 @@ export default function DashboardPage() {
               className="inline-flex h-14 items-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-7 text-base font-bold text-white"
             >
               <Plus className="size-4" />
-              New event type
+              New service
             </Link>
           </div>
         </div>
@@ -131,14 +150,16 @@ export default function DashboardPage() {
 
       <section className="mt-10 rounded-[28px] bg-gradient-to-r from-[#FF6267] via-[#FF8A4C] to-[#A855F7] p-8 text-white lg:flex lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/80">Today</p>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/80">
+            Today
+          </p>
           <h3 className="mt-3 text-[34px] font-bold leading-tight">
             You have {upcoming.length} appointments coming up
           </h3>
           <p className="mt-2 text-lg text-white/90">
             {upcoming[0]
               ? `Your next one starts ${formatDateTime(upcoming[0].startTimeUtc, data.user.timezone)}.`
-              : "Create an event type and share your booking link to get started."}
+              : "Create a service and share your booking link to get started."}
           </p>
         </div>
         <div className="mt-8 grid grid-cols-3 gap-4 lg:mt-0">
@@ -149,16 +170,48 @@ export default function DashboardPage() {
       </section>
 
       <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Clock3} value={String(thisWeekCount)} label="Bookings this week" hint="Confirmed and cancelled" />
-        <Metric icon={Table2} value={String(upcoming.length)} label="Upcoming" hint={upcoming[0] ? formatDateTime(upcoming[0].startTimeUtc, data.user.timezone) : "No upcoming bookings"} tone="purple" />
-        <Metric icon={CalendarDays} value={String(activeEvents.length)} label="Active event types" hint={`${data.eventTypes.length} total`} tone="green" />
-        <Metric icon={Grid2X2} value={String(data.availability.length)} label="Availability rules" hint={data.availability.length ? "Weekly schedule set" : "Not configured"} tone="amber" />
+        <Metric
+          icon={Clock3}
+          value={String(thisWeekCount)}
+          label="Bookings this week"
+          hint="Confirmed and cancelled"
+        />
+        <Metric
+          icon={Table2}
+          value={String(upcoming.length)}
+          label="Upcoming"
+          hint={
+            upcoming[0]
+              ? formatDateTime(upcoming[0].startTimeUtc, data.user.timezone)
+              : "No upcoming bookings"
+          }
+          tone="purple"
+        />
+        <Metric
+          icon={CalendarDays}
+          value={String(activeEvents.length)}
+          label="Active services"
+          hint={`${data.eventTypes.length} total`}
+          tone="green"
+        />
+        <Metric
+          icon={Grid2X2}
+          value={String(data.availability.length)}
+          label="Schedule ranges"
+          hint={
+            data.availability.length ? "Booking schedule set" : "Not configured"
+          }
+          tone="amber"
+        />
       </section>
 
       <section className="mt-9">
         <div className="mb-0 flex items-center justify-between rounded-t-[24px] border border-[#EEE7DF] bg-white px-6 py-5">
           <h3 className="text-xl font-bold">Upcoming bookings</h3>
-          <Link href="/dashboard/bookings" className="text-sm font-bold text-[#FF5F63]">
+          <Link
+            href="/dashboard/bookings"
+            className="text-sm font-bold text-[#FF5F63]"
+          >
             View all
           </Link>
         </div>
@@ -198,13 +251,23 @@ export default function DashboardPage() {
       <section className="mt-9">
         <h3 className="mb-4 text-xl font-bold">Quick actions</h3>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <QuickAction href="/dashboard/event-types" icon={Plus} title="Create event type" text="Add a new bookable service" />
-          <QuickAction href="/dashboard/availability" icon={CalendarDays} title="Edit availability" text="Update your weekly hours" />
+          <QuickAction
+            href="/dashboard/event-types"
+            icon={Plus}
+            title="Create service"
+            text="Add a bookable offer"
+          />
+          <QuickAction
+            href="/dashboard/availability"
+            icon={CalendarDays}
+            title="Edit schedule"
+            text="Update your bookable hours"
+          />
           <button
             className="flex min-h-[76px] items-center gap-3 rounded-lg border border-[#EEE7DF] bg-white p-4 text-left shadow-sm transition hover:border-[#FF5F63]/40"
             onClick={() => {
               if (!firstPublicLink) {
-                toast.error("Create an active event type first");
+                toast.error("Create an active service first");
                 return;
               }
               navigator.clipboard.writeText(firstPublicLink);
@@ -212,9 +275,17 @@ export default function DashboardPage() {
             }}
           >
             <ActionIcon icon={Copy} />
-            <ActionCopy title="Copy booking link" text="Share your public link" />
+            <ActionCopy
+              title="Copy booking link"
+              text="Share your public link"
+            />
           </button>
-          <QuickAction href="/dashboard/bookings" icon={Clock3} title="View all bookings" text="See your full history" />
+          <QuickAction
+            href="/dashboard/bookings"
+            icon={Clock3}
+            title="View all bookings"
+            text="See your full history"
+          />
         </div>
       </section>
     </AppShell>
@@ -263,7 +334,9 @@ function Metric({
   return (
     <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm">
       <div className="flex h-full flex-col items-start gap-5">
-        <div className={`flex size-12 items-center justify-center rounded-2xl ${bg}`}>
+        <div
+          className={`flex size-12 items-center justify-center rounded-2xl ${bg}`}
+        >
           <Icon className="size-4" />
         </div>
         <div>

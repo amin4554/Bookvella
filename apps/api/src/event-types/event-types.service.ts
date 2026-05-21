@@ -40,7 +40,10 @@ export class EventTypesService {
           userId,
           slug,
           title,
+          category: optionalText(dto.category),
           description: optionalText(dto.description),
+          whatIncluded: optionalText(dto.whatIncluded),
+          locationDetails: optionalText(dto.locationDetails),
           durationMinutes: requirePositiveInteger(
             dto.durationMinutes,
             'durationMinutes',
@@ -86,6 +89,18 @@ export class EventTypesService {
 
     if (dto.description !== undefined) {
       data.description = optionalText(dto.description);
+    }
+
+    if (dto.category !== undefined) {
+      data.category = optionalText(dto.category);
+    }
+
+    if (dto.whatIncluded !== undefined) {
+      data.whatIncluded = optionalText(dto.whatIncluded);
+    }
+
+    if (dto.locationDetails !== undefined) {
+      data.locationDetails = optionalText(dto.locationDetails);
     }
 
     if (dto.durationMinutes !== undefined) {

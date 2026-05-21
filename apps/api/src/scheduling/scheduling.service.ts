@@ -34,6 +34,18 @@ export class SchedulingService {
       },
       include: {
         user: true,
+        reviews: {
+          where: { isVisible: true },
+          select: {
+            id: true,
+            guestName: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+        },
       },
     });
 
@@ -41,21 +53,55 @@ export class SchedulingService {
       throw new NotFoundException('Public event not found');
     }
 
+    const reviewCount = eventType.reviews.length;
+    const averageRating =
+      reviewCount > 0
+        ? Number(
+            (
+              eventType.reviews.reduce((sum, review) => sum + review.rating, 0) /
+              reviewCount
+            ).toFixed(1),
+          )
+        : null;
+
     return {
       host: {
         name: eventType.user.name,
         slug: eventType.user.slug,
         timezone: eventType.user.timezone,
+        profileImageUrl: eventType.user.profileImageUrl,
+        coverImageUrl: eventType.user.coverImageUrl,
+        headline: eventType.user.headline,
+        businessCategory: eventType.user.businessCategory,
+        location: eventType.user.location,
+        about: eventType.user.about,
+        whatToExpect: eventType.user.whatToExpect,
+        websiteUrl: eventType.user.websiteUrl,
+        instagramUrl: eventType.user.instagramUrl,
       },
       eventType: {
         id: eventType.id,
         slug: eventType.slug,
         title: eventType.title,
+        category: eventType.category,
         description: eventType.description,
+        whatIncluded: eventType.whatIncluded,
+        locationDetails: eventType.locationDetails,
         durationMinutes: eventType.durationMinutes,
         bufferBeforeMinutes: eventType.bufferBeforeMinutes,
         bufferAfterMinutes: eventType.bufferAfterMinutes,
         locationType: eventType.locationType,
+      },
+      reviews: eventType.reviews.map((review) => ({
+        id: review.id,
+        guestName: review.guestName,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+      })),
+      reviewSummary: {
+        averageRating,
+        reviewCount,
       },
     };
   }

@@ -18,4 +18,13 @@ export type PublicUser = {
   name: string;
   slug: string;
   timezone: string;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
+  headline: string | null;
+  businessCategory: string | null;
+  location: string | null;
+  about: string | null;
+  whatToExpect: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
 };

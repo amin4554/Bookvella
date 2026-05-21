@@ -8,6 +8,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { EventTypesModule } from './event-types/event-types.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     AvailabilityModule,
     SchedulingModule,
     BookingsModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

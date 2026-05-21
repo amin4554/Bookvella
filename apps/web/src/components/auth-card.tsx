@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Globe } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { apiRequest, AuthResponse, saveAuthSession } from "@/lib/api";
@@ -14,7 +15,9 @@ type AuthCardProps = {
 
 export function AuthCard({ mode, state = "default" }: AuthCardProps) {
   const router = useRouter();
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(
     state === "error" ? "Please check your details and try again." : null,
   );
@@ -27,6 +30,82 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
     : isRegister
       ? "Create my free Bookvella page"
       : "Sign in to Bookvella";
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) {
+      return;
+    }
+
+    const scriptId = "google-identity-services";
+
+    function renderGoogleButton() {
+      const google = window.google;
+      const clientId = googleClientId;
+
+      if (!google || !googleButtonRef.current || !clientId) {
+        return;
+      }
+
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async ({ credential }) => {
+          if (!credential) {
+            setError("Google sign-in did not return a credential");
+            return;
+          }
+
+          setGoogleLoading(true);
+          setError(null);
+
+          try {
+            const session = await apiRequest<AuthResponse>("/auth/google", {
+              method: "POST",
+              body: JSON.stringify({
+                credential,
+                timezone: guessTimezoneValue(),
+              }),
+            });
+            saveAuthSession(session);
+            router.push("/dashboard");
+          } catch (caught) {
+            setError(
+              caught instanceof Error
+                ? caught.message
+                : "Google sign-in failed",
+            );
+          } finally {
+            setGoogleLoading(false);
+          }
+        },
+      });
+      google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        type: "standard",
+        shape: "pill",
+        text: isRegister ? "signup_with" : "signin_with",
+        width: googleButtonRef.current.offsetWidth || 360,
+      });
+    }
+
+    const existing = document.getElementById(
+      scriptId,
+    ) as HTMLScriptElement | null;
+
+    if (existing) {
+      renderGoogleButton();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
+    document.head.appendChild(script);
+  }, [googleClientId, isRegister, router]);
 
   return (
     <main className="min-h-screen bg-white text-[#111827] lg:grid lg:grid-cols-[1fr_1fr]">
@@ -38,7 +117,9 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
         </div>
         <div className="relative z-10 my-auto max-w-[540px]">
           <h1 className="text-[52px] font-bold leading-[1.12] tracking-normal">
-            {isRegister ? "Get booked. For free. Forever." : "Your booking page, live in 5 minutes."}
+            {isRegister
+              ? "Get booked. For free. Forever."
+              : "Your booking page, live in 5 minutes."}
           </h1>
           <p className="mt-7 max-w-[440px] text-xl leading-8 text-white/90">
             {isRegister
@@ -74,7 +155,9 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
             {isRegister ? "Create your free page" : "Welcome back"}
           </h1>
           <p className="mt-2 text-base text-[#6B7280]">
-            {isRegister ? "Already have an account?" : "Sign in to your Bookvella account"}
+            {isRegister
+              ? "Already have an account?"
+              : "Sign in to your Bookvella account"}
             <Link
               href={isRegister ? "/login" : "/register"}
               className="ml-1 font-bold text-[#FF5F63] hover:underline"
@@ -89,9 +172,44 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
             </div>
           ) : null}
 
-          <form className="mt-7 space-y-5" onSubmit={handleSubmit}>
+          <div className="mt-7">
+            {googleClientId ? (
+              <div
+                ref={googleButtonRef}
+                className={
+                  googleLoading ? "pointer-events-none opacity-60" : ""
+                }
+              />
+            ) : (
+              <button
+                type="button"
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#E8DED7] bg-white text-sm font-bold text-[#111827] shadow-sm"
+                onClick={() =>
+                  setError(
+                    "Add NEXT_PUBLIC_GOOGLE_CLIENT_ID in the web app and GOOGLE_CLIENT_ID in the API to enable Google sign-in.",
+                  )
+                }
+              >
+                <Globe className="size-4 text-[#FF5F63]" />
+                Continue with Google
+              </button>
+            )}
+          </div>
+
+          <div className="mt-6 flex items-center gap-4 text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">
+            <span className="h-px flex-1 bg-[#EEE7DF]" />
+            Or
+            <span className="h-px flex-1 bg-[#EEE7DF]" />
+          </div>
+
+          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
             {isRegister ? (
-              <Field label="Full name" name="name" placeholder="Marcus Williams" invalid={Boolean(error)} />
+              <Field
+                label="Full name"
+                name="name"
+                placeholder="Marcus Williams"
+                invalid={Boolean(error)}
+              />
             ) : null}
             <Field
               label="Email address"
@@ -100,15 +218,28 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
               invalid={Boolean(error)}
               type="email"
             />
-            <Field label="Password" name="password" placeholder="Enter your password" type="password" />
+            <Field
+              label="Password"
+              name="password"
+              placeholder="Enter your password"
+              type="password"
+            />
             {isRegister ? (
               <>
                 <div>
-                  <Field label="Your booking link" name="slug" placeholder="marcus-williams" />
-                  <p className="mt-1 text-xs text-[#6B7280]">bookvella.com/your-link</p>
+                  <Field
+                    label="Your booking link"
+                    name="slug"
+                    placeholder="marcus-williams"
+                  />
+                  <p className="mt-1 text-xs text-[#6B7280]">
+                    bookvella.com/your-link
+                  </p>
                 </div>
                 <label className="block">
-                  <span className="text-sm font-bold uppercase tracking-wide text-[#111827]">Timezone</span>
+                  <span className="text-sm font-bold uppercase tracking-wide text-[#111827]">
+                    Timezone
+                  </span>
                   <select
                     name="timezone"
                     defaultValue={guessTimezone()}
@@ -131,8 +262,18 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
           </form>
 
           <div className="mt-10 flex flex-wrap gap-3 text-sm text-[#6B7280]">
-            {["Barbers", "Comedians", "Trainers", "Tutors", "Nail artists", "Musicians"].map((item) => (
-              <span key={item} className="rounded-full border border-[#E8DED7] bg-[#FFFBF7] px-4 py-2 font-semibold">
+            {[
+              "Barbers",
+              "Comedians",
+              "Trainers",
+              "Tutors",
+              "Nail artists",
+              "Musicians",
+            ].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-[#E8DED7] bg-[#FFFBF7] px-4 py-2 font-semibold"
+              >
                 {item}
               </span>
             ))}
@@ -174,7 +315,9 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
       saveAuthSession(session);
       router.push("/dashboard");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
+      setError(
+        caught instanceof Error ? caught.message : "Something went wrong",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +339,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold uppercase tracking-wide text-[#111827]">{label}</span>
+      <span className="text-sm font-bold uppercase tracking-wide text-[#111827]">
+        {label}
+      </span>
       <input
         name={name}
         type={type}
@@ -240,4 +385,38 @@ function guessTimezone() {
     return "America / New_York (UTC-5)";
   }
   return "UTC";
+}
+
+function guessTimezoneValue() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+          }) => void;
+          renderButton: (
+            element: HTMLElement,
+            options: {
+              theme: string;
+              size: string;
+              type: string;
+              shape: string;
+              text: string;
+              width: number;
+            },
+          ) => void;
+        };
+      };
+    };
+  }
 }

@@ -10,6 +10,7 @@ import { assertTimeZone } from '../common/time-zone';
 import { optionalText, requireText } from '../common/validation';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { createReviewToken } from '../reviews/reviews.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import type {
   CancelBookingDto,
@@ -140,6 +141,16 @@ export class BookingsService {
         '',
         `This code expires in ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
       ].join('\n'),
+      html: brandedEmailHtml({
+        title: 'Confirm your booking',
+        intro: `Use this code to continue booking ${eventType.title}.`,
+        code,
+        rows: [
+          ['Service', eventType.title],
+          ['Host', eventType.user.name],
+          ['Expires', `${VERIFICATION_CODE_TTL_MINUTES} minutes`],
+        ],
+      }),
     });
 
     return {
@@ -222,12 +233,16 @@ export class BookingsService {
       hostEmail: eventType.user.email,
       hostName: eventType.user.name,
       eventTitle: eventType.title,
+      eventSlug,
+      hostSlug,
       guestName,
       guestEmail,
+      bookingId: booking.id,
       startTimeUtc,
       endTimeUtc,
       guestTimezone,
       hostTimezone: eventType.user.timezone,
+      location: eventType.locationDetails ?? formatLocation(eventType.locationType),
     });
 
     return booking;
@@ -327,28 +342,41 @@ export class BookingsService {
     hostEmail: string;
     hostName: string;
     eventTitle: string;
+    eventSlug: string;
+    hostSlug: string;
     guestName: string;
     guestEmail: string;
+    bookingId: string;
     startTimeUtc: Date;
     endTimeUtc: Date;
     guestTimezone: string;
     hostTimezone: string;
+    location: string;
   }) {
     const guestWhen = formatForEmail(input.startTimeUtc, input.guestTimezone);
     const hostWhen = formatForEmail(input.startTimeUtc, input.hostTimezone);
+    const reviewUrl = buildReviewUrl({
+      hostSlug: input.hostSlug,
+      eventSlug: input.eventSlug,
+      bookingId: input.bookingId,
+    });
     const guestText = [
-      `Your booking is confirmed.`,
+      'Your booking is confirmed.',
       '',
-      `Event: ${input.eventTitle}`,
+      `Service: ${input.eventTitle}`,
       `Host: ${input.hostName}`,
       `Time: ${guestWhen}`,
+      `Location: ${input.location}`,
+      '',
+      `After your visit, you can leave a review here: ${reviewUrl}`,
     ].join('\n');
     const hostText = [
-      `New booking confirmed.`,
+      'New booking confirmed.',
       '',
-      `Event: ${input.eventTitle}`,
+      `Service: ${input.eventTitle}`,
       `Guest: ${input.guestName} <${input.guestEmail}>`,
       `Time: ${hostWhen}`,
+      `Location: ${input.location}`,
     ].join('\n');
 
     await Promise.all([
@@ -356,11 +384,30 @@ export class BookingsService {
         to: input.guestEmail,
         subject: `Confirmed: ${input.eventTitle}`,
         text: guestText,
+        html: brandedEmailHtml({
+          title: 'Your booking is confirmed',
+          intro: `You're booked with ${input.hostName}.`,
+          rows: [
+            ['Service', input.eventTitle],
+            ['Time', guestWhen],
+            ['Location', input.location],
+          ],
+          cta: { label: 'Leave a review after your visit', url: reviewUrl },
+        }),
       }),
       this.emailService.sendMail({
         to: input.hostEmail,
         subject: `New booking: ${input.eventTitle}`,
         text: hostText,
+        html: brandedEmailHtml({
+          title: 'New booking confirmed',
+          intro: `${input.guestName} booked ${input.eventTitle}.`,
+          rows: [
+            ['Guest', `${input.guestName} <${input.guestEmail}>`],
+            ['Time', hostWhen],
+            ['Location', input.location],
+          ],
+        }),
       }),
     ]);
   }
@@ -403,11 +450,33 @@ export class BookingsService {
         to: input.guestEmail,
         subject: `Cancelled: ${input.eventTitle}`,
         text: guestText,
+        html: brandedEmailHtml({
+          title: 'Your booking was cancelled',
+          intro: `${input.eventTitle} with ${input.hostName} was cancelled.`,
+          rows: [
+            ['Time', guestWhen],
+            ...(input.cancellationReason
+              ? ([['Reason', input.cancellationReason]] as [string, string][])
+              : []),
+          ],
+        }),
       }),
       this.emailService.sendMail({
         to: input.hostEmail,
         subject: `Cancelled booking: ${input.eventTitle}`,
         text: hostText,
+        html: brandedEmailHtml({
+          title: 'Booking cancelled',
+          intro: `${input.guestName}'s booking was cancelled.`,
+          rows: [
+            ['Service', input.eventTitle],
+            ['Guest', `${input.guestName} <${input.guestEmail}>`],
+            ['Time', hostWhen],
+            ...(input.cancellationReason
+              ? ([['Reason', input.cancellationReason]] as [string, string][])
+              : []),
+          ],
+        }),
       }),
     ]);
   }
@@ -508,6 +577,77 @@ function formatForEmail(date: Date, timeZone: string) {
     timeStyle: 'short',
     timeZone,
   }).format(date);
+}
+
+function formatLocation(locationType: string) {
+  if (locationType === 'PHONE') {
+    return 'Phone call';
+  }
+
+  if (locationType === 'IN_PERSON') {
+    return 'In person';
+  }
+
+  return 'Video call';
+}
+
+function buildReviewUrl(input: {
+  hostSlug: string;
+  eventSlug: string;
+  bookingId: string;
+}) {
+  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+  const url = new URL(
+    `/${input.hostSlug}/${input.eventSlug}`,
+    appUrl.endsWith('/') ? appUrl : `${appUrl}/`,
+  );
+
+  url.searchParams.set('reviewBooking', input.bookingId);
+  url.searchParams.set('reviewToken', createReviewToken(input.bookingId));
+  return url.toString();
+}
+
+function brandedEmailHtml(input: {
+  title: string;
+  intro: string;
+  rows?: [string, string][];
+  code?: string;
+  cta?: { label: string; url: string };
+}) {
+  const rows = input.rows ?? [];
+
+  return [
+    '<!doctype html>',
+    '<html><body style="margin:0;background:#fffbf7;font-family:Arial,Helvetica,sans-serif;color:#111827;">',
+    '<div style="max-width:620px;margin:0 auto;padding:32px 20px;">',
+    '<div style="font-size:22px;font-weight:800;margin-bottom:20px;">Bookvella</div>',
+    '<div style="background:#ffffff;border:1px solid #eee7df;border-radius:20px;padding:28px;">',
+    `<h1 style="margin:0 0 10px;font-size:28px;line-height:1.2;">${escapeHtml(input.title)}</h1>`,
+    `<p style="margin:0 0 22px;color:#6b7280;line-height:1.6;">${escapeHtml(input.intro)}</p>`,
+    input.code
+      ? `<div style="letter-spacing:8px;font-size:34px;font-weight:800;background:#fff0ef;color:#ff5f63;border-radius:16px;padding:18px;text-align:center;margin-bottom:22px;">${escapeHtml(input.code)}</div>`
+      : '',
+    ...rows.map(
+      ([label, value]) =>
+        `<div style="border-top:1px solid #eee7df;padding:12px 0;"><strong>${escapeHtml(label)}:</strong> <span style="color:#6b7280;">${escapeHtml(value)}</span></div>`,
+    ),
+    input.cta
+      ? `<a href="${escapeHtml(input.cta.url)}" style="display:block;margin-top:22px;background:#ff6267;color:#ffffff;text-align:center;text-decoration:none;border-radius:14px;padding:14px 18px;font-weight:800;">${escapeHtml(input.cta.label)}</a>`
+      : '',
+    '</div>',
+    '<p style="color:#9ca3af;font-size:12px;margin-top:18px;">You received this email because a Bookvella booking used this address.</p>',
+    '</div>',
+    '</body></html>',
+  ].join('');
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function parseIsoDate(value: string | undefined, field: string) {

@@ -2,24 +2,27 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   CalendarClock,
   CircleDot,
   Clock3,
+  Home,
   Grid2X2,
   LogOut,
   Settings,
   Table2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { clearAuthSession, getAuthSession } from "@/lib/api";
+import { getAuthSession, logoutAuthSession } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: Grid2X2 },
+  { label: "Dashboard", href: "/dashboard", icon: Home },
   { label: "Bookings", href: "/dashboard/bookings", icon: Clock3 },
-  { label: "Event Types", href: "/dashboard/event-types", icon: Table2 },
-  { label: "Availability", href: "/dashboard/availability", icon: CircleDot },
+  { label: "Services", href: "/dashboard/event-types", icon: Table2 },
+  { label: "Schedule", href: "/dashboard/availability", icon: CircleDot },
+  { label: "Profile", href: "/dashboard/settings", icon: Grid2X2 },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -35,14 +38,36 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [session, setSession] = useState<ReturnType<typeof getAuthSession>>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  function logout() {
-    clearAuthSession();
+  useEffect(() => {
+    const current = getAuthSession();
+    setSession(current);
+    setCheckingSession(false);
+
+    if (!current) {
+      router.replace("/login");
+    }
+  }, [router]);
+
+  if (checkingSession || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFFBF7] px-6 text-center text-[#6B7280]">
+        <div className="rounded-2xl border border-[#EEE7DF] bg-white px-6 py-5 shadow-sm">
+          Checking your session...
+        </div>
+      </div>
+    );
+  }
+
+  async function logout() {
+    await logoutAuthSession();
     router.push("/login");
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] text-[#111827] lg:grid lg:grid-cols-[300px_1fr]">
+    <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#111827] lg:grid lg:grid-cols-[300px_1fr] lg:pb-0">
       <aside className="hidden min-h-screen flex-col border-r border-[#EEE7DF] bg-white px-4 py-7 text-[#6B7280] lg:flex">
         <div className="px-3">
           <BrandLogo />
@@ -65,11 +90,6 @@ export function AppShell({
               >
                 <Icon className="size-4" />
                 {item.label}
-                {item.label === "Bookings" ? (
-                  <span className="ml-auto rounded-full bg-[#FF666A] px-2.5 py-0.5 text-xs font-bold text-white">
-                    5
-                  </span>
-                ) : null}
               </Link>
             );
           })}
@@ -89,10 +109,10 @@ export function AppShell({
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-[#111827]">
-              {getAuthSession()?.user.name ?? "Bookvella host"}
+              {session?.user.name ?? "Bookvella host"}
             </p>
             <p className="truncate text-xs text-[#6B7280]">
-              bookvella.com/{getAuthSession()?.user.slug ?? "your-link"}
+              bookvella.com/{session?.user.slug ?? "your-link"}
             </p>
           </div>
         </div>
@@ -108,7 +128,7 @@ export function AppShell({
             {userInitial}
           </div>
         </header>
-        <nav className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b border-[#EEE7DF] bg-white px-5 py-2 lg:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[#EEE7DF] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
           {navItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             const selected = item.label === active;
@@ -118,13 +138,11 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm",
-                  selected
-                    ? "bg-[#FFF0EF] font-semibold text-[#FF5F63]"
-                    : "text-[#6B7280]",
+                  "flex h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold",
+                  selected ? "bg-[#FFF0EF] text-[#FF5F63]" : "text-[#9CA3AF]",
                 )}
               >
-                <Icon className="size-3.5" />
+                <Icon className="size-4" />
                 {item.label}
               </Link>
             );

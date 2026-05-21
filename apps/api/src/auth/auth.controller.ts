@@ -1,8 +1,23 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
-import type { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
+import type {
+  GoogleAuthDto,
+  LoginDto,
+  LogoutDto,
+  RefreshTokenDto,
+  RegisterDto,
+  UpdateMeDto,
+} from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -16,6 +31,11 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('google')
+  google(@Body() dto: GoogleAuthDto) {
+    return this.authService.google(dto);
   }
 
   @Post('refresh')
@@ -32,6 +52,12 @@ export class AuthController {
   @UseGuards(AuthGuard)
   me(@Req() request: AuthenticatedRequest) {
     return this.authService.me(request.user!);
+  }
+
+  @Patch('me')
+  @UseGuards(AuthGuard)
+  updateMe(@Req() request: AuthenticatedRequest, @Body() dto: UpdateMeDto) {
+    return this.authService.updateMe(request.user!, dto);
   }
 
   @Get('jwks')

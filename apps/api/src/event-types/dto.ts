@@ -3,7 +3,10 @@ import type { LocationType } from '@prisma/client';
 export type CreateEventTypeDto = {
   slug?: string;
   title?: string;
+  category?: string | null;
   description?: string | null;
+  whatIncluded?: string | null;
+  locationDetails?: string | null;
   durationMinutes?: number;
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
@@ -13,7 +16,10 @@ export type CreateEventTypeDto = {
 export type UpdateEventTypeDto = {
   slug?: string;
   title?: string;
+  category?: string | null;
   description?: string | null;
+  whatIncluded?: string | null;
+  locationDetails?: string | null;
   durationMinutes?: number;
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;

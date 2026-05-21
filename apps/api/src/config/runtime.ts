@@ -24,10 +24,16 @@ export function getCorsOrigins() {
     return [DEFAULT_DEV_ORIGIN];
   }
 
-  return configured
+  const origins = configured
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  if (isProduction() && origins.some((origin) => origin === '*')) {
+    throw new Error('Production CORS origins cannot include wildcard *');
+  }
+
+  return origins;
 }
 
 export function assertRuntimeConfig() {
@@ -122,6 +128,13 @@ function requiredVariables() {
     'JWT_PRIVATE_KEY',
     'JWT_PUBLIC_KEY',
     'EMAIL_CODE_SECRET',
+    'REVIEW_TOKEN_SECRET',
+    'APP_URL',
+    'GOOGLE_CLIENT_ID',
+    'SMTP_HOST',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'SMTP_FROM',
   ];
 }
 
