@@ -18,19 +18,8 @@ COPY apps/api/src ./src
 RUN pnpm prisma generate
 RUN pnpm run build
 RUN node_modules/.bin/jest --runInBand
-# Dereference pnpm symlinks into real files before prod prune removes them.
-# COPY --from across stages preserves symlinks as-is; cp -rL resolves them so the
-# runner gets actual files, not dangling pointers into the missing pnpm virtual store.
-# @prisma/engines is NOT a top-level node_modules entry — pnpm only exposes it inside
-# the prisma package's own virtual-store context (.pnpm/prisma@.../node_modules/).
-# We use require.resolve from the real prisma path to locate it reliably.
-RUN cp -rL node_modules/prisma /tmp/prisma-pkg && \
-    ENGINES_DIR=$(node -e " \
-      const fs=require('fs'),path=require('path'); \
-      const prismaReal=fs.realpathSync('node_modules/prisma'); \
-      const engPkg=require.resolve('@prisma/engines/package.json',{paths:[prismaReal]}); \
-      process.stdout.write(path.dirname(engPkg))") && \
-    cp -rL "$ENGINES_DIR" /tmp/prisma-engines-pkg
+# prisma is in dependencies so pnpm prune --prod keeps it and its full dep tree
+# (@prisma/engines, @prisma/debug, etc.) — no manual rescue needed.
 RUN pnpm prune --prod
 
 FROM base AS runner
@@ -39,19 +28,5 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
-COPY --from=build /tmp/prisma-pkg ./node_modules/prisma
-COPY --from=build /tmp/prisma-engines-pkg ./node_modules/@prisma/engines
-# Create a shell wrapper for the prisma CLI.
-# We read the bin path from the package's own package.json so this stays correct
-# across prisma version bumps (v6 uses build/index.js, not bin/prisma.js).
-# A wrapper script is more reliable than a symlink because it never depends on
-# the execute bit or shebang interpreter of the target file.
-RUN PRISMA_BIN=$(node -e \
-      "const {bin}=require('./node_modules/prisma/package.json'); \
-       console.log(Object.values(bin)[0])") && \
-    mkdir -p node_modules/.bin && \
-    printf '#!/bin/sh\nexec node /app/node_modules/prisma/%s "$@"\n' \
-      "$PRISMA_BIN" > node_modules/.bin/prisma && \
-    chmod +x node_modules/.bin/prisma
 EXPOSE 3000
 CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
