@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   Check,
   Clock3,
+  Download,
   Mail,
   MapPin,
   ShieldCheck,
@@ -50,10 +51,9 @@ export function PublicBooking({
       : "slots",
   );
   const [publicEvent, setPublicEvent] = useState<PublicEvent | null>(null);
-  const [slots, setSlots] = useState<AvailableSlot[]>([]);
-  const [selectedDate, setSelectedDate] = useState(() =>
-    toDateInput(new Date()),
-  );
+  const [slotsByDate, setSlotsByDate] = useState<Map<string, AvailableSlot[]>>(new Map());
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
   const [guestTimezone, setGuestTimezone] = useState(() => guessTimezone());
   const [guest, setGuest] = useState<GuestDetails>({
@@ -93,26 +93,38 @@ export function PublicBooking({
     loadEvent();
   }, [hostSlug, eventSlug]);
 
+  // Fetch slots for the next 21 days whenever event or timezone changes
   useEffect(() => {
+    if (!publicEvent) return;
+
     async function loadSlots() {
       setLoadingSlots(true);
       try {
         const now = new Date();
-        const dayStart = new Date(`${selectedDate}T00:00:00`);
-        const start = (
-          toDateInput(now) === selectedDate && now > dayStart ? now : dayStart
-        ).toISOString();
-        const endDate = new Date(`${selectedDate}T00:00:00`);
-        endDate.setDate(endDate.getDate() + 1);
+        const end = new Date(now);
+        end.setDate(end.getDate() + 21);
         const query = new URLSearchParams({
-          start,
-          end: endDate.toISOString(),
+          start: now.toISOString(),
+          end: end.toISOString(),
           timezone: guestTimezone,
         });
         const available = await apiRequest<AvailableSlot[]>(
           `/public/${hostSlug}/${eventSlug}/slots?${query}`,
         );
-        setSlots(available.filter((slot) => new Date(slot.startTimeUtc) > now));
+        const future = available.filter((s) => new Date(s.startTimeUtc) > now);
+
+        // Group by guest-timezone date
+        const byDate = new Map<string, AvailableSlot[]>();
+        for (const slot of future) {
+          const dateKey = slotGuestDate(slot.startTimeUtc, guestTimezone);
+          if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+          byDate.get(dateKey)!.push(slot);
+        }
+
+        const dates = Array.from(byDate.keys()).sort();
+        setSlotsByDate(byDate);
+        setAvailableDates(dates);
+        setSelectedDate((prev) => (dates.includes(prev) ? prev : dates[0] ?? ""));
       } catch (caught) {
         setError(
           caught instanceof Error
@@ -124,10 +136,8 @@ export function PublicBooking({
       }
     }
 
-    if (publicEvent) {
-      loadSlots();
-    }
-  }, [publicEvent, hostSlug, eventSlug, selectedDate, guestTimezone]);
+    loadSlots();
+  }, [publicEvent, hostSlug, eventSlug, guestTimezone]);
 
   const selectedTime = useMemo(() => {
     if (!selectedSlot) return null;
@@ -427,12 +437,16 @@ export function PublicBooking({
         ) : null}
         {step === "slots" ? (
           <SlotsStep
-            date={selectedDate}
+            selectedDate={selectedDate}
+            availableDates={availableDates}
+            slotsByDate={slotsByDate}
             timezone={guestTimezone}
-            slots={slots}
             loading={loadingSlots}
             onDateChange={setSelectedDate}
-            onTimezoneChange={setGuestTimezone}
+            onTimezoneChange={(tz) => {
+              setGuestTimezone(tz);
+              setSelectedSlot(null);
+            }}
             onSelect={(slot) => {
               setSelectedSlot(slot);
               setStep("details");
@@ -494,95 +508,116 @@ export function PublicBooking({
 }
 
 function SlotsStep({
-  date,
+  selectedDate,
+  availableDates,
+  slotsByDate,
   timezone,
-  slots,
   loading,
   onDateChange,
   onTimezoneChange,
   onSelect,
 }: {
-  date: string;
+  selectedDate: string;
+  availableDates: string[];
+  slotsByDate: Map<string, AvailableSlot[]>;
   timezone: string;
-  slots: AvailableSlot[];
   loading: boolean;
   onDateChange: (date: string) => void;
   onTimezoneChange: (timezone: string) => void;
   onSelect: (slot: AvailableSlot) => void;
 }) {
-  const dates = Array.from({ length: 14 }, (_, index) => {
-    const value = new Date();
-    value.setDate(value.getDate() + index);
-    return toDateInput(value);
-  });
+  const slots = slotsByDate.get(selectedDate) ?? [];
 
   return (
     <div className="mt-12">
       <h2 className="text-[34px] font-bold leading-tight">Pick a time</h2>
-      <p className="mt-2 text-base text-[#6B7280]">
-        All times shown in {timezone}
-      </p>
+      <p className="mt-2 text-base text-[#6B7280]">All times shown in your timezone</p>
       <select
         value={timezone}
         onChange={(event) => onTimezoneChange(event.target.value)}
         className="mt-4 h-10 w-full max-w-[280px] rounded-lg border border-[#D1D5DB] bg-[#FFFBF7] px-3 text-sm text-[#6B7280]"
       >
-        {[timezone, "Europe/Berlin", "America/New_York", "UTC"]
+        {[timezone, "Europe/Berlin", "Europe/London", "America/New_York", "UTC"]
           .filter(unique)
           .map((value) => (
             <option key={value}>{value}</option>
           ))}
       </select>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[340px_1fr]">
-        <div className="rounded-[22px] border border-[#EEE7DF] bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {dates.map((value) => (
-              <button
-                key={value}
-                className={cn(
-                  "h-14 rounded-xl border text-sm font-bold",
-                  value === date
-                    ? "border-[#FF5F63] bg-[#FF5F63] text-white"
-                    : "border-[#D1D5DB] bg-white hover:border-[#FF5F63]",
-                )}
-                onClick={() => onDateChange(value)}
-              >
-                {formatShortDate(value)}
-              </button>
-            ))}
-          </div>
+
+      {loading ? (
+        <div className="mt-10 flex items-center gap-3 text-sm text-[#6B7280]">
+          <span className="inline-block size-4 animate-spin rounded-full border-2 border-[#FF6267] border-t-transparent" />
+          Checking availability...
         </div>
-        <div>
-          <h3 className="font-semibold">{formatFullDate(date)}</h3>
-          <p className="mt-1 text-sm text-[#6B7280]">
-            {loading
-              ? "Checking availability..."
-              : `${slots.length} slots available`}
+      ) : availableDates.length === 0 ? (
+        <div className="mt-10 max-w-[480px] rounded-[22px] border border-[#EEE7DF] bg-[#FFFBF7] p-8 text-center">
+          <p className="font-semibold text-[#111827]">No availability in the next 3 weeks</p>
+          <p className="mt-2 text-sm text-[#6B7280]">
+            The host hasn&apos;t set open slots yet. Try checking back soon.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {slots.map((slot) => (
-              <button
-                key={slot.startTimeUtc}
-                onClick={() => onSelect(slot)}
-                className="h-11 rounded-xl border border-[#D1D5DB] bg-white text-sm font-bold transition hover:border-[#FF5F63] hover:bg-[#FFF0EF]"
-              >
-                {formatTime(slot.startTimeUtc, timezone)}
-              </button>
-            ))}
-          </div>
-          {!loading && slots.length === 0 ? (
-            <div className="mt-5 flex min-h-[102px] max-w-[480px] flex-col items-center justify-center rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] text-center">
-              <p className="text-sm font-medium text-[#6B7280]">
-                No times available
-              </p>
-              <p className="mt-1 text-sm text-[#B8C0CC]">
-                Try another date above or check back after the host updates
-                their schedule.
-              </p>
-            </div>
-          ) : null}
         </div>
-      </div>
+      ) : (
+        <div className="mt-6 grid gap-6 xl:grid-cols-[320px_1fr]">
+          {/* Date list — only available dates */}
+          <div className="rounded-[22px] border border-[#EEE7DF] bg-white p-4 shadow-sm">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">
+              Available dates
+            </p>
+            <div className="space-y-1.5">
+              {availableDates.map((date) => {
+                const count = slotsByDate.get(date)?.length ?? 0;
+                return (
+                  <button
+                    key={date}
+                    onClick={() => onDateChange(date)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-sm transition",
+                      date === selectedDate
+                        ? "bg-[#FF5F63] font-bold text-white"
+                        : "hover:bg-[#FFF0EF] text-[#111827]",
+                    )}
+                  >
+                    <span>{formatFullDate(date)}</span>
+                    <span
+                      className={cn(
+                        "text-xs font-semibold",
+                        date === selectedDate ? "text-white/80" : "text-[#9CA3AF]",
+                      )}
+                    >
+                      {count} {count === 1 ? "slot" : "slots"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time slots for selected date */}
+          <div>
+            {selectedDate ? (
+              <>
+                <h3 className="font-semibold text-[#111827]">
+                  {formatFullDate(selectedDate)}
+                </h3>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  {slots.length} {slots.length === 1 ? "slot" : "slots"} available
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {slots.map((slot) => (
+                    <button
+                      key={slot.startTimeUtc}
+                      onClick={() => onSelect(slot)}
+                      className="h-12 rounded-xl border border-[#D1D5DB] bg-white text-sm font-bold transition hover:border-[#FF5F63] hover:bg-[#FFF0EF]"
+                    >
+                      {formatTime(slot.startTimeUtc, timezone)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -789,15 +824,32 @@ function SuccessStep({
         <Detail label="Time" value={selectedTime.range} />
         <Detail label="Location" value={location} />
       </div>
-      <a
-        href={calendarUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-5 text-sm font-bold text-[#111827] shadow-sm"
-      >
-        <CalendarPlus className="size-4 text-[#FF6267]" />
-        Add to calendar
-      </a>
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <a
+          href={calendarUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-5 text-sm font-bold text-[#111827] shadow-sm"
+        >
+          <CalendarPlus className="size-4 text-[#FF6267]" />
+          Add to Google Calendar
+        </a>
+        <button
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-5 text-sm font-bold text-[#111827] shadow-sm"
+          onClick={() =>
+            downloadIcs({
+              title: eventTitle,
+              hostName,
+              location,
+              startTimeUtc,
+              endTimeUtc,
+            })
+          }
+        >
+          <Download className="size-4 text-[#6B7280]" />
+          Download .ics
+        </button>
+      </div>
       <button
         className="mt-4 text-sm font-medium text-[#FF5F63]"
         onClick={onRestart}
@@ -1109,6 +1161,15 @@ function toDateInput(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function slotGuestDate(utcIso: string, guestTimezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: guestTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(utcIso));
+}
+
 function guessTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -1151,4 +1212,41 @@ function googleCalendarUrl(input: {
 
 function formatCalendarTimestamp(value: string) {
   return new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function downloadIcs(input: {
+  title: string;
+  hostName: string;
+  location: string;
+  startTimeUtc: string;
+  endTimeUtc: string;
+}) {
+  const stamp = formatCalendarTimestamp(new Date().toISOString());
+  const uid = `${Date.now()}-bookvella`;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Bookvella//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${formatCalendarTimestamp(input.startTimeUtc)}`,
+    `DTEND:${formatCalendarTimestamp(input.endTimeUtc)}`,
+    `SUMMARY:${input.title} with ${input.hostName}`,
+    "DESCRIPTION:Booked with Bookvella.",
+    `LOCATION:${input.location}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "booking.ics";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

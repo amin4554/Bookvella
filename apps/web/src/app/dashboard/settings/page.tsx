@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Copy, Upload } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Copy, Upload, ZoomIn, ZoomOut } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -185,6 +185,7 @@ export default function SettingsPage() {
                   />
                   <ImageUploadField
                     label="Profile picture"
+                    shape="circle"
                     value={profileImageUrl}
                     uploading={uploadingProfile}
                     onClear={() => setProfileImageUrl("")}
@@ -608,68 +609,301 @@ function TextArea({
   );
 }
 
+function CropModal({
+  src,
+  shape,
+  onConfirm,
+  onCancel,
+}: {
+  src: string;
+  shape: "circle" | "rect";
+  onConfirm: (file: File) => void;
+  onCancel: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const draggingRef = useRef(false);
+  const dragStartRef = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
+  const [cropSize, setCropSize] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  const cropW = cropSize;
+  const cropH = shape === "circle" ? cropSize : Math.round(cropSize / 2);
+  const maxSlider = shape === "circle" ? 300 : 480;
+
+  function initCrop() {
+    const el = containerRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const base = Math.min(width, height) * (shape === "circle" ? 0.65 : 0.82);
+    const initial = Math.min(Math.round(base), maxSlider);
+    setCropSize(initial);
+    setCropPos({ x: Math.round(width / 2), y: Math.round(height / 2) });
+    setReady(true);
+  }
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!draggingRef.current || !containerRef.current) return;
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      const hw = cropW / 2;
+      const hh = cropH / 2;
+      const dx = e.clientX - dragStartRef.current.mx;
+      const dy = e.clientY - dragStartRef.current.my;
+      setCropPos({
+        x: Math.max(hw, Math.min(width - hw, dragStartRef.current.px + dx)),
+        y: Math.max(hh, Math.min(height - hh, dragStartRef.current.py + dy)),
+      });
+    }
+    function onUp() {
+      draggingRef.current = false;
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [cropW, cropH]);
+
+  function handleCrop() {
+    const img = imgRef.current;
+    const container = containerRef.current;
+    if (!img || !container) return;
+
+    const cRect = container.getBoundingClientRect();
+    const iRect = img.getBoundingClientRect();
+    const imgLeft = iRect.left - cRect.left;
+    const imgTop = iRect.top - cRect.top;
+    const scaleX = img.naturalWidth / iRect.width;
+    const scaleY = img.naturalHeight / iRect.height;
+
+    const srcX = Math.max(0, (cropPos.x - cropW / 2 - imgLeft) * scaleX);
+    const srcY = Math.max(0, (cropPos.y - cropH / 2 - imgTop) * scaleY);
+    const srcW = Math.min(img.naturalWidth - srcX, cropW * scaleX);
+    const srcH = Math.min(img.naturalHeight - srcY, cropH * scaleY);
+
+    const outW = shape === "circle" ? 400 : 800;
+    const outH = shape === "circle" ? 400 : 400;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        onConfirm(new File([blob], "crop.jpg", { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      0.92,
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4">
+      <div className="mb-5 flex w-full max-w-[580px] items-center justify-between">
+        <h3 className="text-lg font-bold text-white">
+          {shape === "circle" ? "Crop profile photo" : "Crop cover image"}
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-sm font-bold text-white/60 hover:text-white"
+        >
+          Cancel
+        </button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-[560px] overflow-hidden rounded-2xl bg-black"
+        style={{ aspectRatio: "4/3" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={src}
+          alt=""
+          draggable={false}
+          onLoad={initCrop}
+          className="h-full w-full object-contain"
+        />
+        {ready && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              draggingRef.current = true;
+              dragStartRef.current = {
+                mx: e.clientX,
+                my: e.clientY,
+                px: cropPos.x,
+                py: cropPos.y,
+              };
+            }}
+            className="absolute cursor-move select-none"
+            style={{
+              left: cropPos.x - cropW / 2,
+              top: cropPos.y - cropH / 2,
+              width: cropW,
+              height: cropH,
+              borderRadius: shape === "circle" ? "50%" : 8,
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.65)",
+              border: "2px solid rgba(255,255,255,0.85)",
+            }}
+          />
+        )}
+      </div>
+
+      <div className="mt-5 flex w-full max-w-[560px] items-center gap-3">
+        <ZoomOut className="size-4 shrink-0 text-white/60" />
+        <input
+          type="range"
+          min={80}
+          max={maxSlider}
+          value={cropSize || 80}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            const el = containerRef.current;
+            if (!el) return;
+            const { width, height } = el.getBoundingClientRect();
+            const hw = next / 2;
+            const hh = (shape === "circle" ? next : Math.round(next / 2)) / 2;
+            setCropSize(next);
+            setCropPos((p) => ({
+              x: Math.max(hw, Math.min(width - hw, p.x)),
+              y: Math.max(hh, Math.min(height - hh, p.y)),
+            }));
+          }}
+          className="flex-1 accent-[#FF6267]"
+        />
+        <ZoomIn className="size-4 shrink-0 text-white/60" />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleCrop}
+        className="mt-6 h-12 rounded-2xl bg-[#FF6267] px-10 font-bold text-white hover:bg-[#F05258]"
+      >
+        Apply crop
+      </button>
+    </div>
+  );
+}
+
 function ImageUploadField({
   label,
   value,
   uploading,
   onChange,
   onClear,
+  shape = "rect",
 }: {
   label: string;
   value: string;
   uploading: boolean;
   onChange: (file: File) => void;
   onClear: () => void;
+  shape?: "circle" | "rect";
 }) {
+  const [pendingSrc, setPendingSrc] = useState<string | null>(null);
+
+  const thumbClass =
+    shape === "circle"
+      ? "rounded-full size-20 border border-[#E8DED7] bg-cover bg-center"
+      : "rounded-2xl size-20 border border-[#E8DED7] bg-cover bg-center";
+
+  const emptyClass =
+    shape === "circle"
+      ? "flex rounded-full size-20 items-center justify-center border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]"
+      : "flex rounded-2xl size-20 items-center justify-center border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]";
+
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold">{label}</p>
-          <p className="mt-1 text-xs text-[#6B7280]">
-            JPG, PNG, WEBP, or GIF up to 5 MB.
-          </p>
-        </div>
-        {value ? (
-          <button
-            type="button"
-            className="text-xs font-bold text-[#FF6267]"
-            onClick={onClear}
-          >
-            Remove
-          </button>
-        ) : null}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-4">
-        {value ? (
-          <div
-            className="size-20 rounded-2xl border border-[#E8DED7] bg-cover bg-center"
-            style={{ backgroundImage: `url(${value})` }}
-          />
-        ) : (
-          <div className="flex size-20 items-center justify-center rounded-2xl border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]">
-            No image
+    <>
+      {pendingSrc ? (
+        <CropModal
+          src={pendingSrc}
+          shape={shape}
+          onConfirm={(file) => {
+            setPendingSrc(null);
+            onChange(file);
+          }}
+          onCancel={() => setPendingSrc(null)}
+        />
+      ) : null}
+      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold">{label}</p>
+            <p className="mt-1 text-xs text-[#6B7280]">
+              JPG, PNG, WEBP, or GIF up to 5 MB.
+            </p>
           </div>
-        )}
-        <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#FF6267] bg-white px-4 text-sm font-bold text-[#FF6267]">
-          <Upload className="size-4" />
-          {uploading ? "Uploading..." : "Choose image"}
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            className="sr-only"
-            disabled={uploading}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) {
-                onChange(file);
-              }
-            }}
-          />
-        </label>
+          {value ? (
+            <button
+              type="button"
+              className="text-xs font-bold text-[#FF6267]"
+              onClick={onClear}
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          {value ? (
+            <div
+              className={thumbClass}
+              style={{ backgroundImage: `url(${value})` }}
+            />
+          ) : (
+            <div className={emptyClass}>No image</div>
+          )}
+          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#FF6267] bg-white px-4 text-sm font-bold text-[#FF6267]">
+            <Upload className="size-4" />
+            {uploading ? "Uploading..." : "Choose image"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) =>
+                  setPendingSrc(ev.target?.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+          {value && (
+            <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-4 text-sm font-bold text-[#6B7280]">
+              <Upload className="size-4" />
+              Replace
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) =>
+                    setPendingSrc(ev.target?.result as string);
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

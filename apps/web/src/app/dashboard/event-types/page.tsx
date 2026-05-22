@@ -27,6 +27,7 @@ export default function EventTypesPage() {
   const [editing, setEditing] = useState<EventType | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [deactivate, setDeactivate] = useState<EventType | null>(null);
+  const [reactivating, setReactivating] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +67,22 @@ export default function EventTypesPage() {
   function openEdit(event: EventType) {
     setEditing(event);
     setDrawerOpen(true);
+  }
+
+  async function reactivateService(event: EventType) {
+    setReactivating(event.id);
+    try {
+      const updated = await authedApiRequest<EventType>(`/event-types/${event.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive: true }),
+      });
+      setEvents((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      toast.success("Service reactivated");
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not reactivate service");
+    } finally {
+      setReactivating(null);
+    }
   }
 
   return (
@@ -173,7 +190,15 @@ export default function EventTypesPage() {
                   >
                     Deactivate
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    className="h-8 rounded-md bg-emerald-100 px-4 text-sm font-medium text-emerald-700 disabled:opacity-50"
+                    disabled={reactivating === event.id}
+                    onClick={() => reactivateService(event)}
+                  >
+                    {reactivating === event.id ? "Reactivating..." : "Reactivate"}
+                  </button>
+                )}
               </div>
             </div>
           ))}

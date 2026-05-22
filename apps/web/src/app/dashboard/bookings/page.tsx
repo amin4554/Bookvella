@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ChevronDown, ChevronUp, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { authedApiRequest, type HostBooking, type PublicUser } from "@/lib/api";
+import { authedApiRequest, type HostBooking, type PublicUser, publicBookingUrl } from "@/lib/api";
 
 type Tab = "upcoming" | "past" | "cancelled";
 
@@ -15,6 +17,7 @@ export default function BookingsPage() {
   const [selected, setSelected] = useState<HostBooking | null>(null);
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [search, setSearch] = useState("");
   const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,19 +44,26 @@ export default function BookingsPage() {
 
   const filtered = useMemo(() => {
     const now = loadedAt;
+    const query = search.toLowerCase().trim();
+
     return bookings.filter((booking) => {
       if (tab === "cancelled") {
-        return booking.status === "CANCELLED";
+        if (booking.status !== "CANCELLED") return false;
+      } else {
+        if (booking.status === "CANCELLED") return false;
+        const start = new Date(booking.startTimeUtc).getTime();
+        if (tab === "upcoming" ? start < now : start >= now) return false;
       }
 
-      if (booking.status === "CANCELLED") {
-        return false;
+      if (query) {
+        const matchesName = booking.guestName.toLowerCase().includes(query);
+        const matchesEmail = booking.guestEmail.toLowerCase().includes(query);
+        if (!matchesName && !matchesEmail) return false;
       }
 
-      const start = new Date(booking.startTimeUtc).getTime();
-      return tab === "upcoming" ? start >= now : start < now;
+      return true;
     });
-  }, [bookings, loadedAt, tab]);
+  }, [bookings, loadedAt, tab, search]);
 
   async function cancelBooking() {
     if (!selected) return;
@@ -74,6 +84,10 @@ export default function BookingsPage() {
     }
   }
 
+  const firstActiveService = user
+    ? (bookings.find((b) => b.status === "CONFIRMED") ?? null)
+    : null;
+
   return (
     <AppShell
       active="Bookings"
@@ -87,10 +101,18 @@ export default function BookingsPage() {
         </p>
       </section>
 
-      <div className="mt-5 flex flex-wrap gap-4">
-        <TabButton active={tab === "upcoming"} onClick={() => setTab("upcoming")}>Upcoming</TabButton>
-        <TabButton active={tab === "past"} onClick={() => setTab("past")}>Past</TabButton>
-        <TabButton active={tab === "cancelled"} onClick={() => setTab("cancelled")}>Cancelled</TabButton>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          <TabButton active={tab === "upcoming"} onClick={() => setTab("upcoming")}>Upcoming</TabButton>
+          <TabButton active={tab === "past"} onClick={() => setTab("past")}>Past</TabButton>
+          <TabButton active={tab === "cancelled"} onClick={() => setTab("cancelled")}>Cancelled</TabButton>
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by guest name or email..."
+          className="h-8 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm outline-none placeholder:text-[#B8C0CC] focus:border-[#FF5F63] focus:ring-2 focus:ring-[#FF5F63]/15 min-w-[200px] max-w-[360px]"
+        />
       </div>
 
       {error ? <InlineState title="Bookings unavailable" text={error} /> : null}
@@ -114,9 +136,7 @@ export default function BookingsPage() {
             />
           ))}
           {filtered.length === 0 ? (
-            <div className="border-t border-[#EEE7DF] px-4 py-8 text-sm text-[#6B7280]">
-              No {tab} bookings found.
-            </div>
+            <EmptyState tab={tab} search={search} user={user} firstBooking={firstActiveService} />
           ) : null}
         </div>
       ) : null}
@@ -174,39 +194,150 @@ function BookingRow({
   timeZone: string;
   onCancel: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const cancelled = booking.status === "CANCELLED";
+  const hasDetails =
+    booking.guestPhone ||
+    booking.guestNote ||
+    booking.cancellationReason ||
+    booking.guestTimezone;
+
+  const location =
+    booking.eventType.locationDetails ?? formatLocation(booking.eventType.locationType);
 
   return (
-    <div
-      className={`grid items-center gap-3 border-t border-[#EEE7DF] px-4 py-3 text-sm lg:grid-cols-[1.4fr_1.4fr_1fr_1fr_1fr] ${
-        cancelled ? "text-[#B8C0CC]" : ""
-      }`}
-    >
-      <GuestCell name={booking.guestName} email={booking.guestEmail} muted={cancelled} />
-      <div>
-        <p className="font-medium">{booking.eventType.title}</p>
-        {booking.guestNote ? (
-          <p className="mt-1 line-clamp-2 text-xs text-[#6B7280]">
-            Note: {booking.guestNote}
-          </p>
-        ) : null}
-        <p className="text-xs text-[#6B7280] lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
+    <div className={`border-t border-[#EEE7DF] ${cancelled ? "text-[#B8C0CC]" : ""}`}>
+      <div
+        className="grid cursor-pointer items-center gap-3 px-4 py-3 text-sm lg:grid-cols-[1.4fr_1.4fr_1fr_1fr_1fr]"
+        onClick={() => hasDetails && setExpanded((v) => !v)}
+      >
+        <GuestCell name={booking.guestName} email={booking.guestEmail} muted={cancelled} />
+        <div>
+          <p className="font-medium">{booking.eventType.title}</p>
+          {booking.guestNote ? (
+            <p className="mt-1 line-clamp-1 text-xs text-[#6B7280]">
+              Note: {booking.guestNote}
+            </p>
+          ) : null}
+          <p className="text-xs text-[#6B7280] lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
+        </div>
+        <p className="text-[#6B7280] max-lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
+        <p className="text-[#6B7280] max-lg:hidden">{formatDate(booking.createdAt, timeZone)}</p>
+        <div className="flex items-center gap-4">
+          <StatusBadge status={cancelled ? "cancelled" : "confirmed"}>
+            {cancelled ? "Cancelled" : "Confirmed"}
+          </StatusBadge>
+          {!cancelled ? (
+            <button
+              className="h-7 rounded-md bg-red-100 px-4 text-sm font-medium text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel();
+              }}
+            >
+              Cancel
+            </button>
+          ) : null}
+          {hasDetails ? (
+            <span className="ml-auto text-[#9CA3AF]">
+              {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            </span>
+          ) : null}
+        </div>
       </div>
-      <p className="text-[#6B7280] max-lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
-      <p className="text-[#6B7280] max-lg:hidden">{formatDate(booking.createdAt, timeZone)}</p>
-      <div className="flex items-center gap-8">
-        <StatusBadge status={cancelled ? "cancelled" : "confirmed"}>
-          {cancelled ? "Cancelled" : "Confirmed"}
-        </StatusBadge>
-        {!cancelled ? (
-          <button
-            className="h-7 rounded-md bg-red-100 px-4 text-sm font-medium text-red-600"
-            onClick={onCancel}
+
+      {expanded ? (
+        <div className="grid gap-3 border-t border-[#EEE7DF] bg-[#FFFBF7] px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          {booking.guestPhone ? (
+            <DetailCell label="Phone" value={booking.guestPhone} />
+          ) : null}
+          <DetailCell label="Timezone" value={booking.guestTimezone} />
+          <DetailCell label="Location" value={location} />
+          {booking.guestNote ? (
+            <div className="sm:col-span-2 lg:col-span-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">Guest note</p>
+              <p className="mt-1 leading-6 text-[#6B7280]">{booking.guestNote}</p>
+            </div>
+          ) : null}
+          {booking.cancellationReason ? (
+            <div className="sm:col-span-2 lg:col-span-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">Cancellation reason</p>
+              <p className="mt-1 leading-6 text-[#6B7280]">{booking.cancellationReason}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DetailCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">{label}</p>
+      <p className="mt-1 text-[#6B7280]">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({
+  tab,
+  search,
+  user,
+  firstBooking,
+}: {
+  tab: Tab;
+  search: string;
+  user: PublicUser | null;
+  firstBooking: HostBooking | null;
+}) {
+  if (search) {
+    return (
+      <div className="border-t border-[#EEE7DF] px-4 py-8 text-sm text-[#6B7280]">
+        No bookings match &ldquo;{search}&rdquo;.
+      </div>
+    );
+  }
+
+  if (tab === "upcoming") {
+    const link = firstBooking && user
+      ? publicBookingUrl(user.slug, firstBooking.eventType.slug)
+      : null;
+
+    return (
+      <div className="border-t border-[#EEE7DF] px-4 py-10">
+        <p className="font-semibold text-[#111827]">No upcoming bookings yet</p>
+        <p className="mt-1 text-sm text-[#6B7280]">
+          Share your booking link so guests can schedule time with you.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {link ? (
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#FF6267] px-4 text-sm font-bold text-white"
+              onClick={() => {
+                navigator.clipboard.writeText(link);
+                toast.success("Booking link copied");
+              }}
+            >
+              <Copy className="size-3.5" />
+              Copy booking link
+            </button>
+          ) : null}
+          <Link
+            href="/dashboard/event-types"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-4 text-sm font-bold"
           >
-            Cancel
-          </button>
-        ) : null}
+            <ExternalLink className="size-3.5" />
+            {link ? "Manage services" : "Create a service"}
+          </Link>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-[#EEE7DF] px-4 py-8 text-sm text-[#6B7280]">
+      No {tab} bookings found.
     </div>
   );
 }
@@ -286,4 +417,10 @@ function formatDate(value: string, timeZone: string) {
     year: "numeric",
     timeZone,
   }).format(new Date(value));
+}
+
+function formatLocation(locationType: string) {
+  if (locationType === "PHONE") return "Phone call";
+  if (locationType === "IN_PERSON") return "In person";
+  return "Video call";
 }

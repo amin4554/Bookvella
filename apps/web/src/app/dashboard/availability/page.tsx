@@ -1,147 +1,220 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  CalendarDays,
-  CircleDot,
-  Clock3,
-  Plus,
-  Sun,
-  Trash2,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import {
-  authedApiRequest,
-  type AvailabilityRule,
-  type PublicUser,
-} from "@/lib/api";
+import { authedApiRequest, type AvailabilityRule, type PublicUser } from "@/lib/api";
 
-type DraftRule = {
-  id?: string;
-  dayOfWeek: number;
-  startMinute: number;
-  endMinute: number;
-};
+// Grid config: 6 AM – 10 PM in 30-min slots
+const GRID_START_HOUR = 6;
+const GRID_END_HOUR = 22;
+const SLOT_MINUTES = 30;
+const SLOTS_PER_DAY = ((GRID_END_HOUR - GRID_START_HOUR) * 60) / SLOT_MINUTES; // 32
 
-const days = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
+const DISPLAY_DAYS = [
+  { label: "Mon", dayIndex: 1 },
+  { label: "Tue", dayIndex: 2 },
+  { label: "Wed", dayIndex: 3 },
+  { label: "Thu", dayIndex: 4 },
+  { label: "Fri", dayIndex: 5 },
+  { label: "Sat", dayIndex: 6 },
+  { label: "Sun", dayIndex: 0 },
 ];
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function slotToMinutes(slotIndex: number) {
+  return GRID_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
+}
+
+function rulesToGrid(rules: AvailabilityRule[]): boolean[][] {
+  const grid: boolean[][] = Array.from({ length: 7 }, () =>
+    Array(SLOTS_PER_DAY).fill(false),
+  );
+  for (const rule of rules) {
+    for (let slot = 0; slot < SLOTS_PER_DAY; slot++) {
+      const slotStart = slotToMinutes(slot);
+      const slotEnd = slotStart + SLOT_MINUTES;
+      if (slotStart >= rule.startMinute && slotEnd <= rule.endMinute) {
+        grid[rule.dayOfWeek][slot] = true;
+      }
+    }
+  }
+  return grid;
+}
+
+function gridToRules(grid: boolean[][]): Omit<AvailabilityRule, "id" | "userId">[] {
+  const rules: Omit<AvailabilityRule, "id" | "userId">[] = [];
+  for (let day = 0; day < 7; day++) {
+    let rangeStart: number | null = null;
+    for (let slot = 0; slot <= SLOTS_PER_DAY; slot++) {
+      const active = slot < SLOTS_PER_DAY && grid[day][slot];
+      if (active && rangeStart === null) {
+        rangeStart = slot;
+      } else if (!active && rangeStart !== null) {
+        rules.push({
+          dayOfWeek: day,
+          startMinute: slotToMinutes(rangeStart),
+          endMinute: slotToMinutes(slot),
+        });
+        rangeStart = null;
+      }
+    }
+  }
+  return rules;
+}
+
+function formatHourLabel(slotIndex: number) {
+  const totalMin = GRID_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
+  const hour = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (min !== 0) return "";
+  const h = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  const suffix = hour < 12 ? "am" : "pm";
+  return `${h}${suffix}`;
+}
+
+function hoursForDay(grid: boolean[][], dayIndex: number) {
+  const active = grid[dayIndex].filter(Boolean).length;
+  return ((active * SLOT_MINUTES) / 60).toFixed(1).replace(/\.0$/, "");
+}
+
+// ── component ──────────────────────────────────────────────────────────────
+
+type DragState = {
+  dayIndex: number;
+  startSlot: number;
+  endSlot: number;
+  mode: "add" | "remove";
+};
 
 export default function AvailabilityPage() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [original, setOriginal] = useState<AvailabilityRule[]>([]);
-  const [rules, setRules] = useState<DraftRule[]>([]);
+  const [grid, setGrid] = useState<boolean[][]>(() =>
+    Array.from({ length: 7 }, () => Array(SLOTS_PER_DAY).fill(false)),
+  );
+  const [drag, setDrag] = useState<DragState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDraggingRef = useRef(false);
 
   useEffect(() => {
     async function load() {
       try {
-        const [me, availability] = await Promise.all([
+        const [me, rules] = await Promise.all([
           authedApiRequest<PublicUser>("/auth/me"),
           authedApiRequest<AvailabilityRule[]>("/availability/rules"),
         ]);
         setUser(me);
-        setOriginal(availability);
-        setRules(
-          availability.map(({ id, dayOfWeek, startMinute, endMinute }) => ({
-            id,
-            dayOfWeek,
-            startMinute,
-            endMinute,
-          })),
-        );
+        setOriginal(rules);
+        setGrid(rulesToGrid(rules));
       } catch (caught) {
         setError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load availability",
+          caught instanceof Error ? caught.message : "Could not load availability",
         );
       } finally {
         setLoading(false);
       }
     }
-
     load();
   }, []);
 
-  const invalid = useMemo(
-    () => rules.some((rule) => rule.startMinute >= rule.endMinute),
-    [rules],
+  // Commit drag on global mouseup
+  useEffect(() => {
+    function onMouseUp() {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setDrag((current) => {
+          if (!current) return null;
+          const start = Math.min(current.startSlot, current.endSlot);
+          const end = Math.max(current.startSlot, current.endSlot);
+          setGrid((g) => {
+            const next = g.map((row) => [...row]);
+            for (let slot = start; slot <= end; slot++) {
+              next[current.dayIndex][slot] = current.mode === "add";
+            }
+            return next;
+          });
+          return null;
+        });
+      }
+    }
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchend", onMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchend", onMouseUp);
+    };
+  }, []);
+
+  const cellActive = useCallback(
+    (dayIndex: number, slotIndex: number): boolean => {
+      if (drag && drag.dayIndex === dayIndex) {
+        const start = Math.min(drag.startSlot, drag.endSlot);
+        const end = Math.max(drag.startSlot, drag.endSlot);
+        if (slotIndex >= start && slotIndex <= end) {
+          return drag.mode === "add";
+        }
+      }
+      return grid[dayIndex][slotIndex];
+    },
+    [grid, drag],
   );
 
-  async function save() {
-    if (invalid) {
-      toast.error("End time must be after start time");
-      return;
-    }
+  function handleCellMouseDown(dayIndex: number, slotIndex: number) {
+    isDraggingRef.current = true;
+    const mode = grid[dayIndex][slotIndex] ? "remove" : "add";
+    setDrag({ dayIndex, startSlot: slotIndex, endSlot: slotIndex, mode });
+  }
 
+  function handleCellMouseEnter(dayIndex: number, slotIndex: number) {
+    if (!isDraggingRef.current) return;
+    setDrag((current) => {
+      if (!current || current.dayIndex !== dayIndex) return current;
+      return { ...current, endSlot: slotIndex };
+    });
+  }
+
+  async function save() {
     setSaving(true);
     try {
-      const currentIds = new Set(rules.map((rule) => rule.id).filter(Boolean));
-      const removed = original.filter((rule) => !currentIds.has(rule.id));
-
-      await Promise.all([
-        ...removed.map((rule) =>
-          authedApiRequest<{ success: boolean }>(
-            `/availability/rules/${rule.id}`,
-            {
-              method: "DELETE",
-            },
-          ),
+      // Delete all existing rules, then create new ones from grid
+      await Promise.all(
+        original.map((rule) =>
+          authedApiRequest(`/availability/rules/${rule.id}`, { method: "DELETE" }),
         ),
-        ...rules.map((rule) =>
-          rule.id
-            ? authedApiRequest<AvailabilityRule>(
-                `/availability/rules/${rule.id}`,
-                {
-                  method: "PATCH",
-                  body: JSON.stringify({
-                    dayOfWeek: rule.dayOfWeek,
-                    startMinute: rule.startMinute,
-                    endMinute: rule.endMinute,
-                  }),
-                },
-              )
-            : authedApiRequest<AvailabilityRule>("/availability/rules", {
-                method: "POST",
-                body: JSON.stringify(rule),
-              }),
-        ),
-      ]);
+      );
 
-      const fresh = await authedApiRequest<AvailabilityRule[]>(
-        "/availability/rules",
+      const newRules = gridToRules(grid);
+      const created = await Promise.all(
+        newRules.map((rule) =>
+          authedApiRequest<AvailabilityRule>("/availability/rules", {
+            method: "POST",
+            body: JSON.stringify(rule),
+          }),
+        ),
       );
-      setOriginal(fresh);
-      setRules(
-        fresh.map(({ id, dayOfWeek, startMinute, endMinute }) => ({
-          id,
-          dayOfWeek,
-          startMinute,
-          endMinute,
-        })),
-      );
+
+      setOriginal(created);
       toast.success("Availability saved");
     } catch (caught) {
       toast.error(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save availability",
+        caught instanceof Error ? caught.message : "Could not save availability",
       );
     } finally {
       setSaving(false);
     }
   }
+
+  const activeRules = gridToRules(grid);
+  const activeDaySet = new Set(activeRules.map((r) => r.dayOfWeek));
+  const totalHours = (
+    (grid.flat().filter(Boolean).length * SLOT_MINUTES) /
+    60
+  ).toFixed(1).replace(/\.0$/, "");
 
   return (
     <AppShell
@@ -151,16 +224,14 @@ export default function AvailabilityPage() {
     >
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-[34px] font-bold leading-tight">
-            Booking schedule
-          </h2>
+          <h2 className="text-[34px] font-bold leading-tight">Booking schedule</h2>
           <p className="mt-1 text-base text-[#6B7280]">
-            Choose when guests can book your services.
+            Click and drag to set when guests can book you.
           </p>
         </div>
         <Button
           className="h-12 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-7 font-bold text-white"
-          disabled={saving || loading || invalid}
+          disabled={saving || loading}
           onClick={save}
         >
           {saving ? "Saving..." : "Save schedule"}
@@ -168,374 +239,255 @@ export default function AvailabilityPage() {
       </section>
 
       {error ? (
-        <InlineState title="Availability unavailable" text={error} />
-      ) : null}
-      {loading ? (
-        <InlineState
-          title="Loading availability"
-          text="Fetching your weekly schedule."
-        />
+        <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
+          <p className="font-semibold">Availability unavailable</p>
+          <p className="mt-1 text-sm text-[#6B7280]">{error}</p>
+        </div>
       ) : null}
 
       {!loading && !error ? (
-        <>
-          {invalid ? (
-            <div className="mt-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-600">
-              Please fix highlighted time ranges before saving.
-            </div>
-          ) : null}
-
-          <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm md:p-8">
-              <h3 className="text-2xl font-bold">
-                When are you usually available?
-              </h3>
-              <p className="mt-2 text-[#6B7280]">
-                Start with a preset, then fine-tune. Most hosts are set up in
-                under a minute.
-              </p>
-
-              <p className="mt-7 text-xs font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-                Quick presets
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <Preset
-                  icon={CalendarDays}
-                  title="Any day"
-                  text="7 days a week"
-                  onClick={() => applyPreset([0, 1, 2, 3, 4, 5, 6])}
-                />
-                <Preset
-                  icon={Clock3}
-                  title="Weekdays"
-                  text="Mon - Fri"
-                  onClick={() => applyPreset([1, 2, 3, 4, 5])}
-                />
-                <Preset
-                  icon={Sun}
-                  title="Weekends"
-                  text="Sat & Sun"
-                  onClick={() => applyPreset([0, 6])}
-                />
-                <Preset
-                  icon={CircleDot}
-                  title="Specific days"
-                  text="You choose"
-                  onClick={() => applyPreset([])}
-                />
-                <Preset
-                  icon={Plus}
-                  title="Custom"
-                  text="Full control"
-                  onClick={() => setRules((current) => current)}
-                />
-              </div>
-
-              <p className="mt-8 text-xs font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-                Days available
-              </p>
-              <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white">
-                {days.map((day, dayOfWeek) => {
-                  const dayRules = rules.filter(
-                    (rule) => rule.dayOfWeek === dayOfWeek,
-                  );
-                  return (
-                    <div
-                      key={day}
-                      className="grid gap-4 border-t border-[#EEE7DF] px-5 py-4 first:border-t-0 md:grid-cols-[160px_1fr]"
+        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
+          {/* ── Calendar grid ──────────────────────────────── */}
+          <div
+            className="overflow-hidden rounded-[24px] border border-[#EEE7DF] bg-white shadow-sm select-none"
+            onMouseLeave={() => {
+              /* allow drag to continue even when briefly leaving a cell */
+            }}
+          >
+            {/* Day header */}
+            <div className="flex border-b border-[#EEE7DF] bg-[#FFFBF7]">
+              <div className="w-12 shrink-0" />
+              {DISPLAY_DAYS.map(({ label, dayIndex }) => {
+                const activeDay = activeDaySet.has(dayIndex);
+                const hrs = hoursForDay(grid, dayIndex);
+                return (
+                  <div
+                    key={dayIndex}
+                    className="flex min-w-0 flex-1 flex-col items-center py-3"
+                  >
+                    <span
+                      className={`text-xs font-bold uppercase tracking-wide ${
+                        activeDay ? "text-[#FF6267]" : "text-[#9CA3AF]"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <Toggle
-                          enabled={dayRules.length > 0}
-                          onClick={() => {
-                            setRules((current) =>
-                              dayRules.length
-                                ? current.filter(
-                                    (rule) => rule.dayOfWeek !== dayOfWeek,
-                                  )
-                                : [
-                                    ...current,
-                                    {
-                                      dayOfWeek,
-                                      startMinute: 540,
-                                      endMinute: 1020,
-                                    },
-                                  ],
-                            );
-                          }}
-                        />
-                        <span
-                          className={dayRules.length ? "" : "text-[#B8C0CC]"}
-                        >
-                          {day}
-                        </span>
-                      </div>
-                      {dayRules.length ? (
-                        <div className="space-y-2">
-                          {dayRules.map((rule) => {
-                            const isInvalid =
-                              rule.startMinute >= rule.endMinute;
-                            return (
-                              <div
-                                key={
-                                  rule.id ??
-                                  `${rule.dayOfWeek}-${rule.startMinute}-${rule.endMinute}`
-                                }
-                                className="flex flex-wrap items-center gap-3"
-                              >
-                                <TimeInput
-                                  value={minuteToTime(rule.startMinute)}
-                                  invalid={isInvalid}
-                                  onChange={(value) =>
-                                    updateRule(rule, {
-                                      startMinute: timeToMinute(value),
-                                    })
-                                  }
-                                />
-                                <span className="text-[#6B7280]">-</span>
-                                <TimeInput
-                                  value={minuteToTime(rule.endMinute)}
-                                  invalid={isInvalid}
-                                  onChange={(value) =>
-                                    updateRule(rule, {
-                                      endMinute: timeToMinute(value),
-                                    })
-                                  }
-                                />
-                                <button
-                                  className="flex size-8 items-center justify-center rounded-lg bg-[#FFFBF7] text-[#6B7280]"
-                                  onClick={() => removeRule(rule)}
-                                  aria-label={`Delete ${day} range`}
-                                >
-                                  <Trash2 className="size-4" />
-                                </button>
-                              </div>
-                            );
-                          })}
-                          <button
-                            className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#FFF0EF] px-3 text-sm font-medium text-[#FF5F63]"
-                            onClick={() =>
-                              setRules((current) => [
-                                ...current,
-                                {
-                                  dayOfWeek,
-                                  startMinute: 780,
-                                  endMinute: 1020,
-                                },
-                              ])
-                            }
-                          >
-                            <Plus className="size-4" />
-                            Add range
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="self-center text-sm text-[#B8C0CC]">
-                          Unavailable
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+                      {label}
+                    </span>
+                    <span className="mt-0.5 text-[10px] text-[#B8C0CC]">
+                      {activeDay ? `${hrs}h` : "off"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
 
-            <aside className="space-y-5 xl:sticky xl:top-8 xl:self-start">
-              <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-bold">Schedule summary</h3>
-                <div className="mt-4 space-y-3 text-sm">
-                  <SummaryDot
-                    color="bg-[#FF6267]"
-                    title={`${rules.length ? activeDayNames(rules).join(", ") : "No days"}`}
-                    text={
-                      rules.length
-                        ? "Bookable days selected"
-                        : "Guests cannot book yet"
-                    }
-                  />
-                  <SummaryDot
-                    color="bg-[#F59E0B]"
-                    title={rangeSummary(rules)}
-                    text="Bookable hours"
-                  />
-                  <SummaryDot
-                    color="bg-[#16A34A]"
-                    title={user?.timezone ?? "UTC"}
-                    text="Timezone"
-                  />
-                </div>
-              </div>
-              <div className="rounded-[24px] border border-[#EEE7DF] bg-gradient-to-br from-[#D7FBF7] to-[#EFE1FF] p-6">
-                <h3 className="text-lg font-bold">How schedules work</h3>
-                <p className="mt-3 leading-7 text-[#6B7280]">
-                  Guests only see available slots based on your schedule,
-                  existing bookings, and cleanup time.
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-bold">Timezone</h3>
-                <p className="mt-3 font-bold">{user?.timezone ?? "UTC"}</p>
-                <p className="mt-1 text-sm text-[#6B7280]">
-                  All slots are shown in this timezone to guests.
-                </p>
-              </div>
-            </aside>
+            {/* Scrollable time grid */}
+            <div className="overflow-y-auto" style={{ maxHeight: 520 }}>
+              {Array.from({ length: SLOTS_PER_DAY }, (_, slotIndex) => {
+                const isHourBoundary = slotIndex % 2 === 0;
+                const label = formatHourLabel(slotIndex);
+                return (
+                  <div
+                    key={slotIndex}
+                    className={`flex ${
+                      isHourBoundary
+                        ? "border-t border-[#E8E3DD]"
+                        : "border-t border-[#F3EFE9]"
+                    }`}
+                  >
+                    {/* Hour label */}
+                    <div className="flex w-12 shrink-0 items-start justify-end pr-2">
+                      {label ? (
+                        <span className="-translate-y-2 text-[10px] text-[#B8C0CC]">
+                          {label}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Day cells */}
+                    {DISPLAY_DAYS.map(({ dayIndex }, colIndex) => {
+                      const active = cellActive(dayIndex, slotIndex);
+                      const prevActive =
+                        slotIndex > 0 && cellActive(dayIndex, slotIndex - 1);
+                      const nextActive =
+                        slotIndex < SLOTS_PER_DAY - 1 &&
+                        cellActive(dayIndex, slotIndex + 1);
+                      const isFirst = active && !prevActive;
+                      const isLast = active && !nextActive;
+
+                      return (
+                        <div
+                          key={dayIndex}
+                          className={[
+                            "relative flex-1 cursor-pointer transition-colors",
+                            colIndex > 0 ? "border-l border-[#F3EFE9]" : "",
+                            active
+                              ? "bg-[#FF6267]"
+                              : "hover:bg-[#FFF0EF]",
+                            isFirst ? "rounded-t-md mt-px mx-px" : "",
+                            isLast ? "rounded-b-md mb-px" : "",
+                            active && !isFirst && !isLast ? "mx-px" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          style={{ height: 20 }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleCellMouseDown(dayIndex, slotIndex);
+                          }}
+                          onMouseEnter={() =>
+                            handleCellMouseEnter(dayIndex, slotIndex)
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-[#EEE7DF] px-4 py-3 text-xs text-[#9CA3AF]">
+              Click and drag on any day to add availability. Click an existing block to remove it.
+            </div>
           </div>
-        </>
+
+          {/* ── Summary sidebar ───────────────────────────── */}
+          <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
+            <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold">Summary</h3>
+              <div className="mt-4 space-y-3">
+                <SummaryRow
+                  label="Available days"
+                  value={
+                    activeDaySet.size
+                      ? DISPLAY_DAYS.filter((d) =>
+                          activeDaySet.has(d.dayIndex),
+                        )
+                          .map((d) => d.label)
+                          .join(", ")
+                      : "None"
+                  }
+                  accent={activeDaySet.size > 0}
+                />
+                <SummaryRow
+                  label="Weekly hours"
+                  value={activeDaySet.size ? `${totalHours}h` : "0h"}
+                  accent={activeDaySet.size > 0}
+                />
+                <SummaryRow
+                  label="Timezone"
+                  value={user?.timezone ?? "UTC"}
+                  accent={false}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-[#EEE7DF] bg-gradient-to-br from-[#D7FBF7] to-[#EFE1FF] p-6">
+              <h3 className="font-bold">Quick presets</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <PresetButton
+                  label="Weekdays 9–5"
+                  onClick={() => applyPreset([1, 2, 3, 4, 5], 540, 1020)}
+                />
+                <PresetButton
+                  label="Mon–Sat"
+                  onClick={() => applyPreset([1, 2, 3, 4, 5, 6], 540, 1020)}
+                />
+                <PresetButton
+                  label="Every day"
+                  onClick={() =>
+                    applyPreset([0, 1, 2, 3, 4, 5, 6], 540, 1020)
+                  }
+                />
+                <PresetButton
+                  label="Evenings"
+                  onClick={() =>
+                    applyPreset([1, 2, 3, 4, 5], 1020, 1320)
+                  }
+                />
+                <PresetButton
+                  label="Clear all"
+                  onClick={() =>
+                    setGrid(
+                      Array.from({ length: 7 }, () =>
+                        Array(SLOTS_PER_DAY).fill(false),
+                      ),
+                    )
+                  }
+                  danger
+                />
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm">
+              <h3 className="font-bold">How it works</h3>
+              <p className="mt-2 text-sm leading-6 text-[#6B7280]">
+                Guests see only open slots that don&apos;t conflict with existing bookings.
+                Buffer times between sessions are applied automatically.
+              </p>
+            </div>
+          </aside>
+        </div>
       ) : null}
     </AppShell>
   );
 
-  function updateRule(target: DraftRule, patch: Partial<DraftRule>) {
-    setRules((current) =>
-      current.map((rule) =>
-        sameRule(rule, target) ? { ...rule, ...patch } : rule,
-      ),
+  function applyPreset(days: number[], startMinute: number, endMinute: number) {
+    const next = Array.from({ length: 7 }, () =>
+      Array(SLOTS_PER_DAY).fill(false),
     );
-  }
-
-  function removeRule(target: DraftRule) {
-    setRules((current) => current.filter((rule) => !sameRule(rule, target)));
-  }
-
-  function applyPreset(dayIndexes: number[]) {
-    setRules(
-      dayIndexes.map((dayOfWeek) => ({
-        dayOfWeek,
-        startMinute: 540,
-        endMinute: 1020,
-      })),
-    );
+    for (const day of days) {
+      for (let slot = 0; slot < SLOTS_PER_DAY; slot++) {
+        const start = slotToMinutes(slot);
+        const end = start + SLOT_MINUTES;
+        if (start >= startMinute && end <= endMinute) {
+          next[day][slot] = true;
+        }
+      }
+    }
+    setGrid(next);
   }
 }
 
-function Preset({
-  icon: Icon,
-  title,
-  text,
-  onClick,
-}: {
-  icon: React.ElementType;
-  title: string;
-  text: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-[#E8DED7] bg-[#FFFBF7] p-4 text-center hover:border-[#FF6267] hover:bg-[#FFF0EF]"
-      onClick={onClick}
-    >
-      <span className="flex size-10 items-center justify-center rounded-xl bg-white text-[#FF6267]">
-        <Icon className="size-4" />
-      </span>
-      <span className="mt-3 font-bold">{title}</span>
-      <span className="mt-1 text-xs text-[#9CA3AF]">{text}</span>
-    </button>
-  );
-}
-
-function SummaryDot({
-  color,
-  title,
-  text,
-}: {
-  color: string;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="flex gap-3">
-      <span className={`mt-1 size-2.5 rounded-full ${color}`} />
-      <div>
-        <p className="font-bold">{title}</p>
-        <p className="text-[#6B7280]">{text}</p>
-      </div>
-    </div>
-  );
-}
-
-function Toggle({
-  enabled,
-  onClick,
-}: {
-  enabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`flex h-6 w-11 items-center rounded-full p-1 ${
-        enabled ? "justify-end bg-[#FF5F63]" : "justify-start bg-[#CBD5E1]"
-      }`}
-      onClick={onClick}
-      aria-label={enabled ? "Mark unavailable" : "Mark available"}
-    >
-      <span className="size-4 rounded-full bg-white" />
-    </button>
-  );
-}
-
-function TimeInput({
+function SummaryRow({
+  label,
   value,
-  invalid,
-  onChange,
+  accent,
 }: {
+  label: string;
   value: string;
-  invalid?: boolean;
-  onChange: (value: string) => void;
+  accent: boolean;
 }) {
   return (
-    <input
-      type="time"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className={`h-9 w-[118px] rounded-lg border bg-white px-3 text-sm outline-none ${
-        invalid
-          ? "border-red-400 text-red-600 focus:ring-red-200"
-          : "border-[#D1D5DB] focus:border-[#FF5F63] focus:ring-[#FF5F63]/15"
-      } focus:ring-2`}
-    />
-  );
-}
-
-function InlineState({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
-      <h3 className="font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-[#6B7280]">{text}</p>
+    <div className="flex items-baseline justify-between gap-2 text-sm">
+      <span className="text-[#6B7280]">{label}</span>
+      <span
+        className={`font-bold text-right ${accent ? "text-[#FF6267]" : "text-[#111827]"}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
-function minuteToTime(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-}
-
-function timeToMinute(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function activeDayNames(rules: DraftRule[]) {
-  return Array.from(
-    new Set(rules.map((rule) => days[rule.dayOfWeek].slice(0, 3))),
+function PresetButton({
+  label,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`h-8 rounded-xl px-3 text-xs font-bold transition-colors ${
+        danger
+          ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+          : "border border-[#E8DED7] bg-white text-[#6B7280] hover:border-[#FF6267] hover:text-[#FF6267]"
+      }`}
+    >
+      {label}
+    </button>
   );
-}
-
-function rangeSummary(rules: DraftRule[]) {
-  if (rules.length === 0) {
-    return "No hours set";
-  }
-
-  const first = rules[0];
-  return `${minuteToTime(first.startMinute)}-${minuteToTime(first.endMinute)}`;
-}
-
-function sameRule(left: DraftRule, right: DraftRule) {
-  if (left.id || right.id) {
-    return left.id === right.id;
-  }
-
-  return left === right;
 }

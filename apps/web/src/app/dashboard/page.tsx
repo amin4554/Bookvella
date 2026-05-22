@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   CalendarDays,
   Clock3,
   Copy,
@@ -123,7 +124,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-[40px] font-bold leading-tight tracking-normal text-[#111827]">
-              Good morning, {data.user.name.split(" ")[0]}
+              {timeGreeting(data.user.name.split(" ")[0])}
             </h2>
             <p className="mt-1 text-lg text-[#6B7280]">
               {formatLongDate(data.loadedAt)} - here is your day at a glance
@@ -168,6 +169,13 @@ export default function DashboardPage() {
           <HeroStat value={String(activeEvents.length)} label="Services" />
         </div>
       </section>
+
+      {activeEvents.length === 0 || data.availability.length === 0 ? (
+        <SetupBanner
+          noServices={activeEvents.length === 0}
+          noSchedule={data.availability.length === 0}
+        />
+      ) : null}
 
       <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <Metric
@@ -399,6 +407,59 @@ function ActionCopy({ title, text }: { title: string; text: string }) {
       <span className="block text-sm font-bold">{title}</span>
       <span className="block text-xs text-[#6B7280]">{text}</span>
     </span>
+  );
+}
+
+function timeGreeting(firstName: string) {
+  const hour = new Date().getHours();
+  if (hour < 12) return `Good morning, ${firstName}`;
+  if (hour < 17) return `Good afternoon, ${firstName}`;
+  return `Good evening, ${firstName}`;
+}
+
+function SetupBanner({
+  noServices,
+  noSchedule,
+}: {
+  noServices: boolean;
+  noSchedule: boolean;
+}) {
+  return (
+    <div className="mt-8 flex items-start gap-4 rounded-[24px] border border-amber-200 bg-amber-50 p-6">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+        <AlertCircle className="size-5" />
+      </div>
+      <div className="min-w-0">
+        <h3 className="font-bold text-[#111827]">
+          {noServices ? "Create your first service to get started" : "Set your availability so guests can book"}
+        </h3>
+        <p className="mt-1 text-sm text-[#6B7280]">
+          {noServices
+            ? "Add a bookable service and set your schedule. Guests can then book you directly from your public link."
+            : "You have services set up but guests cannot book yet — add your available hours to unlock bookings."}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {noServices ? (
+            <Link
+              href="/dashboard/event-types"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#FF6267] px-5 text-sm font-bold text-white"
+            >
+              <Plus className="size-3.5" />
+              Create a service
+            </Link>
+          ) : null}
+          {noSchedule ? (
+            <Link
+              href="/dashboard/availability"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-5 text-sm font-bold text-[#111827]"
+            >
+              <CalendarDays className="size-3.5" />
+              Set your schedule
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 

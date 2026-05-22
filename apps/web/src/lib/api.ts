@@ -74,6 +74,7 @@ export type HostBooking = {
     title: string;
     durationMinutes: number;
     locationType: LocationType;
+    locationDetails: string | null;
   };
 };
 

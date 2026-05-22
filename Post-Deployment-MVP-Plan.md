@@ -1,6 +1,6 @@
 # Bookvella Post-Deployment MVP Plan
 
-Last reviewed: May 22, 2026
+Last reviewed: May 22, 2026 (updated — session 3 improvements)
 
 ## Executive Summary
 
@@ -20,6 +20,8 @@ Update after deployment review:
 - Pipeline stability restored after builds #12 and #13: Build #12's `@prisma/engines` failure (pnpm strict-isolation removes transitive devDep trees after `pnpm prune --prod`) was fixed by moving `prisma` to `dependencies` and stripping all manual rescue logic from the Dockerfile (57 → 33 lines); Build #13's `UnknownDependenciesException` was fixed by adding the missing `AuthModule` import to `MediaModule`.
 - `.env` naming simplified end-to-end: `.env.production` renamed to `.env` across `Jenkinsfile`, `docker-compose.prod.yml`, `.dockerignore`, and the root example file (`.env.example`), eliminating the two-name confusion.
 - Codebase audit and four bug fixes: PrismaService now eagerly establishes the connection pool on startup via `OnModuleInit.$connect()`; review summary stats now use `prisma.review.aggregate()` across all visible reviews instead of only the first 8 loaded for display; email bodies now normalize line endings to CRLF per RFC 2822 and both MIME parts in multipart messages carry `Content-Transfer-Encoding: 7bit`; the rate-limiter `Map` now runs a recurring cleanup timer (`.unref()`) to evict expired entries and prevent unbounded memory growth.
+- Service/booking/dashboard improvements: inactive services can now be reactivated directly from the services list; the bookings page has a live guest name/email search, an expandable detail row (phone, note, timezone, location, cancellation reason), an improved upcoming empty state with a copy-booking-link action; the booking success screen now offers both a Google Calendar link and a downloadable `.ics` file; the dashboard greeting is now time-appropriate (good morning/afternoon/evening); a setup banner guides new hosts who have no services or no availability schedule set; the booking list API now also returns `locationDetails` from the event type alongside `locationType`.
+- Availability schedule, slot intelligence, and image crop: the availability page was fully rewritten as a Google Calendar-style drag-to-select weekly grid (Mon–Sun columns, 6 am–10 pm in 30-minute rows) with preset buttons and rounded visual blocks for continuous ranges; the backend slot generator now steps by session duration instead of a fixed 15-minute increment, and the public booking date picker only shows dates that actually have available slots (21-day range fetched upfront, grouped by guest timezone date); the settings page profile and cover image upload fields now open a canvas-based crop modal — circle crop for the profile photo (400 × 400 output), 2:1 rect crop for the cover image (800 × 400 output) — with drag-to-reposition, a zoom slider, and a "Replace" button once an image is set.
 
 ## Current State Snapshot
 
@@ -246,11 +248,13 @@ Completed:
 - Add add-to-calendar links after successful booking.
 - Improve mobile step visibility so the booking steps remain visible on smaller screens.
 - Add richer no-slots guidance, such as "try next week" or "contact the host."
+- Booking success now offers both "Add to Google Calendar" and a downloadable `.ics` file button.
+- Slot generation now steps by session duration rather than a fixed 15-minute increment — a 60-minute service shows slots every 60 minutes, not every 15. The `alignToStep` helper aligns the window start to the nearest duration boundary.
+- Public booking date picker fetches a 21-day range upfront, groups slots by guest timezone date using `Intl.DateTimeFormat("en-CA")`, and only renders dates that actually have available slots — no more hardcoded 14-day list with empty days.
 
 Remaining:
 
 - Run the full browser flow against production after the guest-note and service-image migrations are deployed.
-- Consider adding downloadable `.ics` files in addition to the Google Calendar link.
 - Keep improving edge-case copy for invalid/expired codes and booking conflicts after real-user testing.
 
 ### Host profile/settings
@@ -261,26 +265,33 @@ Completed:
 - Use real review counts in the live preview instead of placeholder `4.9 / 312 reviews`.
 - Add a proper public profile URL copy area.
 - Replace profile and cover image URL inputs with authenticated image uploads.
+- Dashboard now shows a prominent setup banner guiding new hosts to create a service and/or set their schedule if either is missing.
+- Dashboard greeting is now time-appropriate (good morning / good afternoon / good evening).
+- Profile and cover image upload fields now open a canvas-based crop modal before uploading: circle crop (400 × 400) for the profile photo; 2:1 rect crop (800 × 400) for the cover image. The modal shows the image with `object-contain`, overlays a draggable crop window using the `box-shadow: 0 0 0 9999px` trick clipped by the container's `overflow-hidden`, and provides a zoom slider. Canvas extraction maps the crop box position to natural image coordinates via `getBoundingClientRect()` scaling and exports JPEG at 0.92 quality. A "Replace" button appears once an image is set. Profile photo thumbnail now renders as a circle to match the crop shape.
 
 Remaining:
 
-- Add profile completeness cues for new hosts.
+- Add deeper profile completeness cues (e.g. missing photo, headline, about text) on the settings page itself.
 
 ### Services
 
 Completed:
 
 - Services now support optional uploaded images that appear in the dashboard and public booking flow.
+- Inactive services can now be reactivated directly from the services list with a "Reactivate" button.
 
 Remaining:
 
 - Consider renaming the route from `/dashboard/event-types` to `/dashboard/services` when convenient.
 - Keep URL editing advanced-only.
 - Add price display decision: hidden, plain text, or structured field.
-- Make reactivating inactive services more discoverable.
 - Add validation for odd service values and longer descriptions.
 
 ### Booking schedule
+
+Completed:
+
+- Availability page fully rewritten as a Google Calendar-style drag-to-select weekly grid: Mon–Sun columns, 6 am–10 pm rows in 30-minute increments. Click or drag to toggle blocks; continuous selected blocks render with rounded top/bottom pill styling. Preset buttons ("Weekdays 9–5", "Mon–Sat", "Every day", "Evenings", "Clear all") let hosts set a schedule in one click. Save strategy deletes all existing rules then posts the new grid, avoiding a diff.
 
 Remaining:
 
@@ -292,11 +303,16 @@ Remaining:
 
 ### Bookings
 
+Completed:
+
+- Bookings page now has a live search input that filters by guest name or email.
+- Each booking row is expandable to show guest phone, note, timezone, location, and cancellation reason.
+- The upcoming empty state now shows a copy-booking-link button and a "create service" link instead of a plain text message.
+- The booking list API now returns `locationDetails` from the event type alongside `locationType`.
+
 Remaining:
 
-- Improve empty states with public-link copy and "create service" actions.
-- Add search/filter by guest, service, status, and date.
-- Add booking detail view or expanded row with guest phone, note, location, and email status.
+- Add filter by service, status, and date range.
 - Consider guest self-cancellation/rescheduling links after MVP.
 
 ### Reviews

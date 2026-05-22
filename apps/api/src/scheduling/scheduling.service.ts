@@ -16,7 +16,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { AvailableSlot, GetAvailableSlotsInput } from './scheduling.types';
 
-const SLOT_STEP_MINUTES = 15;
 const MAX_RANGE_DAYS = 31;
 
 @Injectable()
@@ -200,11 +199,11 @@ export class SchedulingService {
           end,
         );
 
+        const stepMs = eventType.durationMinutes * 60_000;
         for (
-          let slotStartMs = alignToStep(windowStart.getTime());
-          slotStartMs + eventType.durationMinutes * 60_000 <=
-          windowEnd.getTime();
-          slotStartMs += SLOT_STEP_MINUTES * 60_000
+          let slotStartMs = alignToStep(windowStart.getTime(), eventType.durationMinutes);
+          slotStartMs + stepMs <= windowEnd.getTime();
+          slotStartMs += stepMs
         ) {
           const slotEndMs = slotStartMs + eventType.durationMinutes * 60_000;
           const candidateBusy = {
@@ -295,8 +294,8 @@ function localDateOnly(parts: { year: number; month: number; day: number }) {
   };
 }
 
-function alignToStep(timestampMs: number) {
-  const stepMs = SLOT_STEP_MINUTES * 60_000;
+function alignToStep(timestampMs: number, stepMinutes: number) {
+  const stepMs = stepMinutes * 60_000;
   return Math.ceil(timestampMs / stepMs) * stepMs;
 }
 

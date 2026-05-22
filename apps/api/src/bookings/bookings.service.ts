@@ -40,6 +40,7 @@ export class BookingsService {
             title: true,
             durationMinutes: true,
             locationType: true,
+            locationDetails: true,
           },
         },
       },
