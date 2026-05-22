@@ -5,7 +5,7 @@ pipeline {
         COMPOSE_FILE = 'docker-compose.prod.yml'
         COMPOSE_PROJECT_NAME = 'bookvella'
         // Persistent server-only secrets live in the mounted deploy directory.
-        SECRET_ENV_FILE = '/workspace/bookvella/.env.production'
+        SECRET_ENV_FILE = '/workspace/bookvella/.env'
     }
 
     options {
@@ -32,8 +32,11 @@ pipeline {
                     docker --version
                     docker compose version
                     test -f "${SECRET_ENV_FILE}" || \
-                        { echo "ERROR: .env.production not found on VPS. Create it first."; exit 1; }
-                    cp "${SECRET_ENV_FILE}" "${WORKSPACE}/.env.production"
+                        { echo "ERROR: .env not found on VPS. Create it first."; exit 1; }
+                    # Copy to the job workspace so docker compose can find it.
+                    # Docker compose auto-loads .env for ${VAR} YAML interpolation AND
+                    # env_file: .env loads it into each container at runtime — one file, both jobs.
+                    cp "${SECRET_ENV_FILE}" "${WORKSPACE}/.env"
                 '''
             }
         }

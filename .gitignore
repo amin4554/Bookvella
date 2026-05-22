@@ -115,4 +115,5 @@ storage/
 
 # Local design exports and reference screenshots
 designs/
+.claude/
 

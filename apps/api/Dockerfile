@@ -31,6 +31,17 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /tmp/prisma-pkg ./node_modules/prisma
-RUN mkdir -p node_modules/.bin && ln -sf ../prisma/bin/prisma.js node_modules/.bin/prisma
+# Create a shell wrapper for the prisma CLI.
+# We read the bin path from the package's own package.json so this stays correct
+# across prisma version bumps (v6 uses build/index.js, not bin/prisma.js).
+# A wrapper script is more reliable than a symlink because it never depends on
+# the execute bit or shebang interpreter of the target file.
+RUN PRISMA_BIN=$(node -e \
+      "const {bin}=require('./node_modules/prisma/package.json'); \
+       console.log(Object.values(bin)[0])") && \
+    mkdir -p node_modules/.bin && \
+    printf '#!/bin/sh\nexec node /app/node_modules/prisma/%s "$@"\n' \
+      "$PRISMA_BIN" > node_modules/.bin/prisma && \
+    chmod +x node_modules/.bin/prisma
 EXPOSE 3000
 CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
