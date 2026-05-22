@@ -18,10 +18,14 @@ COPY apps/api/src ./src
 RUN pnpm prisma generate
 RUN pnpm run build
 RUN node_modules/.bin/jest --runInBand
-# Dereference pnpm symlinks for prisma CLI into real files before prod prune removes it.
+# Dereference pnpm symlinks into real files before prod prune removes them.
 # COPY --from across stages preserves symlinks as-is; cp -rL resolves them so the
 # runner gets actual files, not dangling pointers into the missing pnpm virtual store.
-RUN cp -rL node_modules/prisma /tmp/prisma-pkg
+# Both packages are devDeps (via the prisma CLI) and are stripped by pnpm prune --prod:
+#   prisma          – the CLI entry point
+#   @prisma/engines – the migration engine binary that prisma migrate deploy needs
+RUN cp -rL node_modules/prisma /tmp/prisma-pkg && \
+    cp -rL node_modules/@prisma/engines /tmp/prisma-engines-pkg
 RUN pnpm prune --prod
 
 FROM base AS runner
@@ -31,6 +35,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /tmp/prisma-pkg ./node_modules/prisma
+COPY --from=build /tmp/prisma-engines-pkg ./node_modules/@prisma/engines
 # Create a shell wrapper for the prisma CLI.
 # We read the bin path from the package's own package.json so this stays correct
 # across prisma version bumps (v6 uses build/index.js, not bin/prisma.js).
