@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarX, CheckCircle, Clock3 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -19,6 +19,30 @@ type BookingSummary = {
 };
 
 export default function CancelPage() {
+  return (
+    <Suspense fallback={<CancelPageShell />}>
+      <CancelPageContent />
+    </Suspense>
+  );
+}
+
+function CancelPageShell() {
+  return (
+    <div className="min-h-screen bg-[#FFFBF7] px-4 py-12">
+      <div className="mx-auto w-full max-w-[480px]">
+        <div className="mb-8 flex justify-center">
+          <BrandLogo />
+        </div>
+
+        <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
+          <p className="text-sm text-[#6B7280]">Loading booking details...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CancelPageContent() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
 
@@ -80,7 +104,7 @@ export default function CancelPage() {
 
         {loading && (
           <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
-            <p className="text-sm text-[#6B7280]">Loading booking details…</p>
+            <p className="text-sm text-[#6B7280]">Loading booking details...</p>
           </div>
         )}
 
@@ -148,7 +172,7 @@ export default function CancelPage() {
                 disabled={cancelling}
                 onClick={handleCancel}
               >
-                {cancelling ? "Cancelling…" : "Yes, cancel it"}
+                {cancelling ? "Cancelling..." : "Yes, cancel it"}
               </Button>
             </div>
           </div>
