@@ -49,9 +49,6 @@ pipeline {
             steps {
                 sh '''
                     cd ${PROJECT_DIR}
-                    docker compose -f ${COMPOSE_FILE} run --rm \
-                        -e DATABASE_URL=$(grep DATABASE_URL .env.production | cut -d= -f2-) \
-                        api node dist/src/main.js --migrate-only || \
                     docker compose -f ${COMPOSE_FILE} run --rm api \
                         sh -c "npx prisma migrate deploy"
                 '''
