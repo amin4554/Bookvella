@@ -50,7 +50,7 @@ pipeline {
                 sh '''
                     cd ${PROJECT_DIR}
                     docker compose -f ${COMPOSE_FILE} run --rm api \
-                        sh -c "npx prisma migrate deploy"
+                        sh -c "./node_modules/.bin/prisma migrate deploy"
                 '''
             }
         }
