@@ -17,6 +17,10 @@ COPY apps/api/tsconfig.json apps/api/tsconfig.build.json apps/api/nest-cli.json 
 COPY apps/api/src ./src
 RUN pnpm prisma generate
 RUN pnpm run build
+# Dereference pnpm symlinks for prisma CLI into real files before prod prune removes it.
+# COPY --from across stages preserves symlinks as-is; cp -rL resolves them so the
+# runner gets actual files, not dangling pointers into the missing pnpm virtual store.
+RUN cp -rL node_modules/prisma /tmp/prisma-pkg
 RUN pnpm prune --prod
 
 FROM base AS runner
@@ -25,8 +29,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
-# Copy prisma CLI binary so migrations can run at startup
-COPY --from=deps /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=deps /app/node_modules/prisma ./node_modules/prisma
+COPY --from=build /tmp/prisma-pkg ./node_modules/prisma
+RUN ln -sf ../prisma/bin/prisma.js node_modules/.bin/prisma
 EXPOSE 3000
 CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]

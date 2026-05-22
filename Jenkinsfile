@@ -45,16 +45,6 @@ pipeline {
             }
         }
 
-        stage('Run DB migrations') {
-            steps {
-                sh '''
-                    cd ${PROJECT_DIR}
-                    docker compose -f ${COMPOSE_FILE} run --rm api \
-                        sh -c "./node_modules/.bin/prisma migrate deploy"
-                '''
-            }
-        }
-
         stage('Deploy') {
             steps {
                 sh '''
@@ -69,14 +59,29 @@ pipeline {
 
         stage('Health check') {
             steps {
-                // Give the API a moment to start, then verify it's alive
+                // Poll Docker's own healthcheck status (includes migration time) instead of
+                // a fixed sleep that may expire before prisma migrate deploy finishes.
                 sh '''
-                    sleep 15
                     cd ${PROJECT_DIR}
+                    echo "Waiting up to 120 s for the API to become healthy..."
+                    i=0
+                    while [ $i -lt 24 ]; do
+                        STATUS=$(docker inspect --format="{{.State.Health.Status}}" \
+                            "$(docker compose -f ${COMPOSE_FILE} ps -q api)" 2>/dev/null || echo "starting")
+                        if [ "$STATUS" = "healthy" ]; then
+                            echo "✅ API healthy after $((i * 5)) s"
+                            break
+                        fi
+                        i=$((i + 1))
+                        if [ $i -eq 24 ]; then
+                            echo "❌ Timed out waiting for healthy API"
+                            docker compose -f ${COMPOSE_FILE} logs --tail=50 api
+                            exit 1
+                        fi
+                        echo "  ${i}/24 – status: ${STATUS}"
+                        sleep 5
+                    done
                     docker compose -f ${COMPOSE_FILE} ps
-                    docker compose -f ${COMPOSE_FILE} exec -T api \
-                        node -e "fetch('http://localhost:3000/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))" \
-                        || { echo "API health check failed!"; exit 1; }
                     echo "✅ Deployment successful"
                 '''
             }
