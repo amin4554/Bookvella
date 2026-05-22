@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(node_modules/.bin/jest --runInBand --no-coverage)",
-      "Bash(node -e \"const p = require\\('C:/Users/mehdi/Desktop/Bookvella/apps/api/node_modules/.pnpm/prisma@6.19.3/node_modules/prisma/package.json'\\); console.log\\(JSON.stringify\\(p.bin, null, 2\\)\\);\")"
-    ]
-  }
-}
