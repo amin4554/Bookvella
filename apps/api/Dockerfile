@@ -17,7 +17,7 @@ COPY apps/api/tsconfig.json apps/api/tsconfig.build.json apps/api/nest-cli.json 
 COPY apps/api/src ./src
 RUN pnpm prisma generate
 RUN pnpm run build
-RUN pnpm run test -- --runInBand
+RUN node_modules/.bin/jest --runInBand
 # Dereference pnpm symlinks for prisma CLI into real files before prod prune removes it.
 # COPY --from across stages preserves symlinks as-is; cp -rL resolves them so the
 # runner gets actual files, not dangling pointers into the missing pnpm virtual store.
