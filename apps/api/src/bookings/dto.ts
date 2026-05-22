@@ -8,6 +8,7 @@ export type CreatePublicBookingDto = {
   guestName?: string;
   guestEmail?: string;
   guestPhone?: string | null;
+  guestNote?: string | null;
   guestTimezone?: string;
   startTimeUtc?: string;
   verificationId?: string;

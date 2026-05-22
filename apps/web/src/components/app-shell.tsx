@@ -14,7 +14,14 @@ import {
   Table2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { getAuthSession, logoutAuthSession } from "@/lib/api";
+import {
+  authedApiRequest,
+  clearAuthSession,
+  getAuthSession,
+  logoutAuthSession,
+  type PublicUser,
+  updateStoredUser,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -42,13 +49,63 @@ export function AppShell({
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    const current = getAuthSession();
-    setSession(current);
-    setCheckingSession(false);
+    let active = true;
 
-    if (!current) {
-      router.replace("/login");
+    async function verifySession() {
+      const current = getAuthSession();
+
+      if (!current) {
+        if (active) {
+          setSession(null);
+          setCheckingSession(false);
+          router.replace("/login");
+        }
+        return;
+      }
+
+      try {
+        const user = await authedApiRequest<PublicUser>("/auth/me");
+        updateStoredUser(user);
+        const refreshed = getAuthSession();
+
+        if (active) {
+          setSession(refreshed ? { ...refreshed, user } : null);
+          setCheckingSession(false);
+        }
+      } catch (caught) {
+        const status =
+          caught instanceof Error && "status" in caught
+            ? (caught.status as number | undefined)
+            : undefined;
+
+        if (status === 401) {
+          clearAuthSession();
+          if (active) {
+            setSession(null);
+            setCheckingSession(false);
+            const next =
+              typeof window === "undefined"
+                ? "/dashboard"
+                : `${window.location.pathname}${window.location.search}`;
+            router.replace(
+              `/login?reason=session_expired&next=${encodeURIComponent(next)}`,
+            );
+          }
+          return;
+        }
+
+        if (active) {
+          setSession(current);
+          setCheckingSession(false);
+        }
+      }
     }
+
+    verifySession();
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   if (checkingSession || !session) {

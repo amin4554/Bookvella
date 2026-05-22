@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ACCESS_TOKEN_COOKIE, getCookie } from './auth-cookies';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
 
@@ -14,12 +15,14 @@ export class AuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authHeader = request.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length).trim()
+      : getCookie(request, ACCESS_TOKEN_COOKIE);
 
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing Authorization bearer token');
+    if (!token) {
+      throw new UnauthorizedException('Missing auth session');
     }
 
-    const token = authHeader.slice('Bearer '.length).trim();
     request.user = this.authService.verifyAccessToken(token);
 
     return true;

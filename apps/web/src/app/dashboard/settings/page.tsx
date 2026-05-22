@@ -11,6 +11,7 @@ import {
   type EventType,
   type HostReview,
   type PublicUser,
+  uploadImage,
   updateStoredUser,
 } from "@/lib/api";
 
@@ -33,6 +34,10 @@ export default function SettingsPage() {
   const [reviews, setReviews] = useState<HostReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +49,8 @@ export default function SettingsPage() {
           authedApiRequest<HostReview[]>("/reviews"),
         ]);
         setUser(me);
+        setProfileImageUrl(me.profileImageUrl ?? "");
+        setCoverImageUrl(me.coverImageUrl ?? "");
         setEvents(services);
         setReviews(hostReviews);
       } catch (caught) {
@@ -72,8 +79,8 @@ export default function SettingsPage() {
           name: readText(form, "name"),
           slug: readText(form, "slug"),
           timezone: readText(form, "timezone"),
-          profileImageUrl: readOptionalText(form, "profileImageUrl"),
-          coverImageUrl: readOptionalText(form, "coverImageUrl"),
+          profileImageUrl: profileImageUrl || null,
+          coverImageUrl: coverImageUrl || null,
           headline: readOptionalText(form, "headline"),
           businessCategory: readOptionalText(form, "businessCategory"),
           location: readOptionalText(form, "location"),
@@ -142,7 +149,7 @@ export default function SettingsPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#FF6267] px-4 text-sm font-bold text-[#FF6267]">
                           <Upload className="size-4" />
-                          Image URL
+                          Upload below
                         </span>
                         <span className="inline-flex h-10 items-center rounded-xl border border-[#E8DED7] px-4 text-sm font-bold text-[#6B7280]">
                           Preview below
@@ -176,17 +183,23 @@ export default function SettingsPage() {
                     defaultValue={user.location ?? ""}
                     placeholder="Shoreditch, London"
                   />
-                  <Field
-                    label="Profile image URL"
-                    name="profileImageUrl"
-                    defaultValue={user.profileImageUrl ?? ""}
-                    placeholder="https://..."
+                  <ImageUploadField
+                    label="Profile picture"
+                    value={profileImageUrl}
+                    uploading={uploadingProfile}
+                    onClear={() => setProfileImageUrl("")}
+                    onChange={(file) =>
+                      handleImageUpload(file, setUploadingProfile, setProfileImageUrl)
+                    }
                   />
-                  <Field
-                    label="Cover image URL"
-                    name="coverImageUrl"
-                    defaultValue={user.coverImageUrl ?? ""}
-                    placeholder="https://..."
+                  <ImageUploadField
+                    label="Cover image"
+                    value={coverImageUrl}
+                    uploading={uploadingCover}
+                    onClear={() => setCoverImageUrl("")}
+                    onChange={(file) =>
+                      handleImageUpload(file, setUploadingCover, setCoverImageUrl)
+                    }
                   />
                 </>
               )}
@@ -223,12 +236,38 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-                <Field
-                  label="Public profile URL"
-                  name="slug"
-                  defaultValue={user?.slug ?? ""}
-                  placeholder="your-name"
-                />
+                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+                  <p className="text-sm font-bold">Public profile URL</p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-[#6B7280]">
+                    <span className="truncate">
+                      {profileUrl(user?.slug)}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-sm font-bold text-[#FF6267]"
+                      onClick={() => {
+                        const url = profileUrl(user?.slug);
+                        navigator.clipboard.writeText(url);
+                        toast.success("Profile link copied");
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <details className="mt-3 rounded-xl border border-[#E8DED7] bg-white px-4 py-3">
+                    <summary className="cursor-pointer text-sm font-bold text-[#6B7280]">
+                      Edit public URL
+                    </summary>
+                    <div className="mt-3">
+                      <Field
+                        label="Public URL ending"
+                        name="slug"
+                        defaultValue={user?.slug ?? ""}
+                        placeholder="your-name"
+                      />
+                    </div>
+                  </details>
+                </div>
                 <label className="block">
                   <span className="text-sm font-bold">Timezone</span>
                   <select
@@ -291,12 +330,12 @@ export default function SettingsPage() {
 
           <aside className="xl:sticky xl:top-8 xl:self-start">
             <div className="mb-4 flex items-center justify-between text-sm font-bold text-[#6B7280]">
-              <span>Live preview — what guests see</span>
+              <span>Live preview - what guests see</span>
               <span className="rounded-full bg-[#D8FFE8] px-4 py-1 text-xs text-[#16A34A]">
                 Live
               </span>
             </div>
-            <Preview user={user} events={events} />
+            <Preview user={user} events={events} reviews={reviews} />
             <button
               type="button"
               className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-[#FF6267]"
@@ -333,6 +372,25 @@ export default function SettingsPage() {
     );
     toast.success(updated.isVisible ? "Review shown" : "Review hidden");
   }
+
+  async function handleImageUpload(
+    file: File,
+    setUploading: (value: boolean) => void,
+    setUrl: (value: string) => void,
+  ) {
+    setUploading(true);
+    setError(null);
+
+    try {
+      const uploaded = await uploadImage(file);
+      setUrl(uploaded.url);
+      toast.success("Image uploaded");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not upload image");
+    } finally {
+      setUploading(false);
+    }
+  }
 }
 
 function Panel({
@@ -355,12 +413,20 @@ function Panel({
 function Preview({
   user,
   events,
+  reviews,
 }: {
   user: PublicUser | null;
   events: EventType[];
+  reviews: HostReview[];
 }) {
   const services = events.length ? events : fallbackServices;
   const name = user?.name ?? "Bookvella host";
+  const visibleReviews = reviews.filter((review) => review.isVisible);
+  const averageRating =
+    visibleReviews.length === 0
+      ? null
+      : visibleReviews.reduce((sum, review) => sum + review.rating, 0) /
+        visibleReviews.length;
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-[#EEE7DF] bg-white shadow-sm">
@@ -396,9 +462,15 @@ function Preview({
               </span>
             ))}
         </div>
-        <p className="mt-4 text-sm text-amber-500">
-          ***** <span className="text-[#6B7280]">4.9 · 312 reviews</span>
-        </p>
+        {averageRating ? (
+          <p className="mt-4 text-sm text-amber-500">
+            {stars(averageRating)}{" "}
+            <span className="text-[#6B7280]">
+              {averageRating.toFixed(1)} - {visibleReviews.length}{" "}
+              {visibleReviews.length === 1 ? "review" : "reviews"}
+            </span>
+          </p>
+        ) : null}
         <PreviewSection
           title="About"
           text={
@@ -414,13 +486,21 @@ function Preview({
             {services.slice(0, 2).map((service) => (
               <div
                 key={service.title}
-                className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4"
+                className="flex gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4"
               >
-                <p className="font-bold">{service.title}</p>
-                <p className="mt-1 text-sm text-[#6B7280]">
-                  {service.durationMinutes} min ·{" "}
-                  {service.locationDetails ?? "Location shared after booking"}
-                </p>
+                {"imageUrl" in service && service.imageUrl ? (
+                  <div
+                    className="size-14 shrink-0 rounded-xl bg-cover bg-center"
+                    style={{ backgroundImage: `url(${service.imageUrl})` }}
+                  />
+                ) : null}
+                <div>
+                  <p className="font-bold">{service.title}</p>
+                  <p className="mt-1 text-sm text-[#6B7280]">
+                    {service.durationMinutes} min -{" "}
+                    {service.locationDetails ?? "Location shared after booking"}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -528,6 +608,71 @@ function TextArea({
   );
 }
 
+function ImageUploadField({
+  label,
+  value,
+  uploading,
+  onChange,
+  onClear,
+}: {
+  label: string;
+  value: string;
+  uploading: boolean;
+  onChange: (file: File) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold">{label}</p>
+          <p className="mt-1 text-xs text-[#6B7280]">
+            JPG, PNG, WEBP, or GIF up to 5 MB.
+          </p>
+        </div>
+        {value ? (
+          <button
+            type="button"
+            className="text-xs font-bold text-[#FF6267]"
+            onClick={onClear}
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        {value ? (
+          <div
+            className="size-20 rounded-2xl border border-[#E8DED7] bg-cover bg-center"
+            style={{ backgroundImage: `url(${value})` }}
+          />
+        ) : (
+          <div className="flex size-20 items-center justify-center rounded-2xl border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]">
+            No image
+          </div>
+        )}
+        <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#FF6267] bg-white px-4 text-sm font-bold text-[#FF6267]">
+          <Upload className="size-4" />
+          {uploading ? "Uploading..." : "Choose image"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="sr-only"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) {
+                onChange(file);
+              }
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function Skeleton({ text }: { text: string }) {
   return <p className="text-sm text-[#6B7280]">{text}</p>;
 }
@@ -548,4 +693,9 @@ function unique<T>(value: T, index: number, array: T[]) {
 
 function stars(rating: number) {
   return "*****".slice(0, Math.max(0, Math.min(5, Math.round(rating))));
+}
+
+function profileUrl(slug?: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+  return `${appUrl.replace(/\/$/, "")}/${slug ?? "your-link"}`;
 }

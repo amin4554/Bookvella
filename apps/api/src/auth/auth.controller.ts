@@ -5,8 +5,16 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import {
+  clearAuthCookies,
+  getCookie,
+  REFRESH_TOKEN_COOKIE,
+  setAuthCookies,
+} from './auth-cookies';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
@@ -24,28 +32,63 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const session = await this.authService.register(dto);
+    setAuthCookies(response, session);
+    return toSessionResponse(session);
   }
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const session = await this.authService.login(dto);
+    setAuthCookies(response, session);
+    return toSessionResponse(session);
   }
 
   @Post('google')
-  google(@Body() dto: GoogleAuthDto) {
-    return this.authService.google(dto);
+  async google(
+    @Body() dto: GoogleAuthDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const session = await this.authService.google(dto);
+    setAuthCookies(response, session);
+    return toSessionResponse(session);
   }
 
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto);
+  async refresh(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: RefreshTokenDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const session = await this.authService.refresh({
+      refreshToken:
+        dto.refreshToken ?? getCookie(request, REFRESH_TOKEN_COOKIE),
+    });
+    setAuthCookies(response, session);
+    return toSessionResponse(session);
   }
 
   @Post('logout')
-  logout(@Body() dto: LogoutDto) {
-    return this.authService.logout(dto);
+  async logout(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: LogoutDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    try {
+      return await this.authService.logout({
+        refreshToken:
+          dto.refreshToken ?? getCookie(request, REFRESH_TOKEN_COOKIE),
+      });
+    } finally {
+      clearAuthCookies(response);
+    }
   }
 
   @Get('me')
@@ -64,4 +107,17 @@ export class AuthController {
   jwks() {
     return this.authService.getJwks();
   }
+}
+
+function toSessionResponse(session: {
+  user: unknown;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}) {
+  return {
+    user: session.user,
+    expiresIn: session.expiresIn,
+    authenticated: true,
+  };
 }

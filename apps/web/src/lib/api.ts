@@ -22,9 +22,8 @@ export type PublicUser = {
 
 export type AuthResponse = {
   user: PublicUser;
-  accessToken: string;
-  refreshToken: string;
   expiresIn: number;
+  authenticated: boolean;
 };
 
 export type EventType = {
@@ -33,6 +32,7 @@ export type EventType = {
   slug: string;
   title: string;
   category: string | null;
+  imageUrl: string | null;
   description: string | null;
   whatIncluded: string | null;
   locationDetails: string | null;
@@ -60,6 +60,7 @@ export type HostBooking = {
   guestName: string;
   guestEmail: string;
   guestPhone: string | null;
+  guestNote: string | null;
   guestTimezone: string;
   startTimeUtc: string;
   endTimeUtc: string;
@@ -118,6 +119,7 @@ export type PublicEvent = {
     slug: string;
     title: string;
     category: string | null;
+    imageUrl: string | null;
     description: string | null;
     whatIncluded: string | null;
     locationDetails: string | null;
@@ -157,8 +159,11 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(options.body instanceof FormData
+        ? {}
+        : { "Content-Type": "application/json" }),
       ...options.headers,
     },
   });
@@ -178,34 +183,52 @@ export async function authedApiRequest<T>(
 ): Promise<T> {
   const session = getAuthSession();
 
-  if (!session?.accessToken) {
+  if (!session?.user) {
     const error = new Error("Please sign in again") as ApiError;
     error.status = 401;
     throw error;
   }
 
   try {
-    return await apiRequest<T>(path, withBearer(options, session.accessToken));
+    return await apiRequest<T>(path, options);
   } catch (caught) {
     const error = caught as ApiError;
 
-    if (error.status !== 401 || !session.refreshToken) {
+    if (error.status !== 401) {
       throw error;
     }
 
-    const refreshed = await apiRequest<AuthResponse>("/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
-    });
+    let refreshed: AuthResponse;
+
+    try {
+      refreshed = await apiRequest<AuthResponse>("/auth/refresh", {
+        method: "POST",
+      });
+    } catch {
+      await clearServerSession();
+      clearAuthSession();
+      const refreshError = new Error("Your session expired. Please sign in again.") as ApiError;
+      refreshError.status = 401;
+      throw refreshError;
+    }
+
     saveAuthSession(refreshed);
 
-    return apiRequest<T>(path, withBearer(options, refreshed.accessToken));
+    return apiRequest<T>(path, options);
   }
 }
 
+export async function uploadImage(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+
+  return authedApiRequest<{ url: string }>("/uploads/images", {
+    method: "POST",
+    body: form,
+  });
+}
+
 export function saveAuthSession(session: AuthResponse) {
-  localStorage.setItem("bookvella.accessToken", session.accessToken);
-  localStorage.setItem("bookvella.refreshToken", session.refreshToken);
   localStorage.setItem("bookvella.user", JSON.stringify(session.user));
 }
 
@@ -218,18 +241,14 @@ export function getAuthSession() {
     return null;
   }
 
-  const accessToken = localStorage.getItem("bookvella.accessToken");
-  const refreshToken = localStorage.getItem("bookvella.refreshToken");
   const userJson = localStorage.getItem("bookvella.user");
 
-  if (!accessToken || !refreshToken || !userJson) {
+  if (!userJson) {
     return null;
   }
 
   try {
     return {
-      accessToken,
-      refreshToken,
       user: JSON.parse(userJson) as PublicUser,
     };
   } catch {
@@ -239,25 +258,11 @@ export function getAuthSession() {
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem("bookvella.accessToken");
-  localStorage.removeItem("bookvella.refreshToken");
   localStorage.removeItem("bookvella.user");
 }
 
 export async function logoutAuthSession() {
-  const session = getAuthSession();
-
-  if (session?.refreshToken) {
-    try {
-      await apiRequest<{ success: boolean }>("/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken: session.refreshToken }),
-      });
-    } catch {
-      // Local logout should still complete if the API session is already gone.
-    }
-  }
-
+  await clearServerSession();
   clearAuthSession();
 }
 
@@ -282,12 +287,12 @@ async function readErrorMessage(response: Response) {
   return response.statusText || "Something went wrong";
 }
 
-function withBearer(options: RequestInit, accessToken: string): RequestInit {
-  return {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  };
+async function clearServerSession() {
+  try {
+    await apiRequest<{ success: boolean }>("/auth/logout", {
+      method: "POST",
+    });
+  } catch {
+    // Local cleanup should still complete if the API session is already gone.
+  }
 }

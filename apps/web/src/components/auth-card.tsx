@@ -6,20 +6,36 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Globe } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
-import { apiRequest, AuthResponse, saveAuthSession } from "@/lib/api";
+import {
+  apiRequest,
+  AuthResponse,
+  authedApiRequest,
+  getAuthSession,
+  saveAuthSession,
+  type PublicUser,
+  updateStoredUser,
+} from "@/lib/api";
 
 type AuthCardProps = {
   mode: "login" | "register";
   state?: "default" | "error" | "loading";
+  message?: string;
+  redirectTo?: string;
 };
 
-export function AuthCard({ mode, state = "default" }: AuthCardProps) {
+export function AuthCard({
+  mode,
+  state = "default",
+  message,
+  redirectTo,
+}: AuthCardProps) {
   const router = useRouter();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(
-    state === "error" ? "Please check your details and try again." : null,
+    message ??
+      (state === "error" ? "Please check your details and try again." : null),
   );
   const isRegister = mode === "register";
   const loading = submitting || state === "loading";
@@ -31,6 +47,33 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
       ? "Create my free Bookvella page"
       : "Sign in to Bookvella";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    let active = true;
+
+    async function redirectIfAlreadySignedIn() {
+      if (!getAuthSession()) {
+        return;
+      }
+
+      try {
+        const user = await authedApiRequest<PublicUser>("/auth/me");
+        updateStoredUser(user);
+
+        if (active) {
+          router.replace(safeRedirect(redirectTo));
+        }
+      } catch {
+        // Stay on the auth page if the saved session is stale.
+      }
+    }
+
+    redirectIfAlreadySignedIn();
+
+    return () => {
+      active = false;
+    };
+  }, [redirectTo, router]);
 
   useEffect(() => {
     if (!googleClientId || !googleButtonRef.current) {
@@ -67,7 +110,7 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
               }),
             });
             saveAuthSession(session);
-            router.push("/dashboard");
+            router.push(safeRedirect(redirectTo));
           } catch (caught) {
             setError(
               caught instanceof Error
@@ -313,7 +356,7 @@ export function AuthCard({ mode, state = "default" }: AuthCardProps) {
       );
 
       saveAuthSession(session);
-      router.push("/dashboard");
+      router.push(safeRedirect(redirectTo));
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Something went wrong",
@@ -393,6 +436,14 @@ function guessTimezoneValue() {
   } catch {
     return "UTC";
   }
+}
+
+function safeRedirect(value: string | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return value;
 }
 
 declare global {

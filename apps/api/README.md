@@ -1,98 +1,187 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Bookvella API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This is the NestJS API for Bookvella.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## What It Contains
 
-## Description
+- Email/password auth.
+- Refresh-token sessions and logout.
+- Google sign-in/sign-up endpoint.
+- Host profile management.
+- Service/event type CRUD.
+- Authenticated image uploads for profile, cover, and service pictures.
+- Weekly availability rules.
+- Public event lookup and slot generation.
+- Email-code booking flow.
+- Host booking list and cancellation.
+- Branded booking and cancellation emails.
+- Guest review submission and host review visibility controls.
+- Health checks for deployment.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Environment
 
-## Project setup
+Create `apps/api/.env` from `apps/api/.env.example`:
 
-```bash
-$ pnpm install
+```bat
+copy .env.example .env
 ```
 
-## Compile and run the project
+Typical local database URL:
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```txt
+DATABASE_URL="postgresql://bookvella:bookvella_dev@localhost:5433/bookvella?schema=public"
 ```
 
-## Run tests
+Google sign-in is optional locally. To enable it, set:
 
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+```txt
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
 ```
 
-## Deployment
+## Development
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Start PostgreSQL from the repository root:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+```bat
+docker compose up -d
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Install and prepare the API:
 
-## Resources
+```bat
+pnpm install
+pnpm prisma generate
+pnpm prisma migrate dev
+pnpm run db:seed
+pnpm run start:dev
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+The API runs on:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```txt
+http://localhost:3000
+```
 
-## Support
+## Useful Scripts
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bat
+pnpm run build
+pnpm run test
+pnpm run test:e2e
+pnpm run db:seed
+pnpm prisma generate
+pnpm prisma migrate dev
+pnpm prisma migrate deploy
+```
 
-## Stay in touch
+## E2E Smoke Test
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+The E2E suite exercises the MVP booking loop: host registration, service setup, schedule setup, slot lookup, email-code booking, duplicate-slot rejection, cancellation, review submission, and review visibility.
 
-## License
+Before running it locally, make sure PostgreSQL is running and migrations are applied:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bat
+cd ..\..
+docker compose up -d db
+cd apps\api
+pnpm prisma migrate dev
+pnpm run test:e2e
+```
+
+The test sets `EMAIL_DEV_RETURN_CODE=true` internally so it can read the verification code from the API response instead of depending on a real inbox.
+
+## Health Checks
+
+```txt
+GET /health
+GET /health/live
+GET /health/ready
+```
+
+## Main Route Groups
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/google`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `PATCH /auth/me`
+- `GET /event-types`
+- `POST /event-types`
+- `PATCH /event-types/:id`
+- `DELETE /event-types/:id`
+- `GET /availability/rules`
+- `POST /availability/rules`
+- `PATCH /availability/rules/:id`
+- `DELETE /availability/rules/:id`
+- `GET /public/:hostSlug/:eventSlug`
+- `GET /public/:hostSlug/:eventSlug/slots`
+- `POST /public/:hostSlug/:eventSlug/booking-codes`
+- `POST /public/:hostSlug/:eventSlug/bookings`
+- `GET /bookings`
+- `PATCH /bookings/:id/cancel`
+- `POST /public/reviews`
+- `GET /reviews`
+- `PATCH /reviews/:id/visibility`
+- `POST /uploads/images`
+- `GET /uploads/images/:fileName`
+
+## Prisma
+
+This project currently uses Prisma 6. Prisma Client must be regenerated after schema changes:
+
+```bat
+pnpm prisma generate
+```
+
+Prisma 7 has been reviewed and is intentionally deferred until after MVP stabilization because it is not only a version bump. It introduces ESM-oriented setup, a required generated-client output path, Prisma config changes, and PostgreSQL driver adapters.
+
+## Auth Cookies
+
+Browser auth uses httpOnly cookies:
+
+- `bookvella.access`: short-lived access token.
+- `bookvella.refresh`: refresh token.
+- `bookvella.session`: non-sensitive session marker used by the web proxy for early dashboard redirects.
+
+The API still accepts `Authorization: Bearer ...` as a compatibility fallback for tooling, but the web app does not store or send bearer tokens after login.
+
+Production should set:
+
+```txt
+AUTH_COOKIE_DOMAIN=.bookvella.com
+AUTH_COOKIE_SECURE=true
+```
+
+Local development can leave `AUTH_COOKIE_DOMAIN` empty and `AUTH_COOKIE_SECURE=false`.
+
+## Uploads
+
+Hosts upload profile, cover, and service images through:
+
+```txt
+POST /uploads/images
+```
+
+The endpoint accepts authenticated multipart form data with a `file` field. JPG, PNG, WEBP, and GIF files up to 5 MB are accepted. Uploaded files are served from:
+
+```txt
+GET /uploads/images/:fileName
+```
+
+Production stores uploads in the `api_uploads` Docker volume mounted at `/app/uploads`.
+
+## Production
+
+The production Dockerfile runs:
+
+```txt
+pnpm prisma generate
+pnpm run build
+pnpm run test -- --runInBand
+prisma migrate deploy
+node dist/src/main.js
+```
+
+Deployment details are in the repository-level `DEPLOY.md`.

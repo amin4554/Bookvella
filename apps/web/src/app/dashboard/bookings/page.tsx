@@ -185,6 +185,11 @@ function BookingRow({
       <GuestCell name={booking.guestName} email={booking.guestEmail} muted={cancelled} />
       <div>
         <p className="font-medium">{booking.eventType.title}</p>
+        {booking.guestNote ? (
+          <p className="mt-1 line-clamp-2 text-xs text-[#6B7280]">
+            Note: {booking.guestNote}
+          </p>
+        ) : null}
         <p className="text-xs text-[#6B7280] lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
       </div>
       <p className="text-[#6B7280] max-lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>

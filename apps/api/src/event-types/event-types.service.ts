@@ -41,6 +41,7 @@ export class EventTypesService {
           slug,
           title,
           category: optionalText(dto.category),
+          imageUrl: optionalUrl(dto.imageUrl, 'imageUrl'),
           description: optionalText(dto.description),
           whatIncluded: optionalText(dto.whatIncluded),
           locationDetails: optionalText(dto.locationDetails),
@@ -93,6 +94,10 @@ export class EventTypesService {
 
     if (dto.category !== undefined) {
       data.category = optionalText(dto.category);
+    }
+
+    if (dto.imageUrl !== undefined) {
+      data.imageUrl = optionalUrl(dto.imageUrl, 'imageUrl');
     }
 
     if (dto.whatIncluded !== undefined) {
@@ -193,4 +198,24 @@ function isUniqueConstraintError(error: unknown) {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002'
   );
+}
+
+function optionalUrl(value: string | null | undefined, field: string) {
+  const text = optionalText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const url = new URL(text);
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error('Invalid protocol');
+    }
+
+    return url.toString();
+  } catch {
+    throw new BadRequestException(`${field} must be a valid URL`);
+  }
 }

@@ -3,8 +3,9 @@ pipeline {
 
     environment {
         COMPOSE_FILE = 'docker-compose.prod.yml'
-        // The workspace mount path inside the Jenkins container (set in docker-compose.prod.yml)
-        PROJECT_DIR  = '/workspace/bookvella'
+        COMPOSE_PROJECT_NAME = 'bookvella'
+        // Persistent server-only secrets live in the mounted deploy directory.
+        SECRET_ENV_FILE = '/workspace/bookvella/.env.production'
     }
 
     options {
@@ -30,8 +31,9 @@ pipeline {
                 sh '''
                     docker --version
                     docker compose version
-                    test -f ${PROJECT_DIR}/.env.production || \
+                    test -f "${SECRET_ENV_FILE}" || \
                         { echo "ERROR: .env.production not found on VPS. Create it first."; exit 1; }
+                    cp "${SECRET_ENV_FILE}" "${WORKSPACE}/.env.production"
                 '''
             }
         }
@@ -39,8 +41,8 @@ pipeline {
         stage('Build images') {
             steps {
                 sh '''
-                    cd ${PROJECT_DIR}
-                    docker compose -f ${COMPOSE_FILE} build --pull --no-cache api web
+                    cd "${WORKSPACE}"
+                    docker compose -p "${COMPOSE_PROJECT_NAME}" -f "${COMPOSE_FILE}" build --pull --no-cache api web
                 '''
             }
         }
@@ -48,9 +50,9 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    cd ${PROJECT_DIR}
+                    cd "${WORKSPACE}"
                     # Bring up updated containers; postgres, nginx, certbot stay running
-                    docker compose -f ${COMPOSE_FILE} up -d --no-deps api web
+                    docker compose -p "${COMPOSE_PROJECT_NAME}" -f "${COMPOSE_FILE}" up -d --no-deps api web
                     # Remove dangling images to keep disk clean
                     docker image prune -f
                 '''
@@ -62,12 +64,12 @@ pipeline {
                 // Poll Docker's own healthcheck status (includes migration time) instead of
                 // a fixed sleep that may expire before prisma migrate deploy finishes.
                 sh '''
-                    cd ${PROJECT_DIR}
+                    cd "${WORKSPACE}"
                     echo "Waiting up to 120 s for the API to become healthy..."
                     i=0
                     while [ $i -lt 24 ]; do
                         STATUS=$(docker inspect --format="{{.State.Health.Status}}" \
-                            "$(docker compose -f ${COMPOSE_FILE} ps -q api)" 2>/dev/null || echo "starting")
+                            "$(docker compose -p "${COMPOSE_PROJECT_NAME}" -f "${COMPOSE_FILE}" ps -q api)" 2>/dev/null || echo "starting")
                         if [ "$STATUS" = "healthy" ]; then
                             echo "✅ API healthy after $((i * 5)) s"
                             break
@@ -75,13 +77,13 @@ pipeline {
                         i=$((i + 1))
                         if [ $i -eq 24 ]; then
                             echo "❌ Timed out waiting for healthy API"
-                            docker compose -f ${COMPOSE_FILE} logs --tail=50 api
+                            docker compose -p "${COMPOSE_PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --tail=50 api
                             exit 1
                         fi
                         echo "  ${i}/24 – status: ${STATUS}"
                         sleep 5
                     done
-                    docker compose -f ${COMPOSE_FILE} ps
+                    docker compose -p "${COMPOSE_PROJECT_NAME}" -f "${COMPOSE_FILE}" ps
                     echo "✅ Deployment successful"
                 '''
             }

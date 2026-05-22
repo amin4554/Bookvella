@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     SchedulingModule,
     BookingsModule,
     ReviewsModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -84,6 +84,7 @@ export class SchedulingService {
         slug: eventType.slug,
         title: eventType.title,
         category: eventType.category,
+        imageUrl: eventType.imageUrl,
         description: eventType.description,
         whatIncluded: eventType.whatIncluded,
         locationDetails: eventType.locationDetails,

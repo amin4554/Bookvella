@@ -1,7 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Check, Clock3, Mail, MapPin, ShieldCheck } from "lucide-react";
+import {
+  CalendarPlus,
+  Check,
+  Clock3,
+  Mail,
+  MapPin,
+  ShieldCheck,
+} from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +26,7 @@ type GuestDetails = {
   name: string;
   email: string;
   phone: string;
+  note: string;
 };
 
 const validSteps: BookingStep[] = ["slots", "details", "code", "success"];
@@ -52,6 +60,7 @@ export function PublicBooking({
     name: "",
     email: "",
     phone: "",
+    note: "",
   });
   const [verification, setVerification] = useState<BookingCodeResponse | null>(
     null,
@@ -142,6 +151,7 @@ export function PublicBooking({
         name: readText(form, "name"),
         email: readText(form, "email"),
         phone: readText(form, "phone"),
+        note: readText(form, "note"),
       };
       const response = await apiRequest<BookingCodeResponse>(
         `/public/${hostSlug}/${eventSlug}/booking-codes`,
@@ -182,6 +192,7 @@ export function PublicBooking({
             guestName: guest.name,
             guestEmail: guest.email,
             guestPhone: guest.phone || null,
+            guestNote: guest.note || null,
             guestTimezone,
             startTimeUtc: selectedSlot.startTimeUtc,
             verificationId: verification.verificationId,
@@ -197,6 +208,42 @@ export function PublicBooking({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function resendCode() {
+    if (!selectedSlot || !guest.email) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await apiRequest<BookingCodeResponse>(
+        `/public/${hostSlug}/${eventSlug}/booking-codes`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            guestEmail: guest.email,
+            guestTimezone,
+            startTimeUtc: selectedSlot.startTimeUtc,
+          }),
+        },
+      );
+      setVerification(response);
+      setCode("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not resend verification code",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function changeEmail() {
+    setVerification(null);
+    setCode("");
+    setStep("details");
   }
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
@@ -278,6 +325,14 @@ export function PublicBooking({
               ) : null}
             </div>
           </div>
+          {publicEvent.eventType.imageUrl ? (
+            <div
+              className="mt-6 aspect-[4/3] rounded-[22px] border border-[#EEE7DF] bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${publicEvent.eventType.imageUrl})`,
+              }}
+            />
+          ) : null}
           <div className="mt-8 rounded-[22px] border border-[#EEE7DF] bg-[#FFFBF7] p-5">
             <h1 className="text-xl font-bold">{publicEvent.eventType.title}</h1>
             <div className="mt-4 space-y-4 text-sm">
@@ -394,6 +449,7 @@ export function PublicBooking({
               formatLocation(publicEvent.eventType.locationType)
             }
             selectedTime={selectedTime}
+            guest={guest}
             submitting={submitting}
             onBack={() => setStep("slots")}
             onSubmit={requestCode}
@@ -407,10 +463,12 @@ export function PublicBooking({
             submitting={submitting}
             onCodeChange={setCode}
             onBack={() => setStep("details")}
+            onChangeEmail={changeEmail}
+            onResend={resendCode}
             onSuccess={confirmBooking}
           />
         ) : null}
-        {step === "success" && selectedTime ? (
+        {step === "success" && selectedTime && selectedSlot ? (
           <SuccessStep
             eventTitle={publicEvent.eventType.title}
             hostName={publicEvent.host.name}
@@ -420,6 +478,8 @@ export function PublicBooking({
               formatLocation(publicEvent.eventType.locationType)
             }
             selectedTime={selectedTime}
+            startTimeUtc={selectedSlot.startTimeUtc}
+            endTimeUtc={selectedSlot.endTimeUtc}
             onRestart={() => {
               setSelectedSlot(null);
               setVerification(null);
@@ -516,7 +576,8 @@ function SlotsStep({
                 No times available
               </p>
               <p className="mt-1 text-sm text-[#B8C0CC]">
-                Try selecting a different date.
+                Try another date above or check back after the host updates
+                their schedule.
               </p>
             </div>
           ) : null}
@@ -532,6 +593,7 @@ function DetailsStep({
   duration,
   location,
   selectedTime,
+  guest,
   submitting,
   onBack,
   onSubmit,
@@ -541,6 +603,7 @@ function DetailsStep({
   duration: number;
   location: string;
   selectedTime: { day: string; time: string; range: string };
+  guest: GuestDetails;
   submitting: boolean;
   onBack: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -558,17 +621,20 @@ function DetailsStep({
             label="Full name"
             name="name"
             placeholder="Your full name"
+            defaultValue={guest.name}
           />
           <PublicField
             label="Email address"
             name="email"
             placeholder="you@example.com"
             type="email"
+            defaultValue={guest.email}
           />
           <PublicField
             label="Phone number (optional)"
             name="phone"
             placeholder="+1 (555) 000-0000"
+            defaultValue={guest.phone}
           />
           <label className="block">
             <span className="text-sm font-bold">
@@ -577,6 +643,7 @@ function DetailsStep({
             </span>
             <textarea
               name="note"
+              defaultValue={guest.note}
               rows={4}
               className="mt-2 w-full resize-none rounded-2xl border border-[#E8DED7] bg-white px-5 py-4 outline-none placeholder:text-[#9CA3AF] focus:border-[#FF5F63] focus:ring-4 focus:ring-[#FF5F63]/10"
               placeholder="Anything they should know before the appointment?"
@@ -612,6 +679,8 @@ function CodeStep({
   submitting,
   onCodeChange,
   onBack,
+  onChangeEmail,
+  onResend,
   onSuccess,
 }: {
   email: string;
@@ -620,6 +689,8 @@ function CodeStep({
   submitting: boolean;
   onCodeChange: (code: string) => void;
   onBack: () => void;
+  onChangeEmail: () => void;
+  onResend: () => void;
   onSuccess: () => void;
 }) {
   return (
@@ -661,6 +732,14 @@ function CodeStep({
       >
         Back
       </button>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm font-medium">
+        <button className="text-[#FF5F63]" onClick={onResend} type="button">
+          Resend code
+        </button>
+        <button className="text-[#6B7280]" onClick={onChangeEmail} type="button">
+          Change email
+        </button>
+      </div>
     </div>
   );
 }
@@ -671,6 +750,8 @@ function SuccessStep({
   email,
   location,
   selectedTime,
+  startTimeUtc,
+  endTimeUtc,
   onRestart,
 }: {
   eventTitle: string;
@@ -678,8 +759,18 @@ function SuccessStep({
   email: string;
   location: string;
   selectedTime: { day: string; range: string };
+  startTimeUtc: string;
+  endTimeUtc: string;
   onRestart: () => void;
 }) {
+  const calendarUrl = googleCalendarUrl({
+    title: eventTitle,
+    hostName,
+    location,
+    startTimeUtc,
+    endTimeUtc,
+  });
+
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
       <div className="rounded-full bg-gradient-to-br from-[#FFE6E3] to-[#F0E6FF] p-5">
@@ -698,6 +789,15 @@ function SuccessStep({
         <Detail label="Time" value={selectedTime.range} />
         <Detail label="Location" value={location} />
       </div>
+      <a
+        href={calendarUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-5 text-sm font-bold text-[#111827] shadow-sm"
+      >
+        <CalendarPlus className="size-4 text-[#FF6267]" />
+        Add to calendar
+      </a>
       <button
         className="mt-4 text-sm font-medium text-[#FF5F63]"
         onClick={onRestart}
@@ -717,16 +817,19 @@ function Stepper({ step }: { step: BookingStep }) {
   const currentIndex = order.findIndex((item) => item.id === step);
 
   return (
-    <div className="hidden items-center gap-5 lg:flex">
+    <div className="flex items-center gap-3 overflow-x-auto pb-1 lg:gap-5">
       {order.map((item, index) => {
         const complete = currentIndex > index || step === "success";
         const active = currentIndex === index;
 
         return (
-          <div key={item.id} className="flex min-w-0 flex-1 items-center gap-4">
+          <div
+            key={item.id}
+            className="flex min-w-[150px] flex-1 items-center gap-3 lg:min-w-0 lg:gap-4"
+          >
             <span
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold lg:size-10 lg:text-sm",
                 complete
                   ? "bg-[#16C784] text-white"
                   : active
@@ -738,7 +841,7 @@ function Stepper({ step }: { step: BookingStep }) {
             </span>
             <span
               className={cn(
-                "text-sm font-bold",
+                "text-xs font-bold lg:text-sm",
                 active ? "text-[#FF6267]" : "text-[#9CA3AF]",
               )}
             >
@@ -932,11 +1035,13 @@ function PublicField({
   label,
   name,
   placeholder,
+  defaultValue,
   type = "text",
 }: {
   label: string;
   name: string;
   placeholder: string;
+  defaultValue?: string;
   type?: string;
 }) {
   return (
@@ -945,6 +1050,7 @@ function PublicField({
       <input
         name={name}
         type={type}
+        defaultValue={defaultValue}
         required={name !== "phone"}
         className="mt-1 h-10 w-full rounded-lg border border-[#D1D5DB] px-3 text-sm outline-none placeholder:text-[#B8C0CC] focus:border-[#FF5F63] focus:ring-2 focus:ring-[#FF5F63]/15"
         placeholder={placeholder}
@@ -1023,4 +1129,26 @@ function formatLocation(locationType: string) {
 
 function stars(rating: number) {
   return "*****".slice(0, Math.max(0, Math.min(5, Math.round(rating))));
+}
+
+function googleCalendarUrl(input: {
+  title: string;
+  hostName: string;
+  location: string;
+  startTimeUtc: string;
+  endTimeUtc: string;
+}) {
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `${input.title} with ${input.hostName}`,
+    dates: `${formatCalendarTimestamp(input.startTimeUtc)}/${formatCalendarTimestamp(input.endTimeUtc)}`,
+    location: input.location,
+    details: "Booked with Bookvella.",
+  });
+
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
+function formatCalendarTimestamp(value: string) {
+  return new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }

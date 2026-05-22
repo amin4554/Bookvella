@@ -71,6 +71,7 @@ model EventType {
   slug                String
   title               String
   category            String?
+  imageUrl            String?      @map("image_url")
   description         String?
   whatIncluded        String?      @map("what_included")
   locationDetails     String?      @map("location_details")
@@ -110,6 +111,7 @@ model Booking {
   guestName          String        @map("guest_name")
   guestEmail         String        @map("guest_email")
   guestPhone         String?       @map("guest_phone")
+  guestNote          String?       @map("guest_note")
   guestTimezone      String        @map("guest_timezone")
   startTimeUtc       DateTime      @map("start_time_utc")
   endTimeUtc         DateTime      @map("end_time_utc")

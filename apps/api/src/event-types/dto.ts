@@ -4,6 +4,7 @@ export type CreateEventTypeDto = {
   slug?: string;
   title?: string;
   category?: string | null;
+  imageUrl?: string | null;
   description?: string | null;
   whatIncluded?: string | null;
   locationDetails?: string | null;
@@ -17,6 +18,7 @@ export type UpdateEventTypeDto = {
   slug?: string;
   title?: string;
   category?: string | null;
+  imageUrl?: string | null;
   description?: string | null;
   whatIncluded?: string | null;
   locationDetails?: string | null;

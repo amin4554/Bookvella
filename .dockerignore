@@ -7,6 +7,8 @@ dist
 **/.next
 coverage
 **/coverage
+uploads
+**/uploads
 *.log
 .env
 .env.*

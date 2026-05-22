@@ -12,6 +12,7 @@ import {
   type LocationType,
   type PublicUser,
   publicBookingUrl,
+  uploadImage,
 } from "@/lib/api";
 
 const locationOptions: { value: LocationType; label: string }[] = [
@@ -118,12 +119,22 @@ export default function EventTypesPage() {
                   <Copy className="size-4" />
                 </button>
                 <div className="min-w-0">
-                  <p className="font-semibold">{event.title}</p>
-                  <p className="truncate text-sm text-[#6B7280]">
-                    {user
-                      ? publicBookingUrl(user.slug, event.slug)
-                      : event.slug}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    {event.imageUrl ? (
+                      <div
+                        className="size-12 shrink-0 rounded-xl bg-cover bg-center"
+                        style={{ backgroundImage: `url(${event.imageUrl})` }}
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="font-semibold">{event.title}</p>
+                      <p className="truncate text-sm text-[#6B7280]">
+                        {user
+                          ? publicBookingUrl(user.slug, event.slug)
+                          : event.slug}
+                      </p>
+                    </div>
+                  </div>
                   <div className="mt-1 flex flex-wrap gap-x-8 gap-y-1 text-xs text-[#6B7280]">
                     <span className="inline-flex items-center gap-1">
                       <Clock3 className="size-3" />
@@ -226,6 +237,8 @@ function EventTypeDrawer({
   onSaved: (event: EventType) => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -238,6 +251,7 @@ function EventTypeDrawer({
       title: readText(form, "title"),
       slug: readOptionalText(form, "slug") ?? undefined,
       category: readOptionalText(form, "category"),
+      imageUrl: imageUrl || null,
       description: readOptionalText(form, "description"),
       whatIncluded: readOptionalText(form, "whatIncluded"),
       locationDetails: readOptionalText(form, "locationDetails"),
@@ -311,6 +325,28 @@ function EventTypeDrawer({
                 name="whatIncluded"
                 placeholder="Precision cut, styling, and finish"
                 value={initial?.whatIncluded ?? ""}
+              />
+              <ServiceImageUpload
+                value={imageUrl}
+                uploading={uploadingImage}
+                onClear={() => setImageUrl("")}
+                onChange={async (file) => {
+                  setUploadingImage(true);
+                  setError(null);
+                  try {
+                    const uploaded = await uploadImage(file);
+                    setImageUrl(uploaded.url);
+                    toast.success("Service image uploaded");
+                  } catch (caught) {
+                    setError(
+                      caught instanceof Error
+                        ? caught.message
+                        : "Could not upload image",
+                    );
+                  } finally {
+                    setUploadingImage(false);
+                  }
+                }}
               />
             </FormPanel>
             <FormPanel eyebrow="Booking rules">
@@ -404,6 +440,69 @@ function EventTypeDrawer({
           </footer>
         </form>
       </aside>
+    </div>
+  );
+}
+
+function ServiceImageUpload({
+  value,
+  uploading,
+  onChange,
+  onClear,
+}: {
+  value: string;
+  uploading: boolean;
+  onChange: (file: File) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold">Service picture</p>
+          <p className="mt-1 text-xs text-[#6B7280]">
+            Optional. JPG, PNG, WEBP, or GIF up to 5 MB.
+          </p>
+        </div>
+        {value ? (
+          <button
+            type="button"
+            className="text-xs font-bold text-[#FF6267]"
+            onClick={onClear}
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        {value ? (
+          <div
+            className="h-20 w-28 rounded-xl border border-[#E8DED7] bg-cover bg-center"
+            style={{ backgroundImage: `url(${value})` }}
+          />
+        ) : (
+          <div className="flex h-20 w-28 items-center justify-center rounded-xl border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]">
+            No image
+          </div>
+        )}
+        <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-[#FF6267] bg-white px-4 text-sm font-bold text-[#FF6267]">
+          <Plus className="size-4" />
+          {uploading ? "Uploading..." : "Choose image"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="sr-only"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) {
+                onChange(file);
+              }
+            }}
+          />
+        </label>
+      </div>
     </div>
   );
 }

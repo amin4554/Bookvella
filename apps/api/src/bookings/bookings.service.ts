@@ -168,6 +168,7 @@ export class BookingsService {
   ) {
     const guestName = requireText(dto.guestName, 'guestName');
     const guestEmail = normalizeEmail(dto.guestEmail);
+    const guestNote = optionalText(dto.guestNote);
     const guestTimezone = normalizeTimezone(dto.guestTimezone);
     const startTimeUtc = parseIsoDate(dto.startTimeUtc, 'startTimeUtc');
     const verificationId = requireText(dto.verificationId, 'verificationId');
@@ -215,6 +216,7 @@ export class BookingsService {
             guestName,
             guestEmail,
             guestPhone: optionalText(dto.guestPhone),
+            guestNote,
             guestTimezone,
             startTimeUtc,
             endTimeUtc,
@@ -237,12 +239,14 @@ export class BookingsService {
       hostSlug,
       guestName,
       guestEmail,
+      guestNote,
       bookingId: booking.id,
       startTimeUtc,
       endTimeUtc,
       guestTimezone,
       hostTimezone: eventType.user.timezone,
-      location: eventType.locationDetails ?? formatLocation(eventType.locationType),
+      location:
+        eventType.locationDetails ?? formatLocation(eventType.locationType),
     });
 
     return booking;
@@ -346,6 +350,7 @@ export class BookingsService {
     hostSlug: string;
     guestName: string;
     guestEmail: string;
+    guestNote: string | null;
     bookingId: string;
     startTimeUtc: Date;
     endTimeUtc: Date;
@@ -377,6 +382,7 @@ export class BookingsService {
       `Guest: ${input.guestName} <${input.guestEmail}>`,
       `Time: ${hostWhen}`,
       `Location: ${input.location}`,
+      ...(input.guestNote ? ['', `Guest note: ${input.guestNote}`] : []),
     ].join('\n');
 
     await Promise.all([
@@ -406,6 +412,9 @@ export class BookingsService {
             ['Guest', `${input.guestName} <${input.guestEmail}>`],
             ['Time', hostWhen],
             ['Location', input.location],
+            ...(input.guestNote
+              ? ([['Guest note', input.guestNote]] as [string, string][])
+              : []),
           ],
         }),
       }),
@@ -596,7 +605,10 @@ function buildReviewUrl(input: {
   eventSlug: string;
   bookingId: string;
 }) {
-  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+  const appUrl =
+    process.env.APP_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    'http://localhost:3001';
   const url = new URL(
     `/${input.hostSlug}/${input.eventSlug}`,
     appUrl.endsWith('/') ? appUrl : `${appUrl}/`,
