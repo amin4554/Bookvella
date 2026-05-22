@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BookingStatus, Prisma } from '@prisma/client';
-import { createHash, randomInt, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { assertTimeZone } from '../common/time-zone';
 import { optionalText, requireText } from '../common/validation';
 import { EmailService } from '../email/email.service';
@@ -210,6 +210,8 @@ export class BookingsService {
           throw new ConflictException('Selected slot is no longer available');
         }
 
+        const guestCancelToken = randomBytes(24).toString('hex');
+
         const booking = await tx.booking.create({
           data: {
             eventTypeId: eventType.id,
@@ -222,6 +224,7 @@ export class BookingsService {
             startTimeUtc,
             endTimeUtc,
             status: BookingStatus.CONFIRMED,
+            guestCancelToken,
           },
         });
 
@@ -242,6 +245,7 @@ export class BookingsService {
       guestEmail,
       guestNote,
       bookingId: booking.id,
+      guestCancelToken: booking.guestCancelToken!,
       startTimeUtc,
       endTimeUtc,
       guestTimezone,
@@ -251,6 +255,62 @@ export class BookingsService {
     });
 
     return booking;
+  }
+
+  async getByGuestToken(token: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { guestCancelToken: token },
+      include: { eventType: true, host: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    return {
+      id: booking.id,
+      status: booking.status,
+      guestName: booking.guestName,
+      eventTitle: booking.eventType.title,
+      hostName: booking.host.name,
+      startTimeUtc: booking.startTimeUtc.toISOString(),
+      endTimeUtc: booking.endTimeUtc.toISOString(),
+      guestTimezone: booking.guestTimezone,
+    };
+  }
+
+  async cancelByGuestToken(token: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { guestCancelToken: token },
+      include: { eventType: true, host: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new ConflictException('Booking is already cancelled');
+    }
+
+    await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: BookingStatus.CANCELLED, cancellationReason: 'Guest cancelled' },
+    });
+
+    await this.sendBookingCancellation({
+      hostEmail: booking.host.email,
+      hostName: booking.host.name,
+      eventTitle: booking.eventType.title,
+      guestName: booking.guestName,
+      guestEmail: booking.guestEmail,
+      startTimeUtc: booking.startTimeUtc,
+      guestTimezone: booking.guestTimezone,
+      hostTimezone: booking.host.timezone,
+      cancellationReason: 'Guest cancelled',
+    });
+
+    return { success: true };
   }
 
   private async getPublicEventType(hostSlug: string, eventSlug: string) {
@@ -353,6 +413,7 @@ export class BookingsService {
     guestEmail: string;
     guestNote: string | null;
     bookingId: string;
+    guestCancelToken: string;
     startTimeUtc: Date;
     endTimeUtc: Date;
     guestTimezone: string;
@@ -366,6 +427,7 @@ export class BookingsService {
       eventSlug: input.eventSlug,
       bookingId: input.bookingId,
     });
+    const cancelUrl = buildGuestCancelUrl(input.guestCancelToken);
     const guestText = [
       'Your booking is confirmed.',
       '',
@@ -373,6 +435,8 @@ export class BookingsService {
       `Host: ${input.hostName}`,
       `Time: ${guestWhen}`,
       `Location: ${input.location}`,
+      '',
+      `Need to cancel? ${cancelUrl}`,
       '',
       `After your visit, you can leave a review here: ${reviewUrl}`,
     ].join('\n');
@@ -399,7 +463,10 @@ export class BookingsService {
             ['Time', guestWhen],
             ['Location', input.location],
           ],
-          cta: { label: 'Leave a review after your visit', url: reviewUrl },
+          links: [
+            { label: 'Need to cancel?', url: cancelUrl },
+            { label: 'Leave a review after your visit', url: reviewUrl },
+          ],
         }),
       }),
       this.emailService.sendMail({
@@ -620,14 +687,24 @@ function buildReviewUrl(input: {
   return url.toString();
 }
 
+function buildGuestCancelUrl(token: string) {
+  const appUrl =
+    process.env.APP_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    'http://localhost:3001';
+  return `${appUrl.replace(/\/$/, '')}/cancel?token=${token}`;
+}
+
 function brandedEmailHtml(input: {
   title: string;
   intro: string;
   rows?: [string, string][];
   code?: string;
   cta?: { label: string; url: string };
+  links?: { label: string; url: string }[];
 }) {
   const rows = input.rows ?? [];
+  const links = input.links ?? (input.cta ? [input.cta] : []);
 
   return [
     '<!doctype html>',
@@ -644,9 +721,10 @@ function brandedEmailHtml(input: {
       ([label, value]) =>
         `<div style="border-top:1px solid #eee7df;padding:12px 0;"><strong>${escapeHtml(label)}:</strong> <span style="color:#6b7280;">${escapeHtml(value)}</span></div>`,
     ),
-    input.cta
-      ? `<a href="${escapeHtml(input.cta.url)}" style="display:block;margin-top:22px;background:#ff6267;color:#ffffff;text-align:center;text-decoration:none;border-radius:14px;padding:14px 18px;font-weight:800;">${escapeHtml(input.cta.label)}</a>`
-      : '',
+    ...links.map(
+      (link, i) =>
+        `<a href="${escapeHtml(link.url)}" style="display:block;margin-top:${i === 0 ? '22' : '10'}px;background:${i === 0 ? '#ff6267' : '#f3f4f6'};color:${i === 0 ? '#ffffff' : '#374151'};text-align:center;text-decoration:none;border-radius:14px;padding:14px 18px;font-weight:800;">${escapeHtml(link.label)}</a>`,
+    ),
     '</div>',
     '<p style="color:#9ca3af;font-size:12px;margin-top:18px;">You received this email because a Bookvella booking used this address.</p>',
     '</div>',

@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import type { CreatePublicBookingDto, RequestBookingCodeDto } from './dto';
 
@@ -22,5 +22,15 @@ export class BookingsController {
     @Body() dto: CreatePublicBookingDto,
   ) {
     return this.bookingsService.createPublicBooking(hostSlug, eventSlug, dto);
+  }
+
+  @Get('bookings/guest-cancel/:token')
+  getGuestCancelBooking(@Param('token') token: string) {
+    return this.bookingsService.getByGuestToken(token);
+  }
+
+  @Post('bookings/guest-cancel/:token')
+  cancelByGuestToken(@Param('token') token: string) {
+    return this.bookingsService.cancelByGuestToken(token);
   }
 }

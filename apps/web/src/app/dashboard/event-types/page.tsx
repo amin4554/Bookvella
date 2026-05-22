@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Clock3, Copy, MapPin, Plus, X } from "lucide-react";
+import { Clock3, Copy, DollarSign, MapPin, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
@@ -162,6 +162,14 @@ export default function EventTypesPage() {
                       {event.locationDetails ||
                         formatLocation(event.locationType)}
                     </span>
+                    {event.priceAmount != null ? (
+                      <span className="inline-flex items-center gap-0.5 font-bold text-[#16A34A]">
+                        <DollarSign className="size-3" />
+                        {formatPrice(event.priceAmount, event.priceCurrency)}
+                      </span>
+                    ) : (
+                      <span className="text-[#9CA3AF]">Price on request</span>
+                    )}
                     {event.category ? (
                       <span className="rounded-full bg-[#FFF0EF] px-2 py-0.5 font-bold text-[#FF6267]">
                         {event.category}
@@ -272,6 +280,11 @@ function EventTypeDrawer({
     setError(null);
 
     const form = new FormData(event.currentTarget);
+    const priceInput = readOptionalText(form, "priceInput");
+    const priceCurrency = readText(form, "priceCurrency") || "USD";
+    const priceAmount =
+      priceInput !== null ? Math.round(parseFloat(priceInput) * 100) : null;
+
     const payload = {
       title: readText(form, "title"),
       slug: readOptionalText(form, "slug") ?? undefined,
@@ -285,6 +298,9 @@ function EventTypeDrawer({
       bufferAfterMinutes: readNumber(form, "bufferAfterMinutes"),
       locationType: readText(form, "locationType") as LocationType,
       isActive: form.get("isActive") === "on",
+      priceAmount:
+        priceAmount !== null && !Number.isNaN(priceAmount) ? priceAmount : null,
+      priceCurrency,
     };
 
     try {
@@ -350,6 +366,10 @@ function EventTypeDrawer({
                 name="whatIncluded"
                 placeholder="Precision cut, styling, and finish"
                 value={initial?.whatIncluded ?? ""}
+              />
+              <PriceField
+                priceAmount={initial?.priceAmount ?? null}
+                priceCurrency={initial?.priceCurrency ?? "USD"}
               />
               <ServiceImageUpload
                 value={imageUrl}
@@ -678,5 +698,60 @@ function formatLocation(locationType: LocationType) {
   return (
     locationOptions.find((option) => option.value === locationType)?.label ??
     locationType
+  );
+}
+
+function formatPrice(cents: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
+}
+
+function PriceField({
+  priceAmount,
+  priceCurrency,
+}: {
+  priceAmount: number | null;
+  priceCurrency: string;
+}) {
+  const defaultDollars =
+    priceAmount != null ? (priceAmount / 100).toFixed(2) : "";
+
+  return (
+    <div>
+      <span className="text-sm font-bold">Price</span>
+      <p className="mb-2 text-xs text-[#9CA3AF]">
+        Leave blank to show &ldquo;Price on request&rdquo;.
+      </p>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <span className="absolute inset-y-0 left-3 flex items-center text-sm text-[#9CA3AF]">
+            $
+          </span>
+          <input
+            name="priceInput"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            defaultValue={defaultDollars}
+            className="h-11 w-full rounded-xl border border-[#E8DED7] bg-[#FFFBF7] pl-7 pr-3 text-sm outline-none placeholder:text-[#B8C0CC] focus:border-[#FF5F63] focus:ring-2 focus:ring-[#FF5F63]/15"
+          />
+        </div>
+        <select
+          name="priceCurrency"
+          defaultValue={priceCurrency}
+          className="h-11 rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-3 text-sm outline-none focus:border-[#FF5F63] focus:ring-2 focus:ring-[#FF5F63]/15"
+        >
+          {["USD", "EUR", "GBP", "CAD", "AUD"].map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }

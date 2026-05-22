@@ -84,6 +84,64 @@ export class AvailabilityService {
 
     return { success: true };
   }
+
+  // ── Blackout date overrides ────────────────────────────────────────────────
+
+  listOverrides(userId: string) {
+    return this.prisma.availabilityOverride.findMany({
+      where: { userId },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  async addOverride(userId: string, dateStr: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      throw new BadRequestException('date must be in YYYY-MM-DD format');
+    }
+
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('date is not a valid calendar date');
+    }
+
+    // Reject dates in the past
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+
+    if (date < todayUtc) {
+      throw new BadRequestException('Cannot block a date in the past');
+    }
+
+    try {
+      return await this.prisma.availabilityOverride.create({
+        data: { userId, date, isBlocked: true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // Already blocked — return the existing record
+        return this.prisma.availabilityOverride.findFirst({
+          where: { userId, date },
+        });
+      }
+      throw error;
+    }
+  }
+
+  async removeOverride(userId: string, id: string) {
+    const result = await this.prisma.availabilityOverride.deleteMany({
+      where: { id, userId },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Override not found');
+    }
+
+    return { success: true };
+  }
 }
 
 function normalizeRule(

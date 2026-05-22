@@ -40,11 +40,12 @@ model User {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  sessions          UserSession[]
-  eventTypes        EventType[]
-  availabilityRules AvailabilityRule[]
-  bookings          Booking[]
-  reviews           Review[]
+  sessions               UserSession[]
+  eventTypes             EventType[]
+  availabilityRules      AvailabilityRule[]
+  availabilityOverrides  AvailabilityOverride[]
+  bookings               Booking[]
+  reviews                Review[]
 
   @@map("users")
 }
@@ -79,6 +80,8 @@ model EventType {
   bufferBeforeMinutes Int          @default(0) @map("buffer_before_minutes")
   bufferAfterMinutes  Int          @default(0) @map("buffer_after_minutes")
   locationType        LocationType @default(VIDEO) @map("location_type")
+  priceAmount         Int?         @map("price_amount")      // stored in cents, null = price on request
+  priceCurrency       String       @default("USD") @map("price_currency")
   isActive            Boolean      @default(true) @map("is_active")
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
@@ -104,6 +107,20 @@ model AvailabilityRule {
   @@map("availability_rules")
 }
 
+model AvailabilityOverride {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime @db.Date @map("date")   // date only, no time component
+  isBlocked Boolean  @default(true) @map("is_blocked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("availability_overrides")
+}
+
 model Booking {
   id                 String        @id @default(uuid())
   eventTypeId        String        @map("event_type_id")
@@ -117,6 +134,7 @@ model Booking {
   endTimeUtc         DateTime      @map("end_time_utc")
   status             BookingStatus @default(CONFIRMED)
   cancellationReason String?       @map("cancellation_reason")
+  guestCancelToken   String?       @unique @map("guest_cancel_token")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 

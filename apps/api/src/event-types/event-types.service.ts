@@ -17,6 +17,7 @@ import type { CreateEventTypeDto, UpdateEventTypeDto } from './dto';
 
 const MAX_DURATION_MINUTES = 12 * 60;
 const MAX_BUFFER_MINUTES = 24 * 60;
+const MAX_PRICE_CENTS = 100_000_00; // $100,000
 
 @Injectable()
 export class EventTypesService {
@@ -63,6 +64,8 @@ export class EventTypesService {
               { max: MAX_BUFFER_MINUTES },
             ) ?? 0,
           locationType,
+          priceAmount: normalizePrice(dto.priceAmount),
+          priceCurrency: normalizeCurrency(dto.priceCurrency),
         },
       });
     } catch (error) {
@@ -144,6 +147,14 @@ export class EventTypesService {
       data.isActive = dto.isActive;
     }
 
+    if (dto.priceAmount !== undefined) {
+      data.priceAmount = normalizePrice(dto.priceAmount);
+    }
+
+    if (dto.priceCurrency !== undefined) {
+      data.priceCurrency = normalizeCurrency(dto.priceCurrency);
+    }
+
     try {
       return await this.prisma.eventType.update({
         where: { id },
@@ -198,6 +209,34 @@ function isUniqueConstraintError(error: unknown) {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002'
   );
+}
+
+function normalizePrice(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Number.isInteger(value) || value < 0 || value > MAX_PRICE_CENTS) {
+    throw new BadRequestException(
+      'priceAmount must be a non-negative integer (cents)',
+    );
+  }
+
+  return value;
+}
+
+function normalizeCurrency(value: string | undefined) {
+  if (value === undefined) {
+    return 'USD';
+  }
+
+  const upper = value.trim().toUpperCase();
+
+  if (!/^[A-Z]{3}$/.test(upper)) {
+    throw new BadRequestException('priceCurrency must be a 3-letter ISO currency code');
+  }
+
+  return upper;
 }
 
 function optionalUrl(value: string | null | undefined, field: string) {

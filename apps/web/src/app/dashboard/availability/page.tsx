@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { authedApiRequest, type AvailabilityRule, type PublicUser } from "@/lib/api";
+import { authedApiRequest, type AvailabilityOverride, type AvailabilityRule, type PublicUser } from "@/lib/api";
 
 // Grid config: 6 AM – 10 PM in 30-min slots
 const GRID_START_HOUR = 6;
@@ -101,16 +101,23 @@ export default function AvailabilityPage() {
   const [error, setError] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
 
+  // Blackout dates
+  const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
+  const [newBlockDate, setNewBlockDate] = useState("");
+  const [addingBlock, setAddingBlock] = useState(false);
+
   useEffect(() => {
     async function load() {
       try {
-        const [me, rules] = await Promise.all([
+        const [me, rules, overrideList] = await Promise.all([
           authedApiRequest<PublicUser>("/auth/me"),
           authedApiRequest<AvailabilityRule[]>("/availability/rules"),
+          authedApiRequest<AvailabilityOverride[]>("/availability/overrides"),
         ]);
         setUser(me);
         setOriginal(rules);
         setGrid(rulesToGrid(rules));
+        setOverrides(overrideList);
       } catch (caught) {
         setError(
           caught instanceof Error ? caught.message : "Could not load availability",
@@ -121,6 +128,38 @@ export default function AvailabilityPage() {
     }
     load();
   }, []);
+
+  async function addBlockedDate() {
+    if (!newBlockDate) return;
+    setAddingBlock(true);
+    try {
+      const created = await authedApiRequest<AvailabilityOverride>(
+        "/availability/overrides",
+        { method: "POST", body: JSON.stringify({ date: newBlockDate }) },
+      );
+      setOverrides((prev) =>
+        [...prev.filter((o) => o.id !== created?.id), ...(created ? [created] : [])].sort(
+          (a, b) => a.date.localeCompare(b.date),
+        ),
+      );
+      setNewBlockDate("");
+      toast.success("Date blocked");
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not block date");
+    } finally {
+      setAddingBlock(false);
+    }
+  }
+
+  async function removeBlockedDate(id: string) {
+    try {
+      await authedApiRequest(`/availability/overrides/${id}`, { method: "DELETE" });
+      setOverrides((prev) => prev.filter((o) => o.id !== id));
+      toast.success("Date unblocked");
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not unblock date");
+    }
+  }
 
   // Commit drag on global mouseup
   useEffect(() => {
@@ -426,6 +465,67 @@ export default function AvailabilityPage() {
               </p>
             </div>
           </aside>
+          {/* ── Blackout dates ────────────────────────────── */}
+          <div className="mt-2 rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm xl:col-span-2">
+            <h3 className="text-lg font-bold">Blocked dates</h3>
+            <p className="mt-1 text-sm text-[#6B7280]">
+              Block specific dates — holidays, vacations, or one-off closures. Guests
+              won&apos;t see any slots on these days regardless of your weekly schedule.
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="text-sm font-bold">Date to block</span>
+                <input
+                  type="date"
+                  value={newBlockDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setNewBlockDate(e.target.value)}
+                  className="mt-1 block h-11 rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 text-sm outline-none focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
+                />
+              </label>
+              <Button
+                type="button"
+                className="h-11 rounded-xl bg-[#FF6267] px-5 font-bold text-white hover:bg-[#F05258] disabled:opacity-50"
+                disabled={!newBlockDate || addingBlock}
+                onClick={addBlockedDate}
+              >
+                {addingBlock ? "Blocking…" : "Block date"}
+              </Button>
+            </div>
+
+            {overrides.length === 0 ? (
+              <p className="mt-5 text-sm text-[#9CA3AF]">No dates blocked yet.</p>
+            ) : (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {overrides.map((override) => {
+                  const label = new Intl.DateTimeFormat("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).format(new Date(override.date));
+                  return (
+                    <div
+                      key={override.id}
+                      className="flex items-center gap-2 rounded-full border border-[#EEE7DF] bg-[#FFFBF7] px-3 py-1.5 text-sm font-bold"
+                    >
+                      <span>{label}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeBlockedDate(override.id)}
+                        className="text-[#9CA3AF] hover:text-red-500"
+                        aria-label={`Unblock ${label}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
     </AppShell>

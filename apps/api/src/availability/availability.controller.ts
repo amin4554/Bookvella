@@ -48,4 +48,30 @@ export class AvailabilityController {
   remove(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
     return this.availabilityService.remove(request.user!.sub, id);
   }
+
+  // ── Blackout date overrides ────────────────────────────────────────────────
+
+  @Get('overrides')
+  listOverrides(@Req() request: AuthenticatedRequest) {
+    return this.availabilityService.listOverrides(request.user!.sub);
+  }
+
+  @Post('overrides')
+  addOverride(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: { date?: string },
+  ) {
+    return this.availabilityService.addOverride(
+      request.user!.sub,
+      body.date ?? '',
+    );
+  }
+
+  @Delete('overrides/:id')
+  removeOverride(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.availabilityService.removeOverride(request.user!.sub, id);
+  }
 }

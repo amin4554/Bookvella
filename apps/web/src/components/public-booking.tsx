@@ -6,6 +6,7 @@ import {
   Check,
   Clock3,
   Download,
+  DollarSign,
   Mail,
   MapPin,
   ShieldCheck,
@@ -357,6 +358,18 @@ export function PublicBooking({
                 value={
                   publicEvent.eventType.locationDetails ??
                   formatLocation(publicEvent.eventType.locationType)
+                }
+              />
+              <ServiceFact
+                icon={DollarSign}
+                label="Price"
+                value={
+                  publicEvent.eventType.priceAmount != null
+                    ? formatPublicPrice(
+                        publicEvent.eventType.priceAmount,
+                        publicEvent.eventType.priceCurrency,
+                      )
+                    : "Price on request"
                 }
               />
               <ServiceFact
@@ -1168,6 +1181,14 @@ function slotGuestDate(utcIso: string, guestTimezone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(utcIso));
+}
+
+function formatPublicPrice(cents: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
 }
 
 function guessTimezone() {

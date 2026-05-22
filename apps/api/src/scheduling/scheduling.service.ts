@@ -94,6 +94,8 @@ export class SchedulingService {
         bufferBeforeMinutes: eventType.bufferBeforeMinutes,
         bufferAfterMinutes: eventType.bufferAfterMinutes,
         locationType: eventType.locationType,
+        priceAmount: eventType.priceAmount,
+        priceCurrency: eventType.priceCurrency,
       },
       reviews: eventType.reviews.map((review) => ({
         id: review.id,
@@ -126,6 +128,12 @@ export class SchedulingService {
         user: {
           include: {
             availabilityRules: true,
+            availabilityOverrides: {
+              where: {
+                isBlocked: true,
+                date: { gte: start, lte: end },
+              },
+            },
           },
         },
       },
@@ -140,6 +148,13 @@ export class SchedulingService {
     if (eventType.user.availabilityRules.length === 0) {
       return [];
     }
+
+    // Build a Set of blocked date strings in host timezone (YYYY-MM-DD)
+    const blockedDates = new Set(
+      eventType.user.availabilityOverrides.map((o) =>
+        o.date.toISOString().slice(0, 10),
+      ),
+    );
 
     const bookings = await this.prisma.booking.findMany({
       where: {
@@ -187,6 +202,12 @@ export class SchedulingService {
       compareLocalDates(date, endLocal) <= 0;
       date = addLocalDays(date, 1)
     ) {
+      // Skip dates the host has blocked out
+      const dateKey = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+      if (blockedDates.has(dateKey)) {
+        continue;
+      }
+
       const rules = rulesByDay.get(localDayOfWeek(date)) ?? [];
 
       for (const rule of rules) {

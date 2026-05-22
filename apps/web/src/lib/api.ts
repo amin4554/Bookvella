@@ -40,6 +40,8 @@ export type EventType = {
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
   locationType: LocationType;
+  priceAmount: number | null;
+  priceCurrency: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +53,14 @@ export type AvailabilityRule = {
   dayOfWeek: number;
   startMinute: number;
   endMinute: number;
+};
+
+export type AvailabilityOverride = {
+  id: string;
+  userId: string;
+  date: string; // ISO date string YYYY-MM-DDT00:00:00.000Z
+  isBlocked: boolean;
+  createdAt: string;
 };
 
 export type HostBooking = {
@@ -128,6 +138,8 @@ export type PublicEvent = {
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     locationType: LocationType;
+    priceAmount: number | null;
+    priceCurrency: string;
   };
   reviews: PublicReview[];
   reviewSummary: {

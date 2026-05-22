@@ -12,6 +12,8 @@ export type CreateEventTypeDto = {
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
   locationType?: LocationType;
+  priceAmount?: number | null;    // cents, e.g. 5000 = $50.00; null = price on request
+  priceCurrency?: string;
 };
 
 export type UpdateEventTypeDto = {
@@ -27,4 +29,6 @@ export type UpdateEventTypeDto = {
   bufferAfterMinutes?: number;
   locationType?: LocationType;
   isActive?: boolean;
+  priceAmount?: number | null;
+  priceCurrency?: string;
 };
