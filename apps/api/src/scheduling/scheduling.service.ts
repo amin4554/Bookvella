@@ -53,15 +53,18 @@ export class SchedulingService {
       throw new NotFoundException('Public event not found');
     }
 
-    const reviewCount = eventType.reviews.length;
+    // Compute stats across ALL visible reviews, not just the first 8 that were
+    // returned for display. Using aggregate avoids a full table scan in JS.
+    const reviewAgg = await this.prisma.review.aggregate({
+      where: { eventTypeId: eventType.id, isVisible: true },
+      _count: { id: true },
+      _avg: { rating: true },
+    });
+
+    const reviewCount = reviewAgg._count.id;
     const averageRating =
       reviewCount > 0
-        ? Number(
-            (
-              eventType.reviews.reduce((sum, review) => sum + review.rating, 0) /
-              reviewCount
-            ).toFixed(1),
-          )
+        ? Number((reviewAgg._avg.rating ?? 0).toFixed(1))
         : null;
 
     return {

@@ -227,10 +227,12 @@ function buildMessage(options: {
     '',
     `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: 7bit',
     '',
     escapeMessageBody(options.text),
     `--${boundary}`,
     'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: 7bit',
     '',
     escapeMessageBody(options.html),
     `--${boundary}--`,
@@ -252,7 +254,11 @@ function isAscii(value: string) {
 }
 
 function escapeMessageBody(value: string) {
-  return value.replace(/^\./gm, '..');
+  // RFC 2822 requires CRLF line endings throughout the message body.
+  // Normalize any bare LF or lone CR to CRLF before dot-stuffing so that
+  // lines starting with '.' are correctly escaped even after normalisation.
+  const crlf = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+  return crlf.replace(/^\./gm, '..');
 }
 
 function extractAddress(value: string) {

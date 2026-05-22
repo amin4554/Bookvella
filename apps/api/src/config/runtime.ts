@@ -83,6 +83,19 @@ export function createRateLimitMiddleware(options: {
 }) {
   const buckets = new Map<string, RateLimitBucket>();
 
+  // Evict expired entries on every window cycle so the Map does not grow
+  // without bound when many distinct IPs hit rate-limited endpoints.
+  const cleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of buckets) {
+      if (bucket.resetAt <= now) {
+        buckets.delete(key);
+      }
+    }
+  }, options.windowMs);
+  // Don't let this timer prevent the Node.js process from exiting cleanly.
+  cleanup.unref();
+
   return (request: Request, response: Response, next: NextFunction) => {
     if (!options.paths.some((path) => request.path.endsWith(path))) {
       next();
