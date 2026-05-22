@@ -31,6 +31,6 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /tmp/prisma-pkg ./node_modules/prisma
-RUN ln -sf ../prisma/bin/prisma.js node_modules/.bin/prisma
+RUN mkdir -p node_modules/.bin && ln -sf ../prisma/bin/prisma.js node_modules/.bin/prisma
 EXPOSE 3000
 CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
