@@ -2,16 +2,29 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  CalendarCheck2,
   CalendarClock,
-  CircleDot,
-  Clock3,
-  Home,
-  Grid2X2,
+  Check,
+  ChevronUp,
+  Copy,
+  ExternalLink,
+  LayoutGrid,
+  LayoutDashboard,
+  Layers,
+  LifeBuoy,
   LogOut,
+  MessageSquareText,
   Settings,
-  Table2,
+  User,
+  UserCircle2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -24,12 +37,16 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: Home },
-  { label: "Bookings", href: "/dashboard/bookings", icon: Clock3 },
-  { label: "Services", href: "/dashboard/event-types", icon: Table2 },
-  { label: "Schedule", href: "/dashboard/availability", icon: CircleDot },
-  { label: "Profile", href: "/dashboard/settings", icon: Grid2X2 },
+const navItems: {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+}[] = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Bookings", href: "/dashboard/bookings", icon: CalendarCheck2 },
+  { label: "Services", href: "/dashboard/event-types", icon: Layers },
+  { label: "Availability", href: "/dashboard/availability", icon: CalendarClock },
+  { label: "Profile", href: "/dashboard/profile", icon: User },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -37,25 +54,27 @@ export function AppShell({
   active,
   title,
   userInitial = "B",
+  bookingCount,
   children,
 }: {
   active: string;
   title: string;
   userInitial?: string;
-  children: React.ReactNode;
+  bookingCount?: number;
+  children: ReactNode;
 }) {
   const router = useRouter();
   const [session, setSession] = useState<ReturnType<typeof getAuthSession>>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    let active = true;
+    let alive = true;
 
     async function verifySession() {
       const current = getAuthSession();
 
       if (!current) {
-        if (active) {
+        if (alive) {
           setSession(null);
           setCheckingSession(false);
           router.replace("/login");
@@ -67,8 +86,7 @@ export function AppShell({
         const user = await authedApiRequest<PublicUser>("/auth/me");
         updateStoredUser(user);
         const refreshed = getAuthSession();
-
-        if (active) {
+        if (alive) {
           setSession(refreshed ? { ...refreshed, user } : null);
           setCheckingSession(false);
         }
@@ -80,7 +98,7 @@ export function AppShell({
 
         if (status === 401) {
           clearAuthSession();
-          if (active) {
+          if (alive) {
             setSession(null);
             setCheckingSession(false);
             const next =
@@ -94,7 +112,7 @@ export function AppShell({
           return;
         }
 
-        if (active) {
+        if (alive) {
           setSession(current);
           setCheckingSession(false);
         }
@@ -102,10 +120,14 @@ export function AppShell({
     }
 
     verifySession();
-
     return () => {
-      active = false;
+      alive = false;
     };
+  }, [router]);
+
+  const logout = useCallback(async () => {
+    await logoutAuthSession();
+    router.push("/login");
   }, [router]);
 
   if (checkingSession || !session) {
@@ -118,62 +140,21 @@ export function AppShell({
     );
   }
 
-  async function logout() {
-    await logoutAuthSession();
-    router.push("/login");
-  }
+  const userName = session?.user.name ?? "Bookvella host";
+  const userSlug = session?.user.slug ?? "your-link";
+  const bookingLink = `https://bookvella.com/${userSlug}`;
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#111827] lg:grid lg:grid-cols-[300px_1fr] lg:pb-0">
-      <aside className="hidden min-h-screen flex-col border-r border-[#EEE7DF] bg-white px-4 py-7 text-[#6B7280] lg:flex">
-        <div className="px-3">
-          <BrandLogo />
-        </div>
-        <nav className="mt-8 space-y-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const selected = item.label === active;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex h-12 items-center gap-4 rounded-2xl px-5 text-base font-semibold transition",
-                  selected
-                    ? "bg-[#FFF0EF] text-[#FF5F63]"
-                    : "text-[#6B7280] hover:bg-[#FFFBF7] hover:text-[#111827]",
-                )}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="mx-3 mt-5 h-px bg-[#EEE7DF]" />
-        <button
-          type="button"
-          className="mx-3 mt-auto flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#9CA3AF] hover:bg-[#FFFBF7] hover:text-[#111827]"
-          onClick={logout}
-        >
-          <LogOut className="size-4" />
-          Log out
-        </button>
-        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B61] to-[#A855F7] text-sm font-bold text-white">
-            {userInitial}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-[#111827]">
-              {session?.user.name ?? "Bookvella host"}
-            </p>
-            <p className="truncate text-xs text-[#6B7280]">
-              bookvella.com/{session?.user.slug ?? "your-link"}
-            </p>
-          </div>
-        </div>
-      </aside>
+    <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#0B1220] lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
+      <DesktopSidebar
+        active={active}
+        bookingCount={bookingCount}
+        userName={userName}
+        userInitial={userInitial}
+        userSlug={userSlug}
+        bookingLink={bookingLink}
+        onLogout={logout}
+      />
 
       <div className="min-w-0">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#EEE7DF] bg-white px-5 lg:hidden">
@@ -181,35 +162,269 @@ export function AppShell({
             <BrandLogo />
           </div>
           <h1 className="hidden text-lg font-semibold lg:block">{title}</h1>
-          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B61] to-[#A855F7] text-sm font-bold text-white">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
             {userInitial}
           </div>
         </header>
-        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[#EEE7DF] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-          {navItems.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            const selected = item.label === active;
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold",
-                  selected ? "bg-[#FFF0EF] text-[#FF5F63]" : "text-[#9CA3AF]",
-                )}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <main className="px-5 py-8 lg:px-14 lg:py-12 xl:px-16">
+        <MobileNav active={active} bookingCount={bookingCount} />
+
+        <main className="px-5 py-8 lg:px-10 lg:py-10">
           <div className="mx-auto max-w-[1380px]">{children}</div>
         </main>
       </div>
     </div>
+  );
+}
+
+function DesktopSidebar({
+  active,
+  bookingCount,
+  userName,
+  userInitial,
+  userSlug,
+  bookingLink,
+  onLogout,
+}: {
+  active: string;
+  bookingCount?: number;
+  userName: string;
+  userInitial: string;
+  userSlug: string;
+  bookingLink: string;
+  onLogout: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(bookingLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // ignored
+    }
+  }
+
+  return (
+    <aside className="hidden flex-col border-r border-[#EEE7DF] bg-white lg:flex">
+      <div className="flex h-16 items-center gap-2.5 border-b border-[#EEE7DF] px-5">
+        <BrandLogo />
+      </div>
+
+      <nav className="flex-1 space-y-1 p-3">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const selected = item.label === active;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition",
+                selected
+                  ? "bg-[#FFEDEA] text-[#FF5F63]"
+                  : "text-[#374151] hover:bg-[#FFF6F0] hover:text-[#0B1220]",
+              )}
+            >
+              <Icon
+                className={cn(
+                  "size-4",
+                  selected ? "text-[#FF5F63]" : "text-[#9CA3AF]",
+                )}
+              />
+              <span className="flex-1">{item.label}</span>
+              {item.label === "Bookings" && bookingCount && bookingCount > 0 ? (
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF5F63] px-1.5 text-[10px] font-bold text-white">
+                  {bookingCount}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="relative m-3" ref={menuRef}>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3 text-left hover:bg-white"
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((value) => !value)}
+        >
+          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[13px] font-bold text-white">
+            {userInitial}
+          </div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-[13px] font-bold">{userName}</p>
+            <p className="truncate text-[11px] text-[#6B7280]">
+              bookvella.com/{userSlug}
+            </p>
+          </div>
+          <ChevronUp
+            className={cn(
+              "size-4 text-[#9CA3AF] transition",
+              menuOpen ? "" : "rotate-180",
+            )}
+          />
+        </button>
+
+        {menuOpen ? (
+          <div
+            role="menu"
+            className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]"
+          >
+            <MenuRow
+              as="a"
+              href={`/${userSlug}`}
+              target="_blank"
+              rel="noreferrer"
+              icon={<ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+            >
+              View public page
+            </MenuRow>
+            <MenuRow
+              as="button"
+              type="button"
+              onClick={copyLink}
+              icon={
+                copied ? (
+                  <Check className="size-4 shrink-0 text-[#16A34A]" />
+                ) : (
+                  <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+                )
+              }
+            >
+              {copied ? "Copied!" : "Copy booking link"}
+            </MenuRow>
+            <MenuRow
+              as={Link}
+              href="/dashboard/profile"
+              onClick={() => setMenuOpen(false)}
+              icon={<UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+            >
+              Edit profile
+            </MenuRow>
+            <MenuRow
+              as={Link}
+              href="/dashboard/settings"
+              onClick={() => setMenuOpen(false)}
+              icon={<Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+            >
+              Settings
+            </MenuRow>
+            <div className="my-1 h-px bg-[#EEE7DF]" />
+            <MenuRow
+              as="a"
+              href="#"
+              icon={<LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+            >
+              Help &amp; support
+            </MenuRow>
+            <MenuRow
+              as="a"
+              href="#"
+              icon={<MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+            >
+              Send feedback
+            </MenuRow>
+            <div className="my-1 h-px bg-[#EEE7DF]" />
+            <MenuRow
+              as="button"
+              type="button"
+              onClick={onLogout}
+              danger
+              icon={<LogOut className="size-4 shrink-0 text-[#DC2626]" />}
+            >
+              Sign out
+            </MenuRow>
+          </div>
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+type MenuRowProps = {
+  icon: ReactNode;
+  children: ReactNode;
+  danger?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  as?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+};
+
+function MenuRow({ icon, children, danger, as: As = "button", ...rest }: MenuRowProps) {
+  return (
+    <As
+      {...rest}
+      role="menuitem"
+      className={cn(
+        "group flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold transition",
+        danger
+          ? "text-[#B91C1C] hover:bg-[#FEF2F2]"
+          : "text-[#374151] hover:bg-[#FFFBF7] hover:text-[#0B1220]",
+      )}
+    >
+      {icon}
+      {children}
+    </As>
+  );
+}
+
+function MobileNav({
+  active,
+  bookingCount,
+}: {
+  active: string;
+  bookingCount?: number;
+}) {
+  const items = navItems.slice(0, 5);
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[#EEE7DF] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const selected = item.label === active;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "relative flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-bold",
+              selected ? "bg-[#FFF0EF] text-[#FF5F63]" : "text-[#9CA3AF]",
+            )}
+          >
+            <Icon className="size-4" />
+            {item.label}
+            {item.label === "Bookings" && bookingCount && bookingCount > 0 ? (
+              <span className="absolute right-2 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF5F63] px-1 text-[9px] font-bold text-white">
+                {bookingCount}
+              </span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -220,13 +435,13 @@ export function EmptyPage({
 }: {
   active: string;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <AppShell active={active} title={title}>
       <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 shadow-sm">
         <div className="flex size-10 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
-          <CalendarClock className="size-5" />
+          <LayoutGrid className="size-5" />
         </div>
         {children}
       </div>

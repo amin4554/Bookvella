@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Eye, Globe, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
 import { authedApiRequest, type AvailabilityOverride, type AvailabilityRule, type PublicUser } from "@/lib/api";
 
 // Grid config: 6 AM – 10 PM in 30-min slots
@@ -255,27 +255,79 @@ export default function AvailabilityPage() {
     60
   ).toFixed(1).replace(/\.0$/, "");
 
+  const hasUnsaved = useMemo(() => {
+    const next = gridToRules(grid);
+    const before = original
+      .map((r) => `${r.dayOfWeek}:${r.startMinute}-${r.endMinute}`)
+      .sort()
+      .join("|");
+    const after = next
+      .map((r) => `${r.dayOfWeek}:${r.startMinute}-${r.endMinute}`)
+      .sort()
+      .join("|");
+    return before !== after;
+  }, [grid, original]);
+
   return (
     <AppShell
-      active="Schedule"
-      title="Booking schedule"
+      active="Availability"
+      title="Availability"
       userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
     >
-      <section className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-[34px] font-bold leading-tight">Booking schedule</h2>
-          <p className="mt-1 text-base text-[#6B7280]">
-            Click and drag to set when guests can book you.
+          <h1
+            className="text-[34px] font-extrabold md:text-[38px]"
+            style={{ letterSpacing: "-0.03em", lineHeight: "1.02" }}
+          >
+            Availability
+          </h1>
+          <p className="mt-1.5 text-[13px] text-[#6B7280]">
+            Set when guests can book you. Click and drag on any day to add open
+            time.
           </p>
         </div>
-        <Button
-          className="h-12 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-7 font-bold text-white"
-          disabled={saving || loading}
-          onClick={save}
-        >
-          {saving ? "Saving..." : "Save schedule"}
-        </Button>
-      </section>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasUnsaved ? (
+            <span className="inline-flex h-9 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 text-[12px] font-bold text-amber-800">
+              <span className="size-1.5 rounded-full bg-amber-500" /> Unsaved
+              changes
+            </span>
+          ) : null}
+          <button
+            type="button"
+            disabled
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-70"
+          >
+            <Eye className="size-4" /> Preview as guest
+          </button>
+          <button
+            type="button"
+            disabled={saving || loading || !hasUnsaved}
+            onClick={save}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3 text-[12px] text-[#6B7280]">
+        <Globe className="size-3.5 text-[#9CA3AF]" />
+        <span>
+          Timezone:{" "}
+          <span className="font-semibold text-[#0B1220]">
+            {user?.timezone ?? "UTC"}
+          </span>
+        </span>
+        <span className="text-[#D1D5DB]">·</span>
+        <span>
+          <span className="font-semibold text-[#0B1220] tabular-nums">
+            {totalHours}h
+          </span>{" "}
+          bookable per week
+        </span>
+      </div>
 
       {error ? (
         <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
@@ -465,39 +517,48 @@ export default function AvailabilityPage() {
               </p>
             </div>
           </aside>
-          {/* ── Blackout dates ────────────────────────────── */}
-          <div className="mt-2 rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm xl:col-span-2">
-            <h3 className="text-lg font-bold">Blocked dates</h3>
-            <p className="mt-1 text-sm text-[#6B7280]">
-              Block specific dates — holidays, vacations, or one-off closures. Guests
-              won&apos;t see any slots on these days regardless of your weekly schedule.
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <label className="block">
-                <span className="text-sm font-bold">Date to block</span>
-                <input
-                  type="date"
-                  value={newBlockDate}
-                  min={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setNewBlockDate(e.target.value)}
-                  className="mt-1 block h-11 rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 text-sm outline-none focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
-                />
-              </label>
-              <Button
-                type="button"
-                className="h-11 rounded-xl bg-[#FF6267] px-5 font-bold text-white hover:bg-[#F05258] disabled:opacity-50"
-                disabled={!newBlockDate || addingBlock}
-                onClick={addBlockedDate}
-              >
-                {addingBlock ? "Blocking…" : "Block date"}
-              </Button>
+          {/* ── Date exceptions ────────────────────────────── */}
+          <div className="rounded-2xl border border-[#EEE7DF] bg-white p-6 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)] xl:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold">Date exceptions</h3>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  Block specific dates — holidays, vacations, or one-off
+                  closures. Guests won&apos;t see any slots on these days
+                  regardless of your weekly schedule.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="block">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+                    Date to block
+                  </span>
+                  <input
+                    type="date"
+                    value={newBlockDate}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setNewBlockDate(e.target.value)}
+                    className="mt-1.5 block h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm outline-none focus:border-[#FF6267] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+                  disabled={!newBlockDate || addingBlock}
+                  onClick={addBlockedDate}
+                >
+                  <Plus className="size-4" />
+                  {addingBlock ? "Blocking…" : "Block date"}
+                </button>
+              </div>
             </div>
 
             {overrides.length === 0 ? (
-              <p className="mt-5 text-sm text-[#9CA3AF]">No dates blocked yet.</p>
+              <p className="mt-5 rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-4 py-6 text-center text-sm text-[#9CA3AF]">
+                No dates blocked yet.
+              </p>
             ) : (
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-5 space-y-2">
                 {overrides.map((override) => {
                   const label = new Intl.DateTimeFormat("en-US", {
                     weekday: "short",
@@ -509,16 +570,22 @@ export default function AvailabilityPage() {
                   return (
                     <div
                       key={override.id}
-                      className="flex items-center gap-2 rounded-full border border-[#EEE7DF] bg-[#FFFBF7] px-3 py-1.5 text-sm font-bold"
+                      className="flex items-center gap-3 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3"
                     >
-                      <span>{label}</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[#B91C1C]">
+                        <span className="size-1.5 rounded-full bg-[#DC2626]" />{" "}
+                        Blocked
+                      </span>
+                      <p className="text-[13px] font-bold tabular-nums">
+                        {label}
+                      </p>
                       <button
                         type="button"
                         onClick={() => removeBlockedDate(override.id)}
-                        className="text-[#9CA3AF] hover:text-red-500"
+                        className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-white hover:text-[#B91C1C]"
                         aria-label={`Unblock ${label}`}
                       >
-                        ×
+                        <X className="size-3.5" />
                       </button>
                     </div>
                   );

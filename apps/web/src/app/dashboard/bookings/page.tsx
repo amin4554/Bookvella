@@ -2,12 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Copy, ExternalLink } from "lucide-react";
+import {
+  Calendar,
+  CalendarCheck2,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Filter,
+  Mail,
+  MessageCircle,
+  Plus,
+  QrCode,
+  Repeat,
+  Search,
+  Share2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { StatusBadge } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
-import { authedApiRequest, type HostBooking, type PublicUser, publicBookingUrl } from "@/lib/api";
+import {
+  authedApiRequest,
+  type HostBooking,
+  type PublicUser,
+  publicBookingUrl,
+} from "@/lib/api";
 
 type Tab = "upcoming" | "past" | "cancelled";
 
@@ -15,9 +35,9 @@ export default function BookingsPage() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
   const [selected, setSelected] = useState<HostBooking | null>(null);
-  const [reason, setReason] = useState("");
   const [tab, setTab] = useState<Tab>("upcoming");
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +53,32 @@ export default function BookingsPage() {
         setBookings(hostBookings);
         setLoadedAt(Date.now());
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Could not load bookings");
+        setError(
+          caught instanceof Error ? caught.message : "Could not load bookings",
+        );
       } finally {
         setLoading(false);
       }
     }
-
     load();
   }, []);
+
+  const counts = useMemo(() => {
+    const now = loadedAt;
+    let upcoming = 0;
+    let past = 0;
+    let cancelled = 0;
+    for (const b of bookings) {
+      if (b.status === "CANCELLED") {
+        cancelled += 1;
+        continue;
+      }
+      const start = new Date(b.startTimeUtc).getTime();
+      if (start >= now) upcoming += 1;
+      else past += 1;
+    }
+    return { upcoming, past, cancelled };
+  }, [bookings, loadedAt]);
 
   const filtered = useMemo(() => {
     const now = loadedAt;
@@ -58,224 +96,646 @@ export default function BookingsPage() {
       if (query) {
         const matchesName = booking.guestName.toLowerCase().includes(query);
         const matchesEmail = booking.guestEmail.toLowerCase().includes(query);
-        if (!matchesName && !matchesEmail) return false;
+        const matchesService = booking.eventType.title
+          .toLowerCase()
+          .includes(query);
+        if (!matchesName && !matchesEmail && !matchesService) return false;
       }
 
       return true;
     });
   }, [bookings, loadedAt, tab, search]);
 
-  async function cancelBooking() {
+  async function cancelBooking(reason: string) {
     if (!selected) return;
-
     try {
-      const updated = await authedApiRequest<HostBooking>(`/bookings/${selected.id}/cancel`, {
-        method: "PATCH",
-        body: JSON.stringify({ reason: reason || null }),
-      });
+      const updated = await authedApiRequest<HostBooking>(
+        `/bookings/${selected.id}/cancel`,
+        { method: "PATCH", body: JSON.stringify({ reason: reason || null }) },
+      );
       setBookings((current) =>
-        current.map((booking) => (booking.id === updated.id ? updated : booking)),
+        current.map((b) => (b.id === updated.id ? updated : b)),
       );
       setSelected(null);
-      setReason("");
-      toast.success("Booking cancelled successfully");
+      toast.success("Booking cancelled");
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : "Could not cancel booking");
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not cancel booking",
+      );
     }
   }
 
-  const firstActiveService = user
-    ? (bookings.find((b) => b.status === "CONFIRMED") ?? null)
-    : null;
+  const totalBookings = bookings.length;
+  const thisMonth = bookings.filter((b) =>
+    isThisMonth(b.startTimeUtc, loadedAt),
+  ).length;
 
   return (
     <AppShell
       active="Bookings"
       title="Bookings"
       userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
+      bookingCount={counts.upcoming}
     >
-      <section>
-        <h2 className="text-2xl font-semibold text-[#111827]">Your Bookings</h2>
-        <p className="mt-1 text-sm text-[#6B7280]">
-          Manage and review all your appointments.
-        </p>
-      </section>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === "upcoming"} onClick={() => setTab("upcoming")}>Upcoming</TabButton>
-          <TabButton active={tab === "past"} onClick={() => setTab("past")}>Past</TabButton>
-          <TabButton active={tab === "cancelled"} onClick={() => setTab("cancelled")}>Cancelled</TabButton>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1
+            className="text-[36px] font-extrabold md:text-[42px]"
+            style={{ letterSpacing: "-0.03em", lineHeight: "1.02" }}
+          >
+            Bookings
+          </h1>
+          <p className="mt-2 text-sm text-[#6B7280]">
+            All appointments across your services.
+          </p>
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by guest name or email..."
-          className="h-8 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm outline-none placeholder:text-[#B8C0CC] focus:border-[#FF5F63] focus:ring-2 focus:ring-[#FF5F63]/15 min-w-[200px] max-w-[360px]"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+          >
+            <Download className="size-4" /> Export
+          </button>
+          <button
+            type="button"
+            disabled
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+          >
+            <Calendar className="size-4" /> Calendar view
+          </button>
+        </div>
       </div>
 
       {error ? <InlineState title="Bookings unavailable" text={error} /> : null}
-      {loading ? <InlineState title="Loading bookings" text="Fetching your appointments." /> : null}
+      {loading ? (
+        <InlineState
+          title="Loading bookings"
+          text="Fetching your appointments."
+        />
+      ) : null}
 
       {!loading && !error ? (
-        <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE7DF] bg-white shadow-sm">
-          <div className="grid grid-cols-[1.4fr_1.4fr_1fr_1fr_1fr] bg-[#FFFBF7] px-4 py-3 text-xs font-medium text-[#6B7280] max-lg:hidden">
-            <span>Guest</span>
-            <span>Event</span>
-            <span>Date &amp; Time</span>
-            <span>Booked on</span>
-            <span>Status</span>
-          </div>
-          {filtered.map((booking) => (
-            <BookingRow
-              key={booking.id}
-              booking={booking}
-              timeZone={user?.timezone ?? "UTC"}
-              onCancel={() => setSelected(booking)}
+        <>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile
+              label="Total bookings"
+              value={String(totalBookings)}
+              sub="All-time, all services"
+              accent="text-[#0B1220]"
             />
-          ))}
+            <StatTile
+              label="This month"
+              value={String(thisMonth)}
+              sub="Confirmed in the current month"
+              accent="text-[#A855F7]"
+            />
+            <StatTile
+              label="Upcoming"
+              value={String(counts.upcoming)}
+              sub="Next 7 days"
+              accent="text-[#FF5F63]"
+            />
+            <StatTile
+              label="Completed"
+              value={String(counts.past)}
+              sub="Past appointments"
+              accent="text-[#16A34A]"
+            />
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-white p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+            <div className="flex flex-wrap items-center gap-1.5 p-1">
+              <TabButton
+                active={tab === "upcoming"}
+                count={counts.upcoming}
+                onClick={() => setTab("upcoming")}
+              >
+                Upcoming
+              </TabButton>
+              <TabButton
+                active={tab === "past"}
+                count={counts.past}
+                onClick={() => setTab("past")}
+              >
+                Past
+              </TabButton>
+              <TabButton
+                active={tab === "cancelled"}
+                count={counts.cancelled}
+                onClick={() => setTab("cancelled")}
+              >
+                Cancelled
+              </TabButton>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 px-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search by guest, email, service…"
+                  className="h-10 w-[260px] rounded-xl border border-[#E5E7EB] bg-white pl-9 pr-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+                />
+              </div>
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+              >
+                <Filter className="size-4" /> Filters
+              </button>
+            </div>
+          </div>
+
           {filtered.length === 0 ? (
-            <EmptyState tab={tab} search={search} user={user} firstBooking={firstActiveService} />
-          ) : null}
-        </div>
+            <EmptyState tab={tab} search={search} user={user} />
+          ) : (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-3">
+                <p className="text-[13px] font-bold">
+                  {filtered.length}{" "}
+                  {tab === "upcoming"
+                    ? "upcoming"
+                    : tab === "past"
+                      ? "past"
+                      : "cancelled"}{" "}
+                  appointment{filtered.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <table className="w-full text-left text-[13px]">
+                <thead className="border-b border-[#EEE7DF] bg-[#FFFBF7] text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                  <tr>
+                    <th className="px-5 py-3">Guest</th>
+                    <th className="px-3">Service</th>
+                    <th className="px-3">Date &amp; time</th>
+                    <th className="px-3">Status</th>
+                    <th className="px-3">Location</th>
+                    <th className="px-5 text-right" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EEE7DF]">
+                  {filtered.map((booking) => (
+                    <BookingRow
+                      key={booking.id}
+                      booking={booking}
+                      timeZone={user?.timezone ?? "UTC"}
+                      expanded={expanded === booking.id}
+                      onToggle={() =>
+                        setExpanded((current) =>
+                          current === booking.id ? null : booking.id,
+                        )
+                      }
+                      onCancel={() => setSelected(booking)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between border-t border-[#EEE7DF] px-5 py-3 text-[11px] text-[#6B7280]">
+                <p>
+                  Showing{" "}
+                  <span className="font-bold text-[#0B1220]">
+                    1–{filtered.length}
+                  </span>{" "}
+                  of <span className="font-bold text-[#0B1220]">{filtered.length}</span>
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-[#9CA3AF]"
+                  >
+                    <ChevronLeft className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-[#9CA3AF]"
+                  >
+                    <ChevronRight className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       ) : null}
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111827]/45 px-4">
-          <div className="w-full max-w-[480px] rounded-2xl bg-white p-8 shadow-2xl">
-            <h3 className="text-xl font-semibold">Cancel this booking?</h3>
-            <p className="mt-2 max-w-sm text-sm leading-5 text-[#6B7280]">
-              The guest will receive a cancellation email.
-            </p>
-            <div className="mt-6 rounded-lg bg-[#FFFBF7] px-4 py-3">
-              <p className="text-sm font-semibold">{selected.guestName}</p>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                {selected.eventType.title} - {formatDateTime(selected.startTimeUtc, user?.timezone ?? "UTC")}
-              </p>
-            </div>
-            <label className="mt-5 block">
-              <span className="text-sm font-medium">Reason (optional)</span>
-              <input
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-[#D1D5DB] px-3 text-sm outline-none placeholder:text-[#B8C0CC] focus:border-[#FF5F63]"
-                placeholder="Add a note about this cancellation..."
-              />
-            </label>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Button
-                variant="outline"
-                className="h-10 rounded-lg border-[#D1D5DB] bg-white font-semibold"
-                onClick={() => setSelected(null)}
-              >
-                Keep booking
-              </Button>
-              <Button
-                className="h-10 rounded-lg bg-[#DC2626] font-semibold text-white hover:bg-[#b91c1c]"
-                onClick={cancelBooking}
-              >
-                Yes, cancel booking
-              </Button>
-            </div>
-          </div>
-        </div>
+        <CancelModal
+          booking={selected}
+          timeZone={user?.timezone ?? "UTC"}
+          onClose={() => setSelected(null)}
+          onConfirm={cancelBooking}
+        />
       ) : null}
     </AppShell>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+        {label}
+      </p>
+      <p className={`mt-3 text-[28px] font-bold tabular-nums ${accent}`}>
+        {value}
+      </p>
+      <p className="text-[11px] text-[#6B7280]">{sub}</p>
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  count,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  count: number;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        active
+          ? "inline-flex h-10 items-center gap-2 rounded-xl bg-[#0B1220] px-3.5 text-[13px] font-bold text-white"
+          : "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+      }
+    >
+      {children}
+      <span
+        className={
+          active
+            ? "rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] tabular-nums"
+            : "rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] tabular-nums text-[#6B7280]"
+        }
+      >
+        {count}
+      </span>
+    </button>
   );
 }
 
 function BookingRow({
   booking,
   timeZone,
+  expanded,
+  onToggle,
   onCancel,
 }: {
   booking: HostBooking;
   timeZone: string;
+  expanded: boolean;
+  onToggle: () => void;
   onCancel: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const cancelled = booking.status === "CANCELLED";
-  const hasDetails =
-    booking.guestPhone ||
-    booking.guestNote ||
-    booking.cancellationReason ||
-    booking.guestTimezone;
-
   const location =
-    booking.eventType.locationDetails ?? formatLocation(booking.eventType.locationType);
+    booking.eventType.locationDetails ??
+    formatLocation(booking.eventType.locationType);
 
   return (
-    <div className={`border-t border-[#EEE7DF] ${cancelled ? "text-[#B8C0CC]" : ""}`}>
-      <div
-        className="grid cursor-pointer items-center gap-3 px-4 py-3 text-sm lg:grid-cols-[1.4fr_1.4fr_1fr_1fr_1fr]"
-        onClick={() => hasDetails && setExpanded((v) => !v)}
+    <>
+      <tr
+        className="cursor-pointer hover:bg-[#FFFBF7]"
+        onClick={onToggle}
       >
-        <GuestCell name={booking.guestName} email={booking.guestEmail} muted={cancelled} />
-        <div>
-          <p className="font-medium">{booking.eventType.title}</p>
-          {booking.guestNote ? (
-            <p className="mt-1 line-clamp-1 text-xs text-[#6B7280]">
-              Note: {booking.guestNote}
-            </p>
-          ) : null}
-          <p className="text-xs text-[#6B7280] lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
-        </div>
-        <p className="text-[#6B7280] max-lg:hidden">{formatDateTime(booking.startTimeUtc, timeZone)}</p>
-        <p className="text-[#6B7280] max-lg:hidden">{formatDate(booking.createdAt, timeZone)}</p>
-        <div className="flex items-center gap-4">
-          <StatusBadge status={cancelled ? "cancelled" : "confirmed"}>
-            {cancelled ? "Cancelled" : "Confirmed"}
-          </StatusBadge>
+        <td className="px-5 py-3.5">
+          <div className="flex items-center gap-3">
+            <Avatar name={booking.guestName} />
+            <div className="leading-tight">
+              <p className="font-bold">{booking.guestName}</p>
+              <p className="text-[11px] text-[#9CA3AF]">{booking.guestEmail}</p>
+            </div>
+          </div>
+        </td>
+        <td className="px-3">
+          <span
+            className={
+              cancelled
+                ? "inline-flex rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[11px] font-bold text-[#9CA3AF]"
+                : "inline-flex rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold text-[#FF5F63]"
+            }
+          >
+            {booking.eventType.title}
+          </span>
+        </td>
+        <td className="px-3 tabular-nums">
+          <p className="font-semibold">
+            {formatDateTime(booking.startTimeUtc, timeZone)}
+          </p>
+          <p className="text-[11px] text-[#9CA3AF]">
+            {booking.eventType.durationMinutes} min
+          </p>
+        </td>
+        <td className="px-3">
+          {cancelled ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEE2E2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C]">
+              <span className="size-1.5 rounded-full bg-[#DC2626]" /> Cancelled
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[11px] font-bold text-[#16A34A]">
+              <span className="size-1.5 rounded-full bg-[#16A34A]" /> Confirmed
+            </span>
+          )}
+        </td>
+        <td className="px-3 text-[12px] text-[#374151]">
+          {location.split("·")[0].trim()}
+        </td>
+        <td className="px-5 text-right">
           {!cancelled ? (
             <button
-              className="h-7 rounded-md bg-red-100 px-4 text-sm font-medium text-red-600"
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
                 onCancel();
               }}
+              className="inline-flex items-center gap-1 rounded-lg border border-[#FECACA] bg-white px-3 py-1.5 text-[12px] font-bold text-[#B91C1C] hover:bg-[#FEF2F2]"
             >
               Cancel
             </button>
           ) : null}
-          {hasDetails ? (
-            <span className="ml-auto text-[#9CA3AF]">
-              {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
+        </td>
+      </tr>
       {expanded ? (
-        <div className="grid gap-3 border-t border-[#EEE7DF] bg-[#FFFBF7] px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          {booking.guestPhone ? (
-            <DetailCell label="Phone" value={booking.guestPhone} />
-          ) : null}
-          <DetailCell label="Timezone" value={booking.guestTimezone} />
-          <DetailCell label="Location" value={location} />
-          {booking.guestNote ? (
-            <div className="sm:col-span-2 lg:col-span-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">Guest note</p>
-              <p className="mt-1 leading-6 text-[#6B7280]">{booking.guestNote}</p>
+        <tr>
+          <td colSpan={6} className="bg-[#FFFBF7] px-5 py-5">
+            <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailBlock label="Guest">
+                  <p className="text-[13px] font-bold">{booking.guestName}</p>
+                  <p className="text-[12px] text-[#6B7280]">
+                    {booking.guestEmail}
+                  </p>
+                  {booking.guestPhone ? (
+                    <p className="text-[12px] text-[#6B7280] tabular-nums">
+                      {booking.guestPhone}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-[11px] text-[#9CA3AF]">
+                    Guest timezone:{" "}
+                    <span className="font-semibold text-[#0B1220]">
+                      {booking.guestTimezone}
+                    </span>
+                  </p>
+                </DetailBlock>
+                <DetailBlock label="Appointment">
+                  <p className="text-[13px] font-bold">
+                    {booking.eventType.title}
+                  </p>
+                  <p className="text-[12px] text-[#6B7280] tabular-nums">
+                    {formatDateTime(booking.startTimeUtc, timeZone)} ·{" "}
+                    {booking.eventType.durationMinutes} min
+                  </p>
+                  <p className="text-[12px] text-[#6B7280]">{location}</p>
+                </DetailBlock>
+                {booking.guestNote ? (
+                  <div className="sm:col-span-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                      Guest note
+                    </p>
+                    <p className="mt-1 rounded-xl border border-[#EEE7DF] bg-white p-3 text-[13px] leading-[1.6] text-[#374151]">
+                      {booking.guestNote}
+                    </p>
+                  </div>
+                ) : null}
+                {booking.cancellationReason ? (
+                  <div className="sm:col-span-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                      Cancellation reason
+                    </p>
+                    <p className="mt-1 rounded-xl border border-[#EEE7DF] bg-white p-3 text-[13px] leading-[1.6] text-[#374151]">
+                      {booking.cancellationReason}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-2">
+                <ActionButton
+                  icon={Copy}
+                  label="Copy guest email"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(booking.guestEmail);
+                      toast.success("Email copied");
+                    } catch {
+                      // ignored
+                    }
+                  }}
+                />
+                <a
+                  href={`mailto:${booking.guestEmail}`}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+                >
+                  <Mail className="size-4" /> Email guest
+                </a>
+                <ActionButton
+                  icon={CalendarPlus}
+                  label="Add to my calendar"
+                  disabled
+                  hint="Soon"
+                />
+                <ActionButton
+                  icon={Repeat}
+                  label="Reschedule"
+                  disabled
+                  hint="Soon"
+                />
+                {!cancelled ? (
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-4 text-[13px] font-bold text-white hover:bg-[#B91C1C]"
+                  >
+                    <X className="size-4" /> Cancel booking
+                  </button>
+                ) : null}
+              </div>
             </div>
-          ) : null}
-          {booking.cancellationReason ? (
-            <div className="sm:col-span-2 lg:col-span-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">Cancellation reason</p>
-              <p className="mt-1 leading-6 text-[#6B7280]">{booking.cancellationReason}</p>
-            </div>
-          ) : null}
-        </div>
+          </td>
+        </tr>
       ) : null}
+    </>
+  );
+}
+
+function DetailBlock({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+        {label}
+      </p>
+      <div className="mt-1 space-y-0.5">{children}</div>
     </div>
   );
 }
 
-function DetailCell({ label, value }: { label: string; value: string }) {
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  hint,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  hint?: string;
+}) {
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className="mt-1 text-[#6B7280]">{value}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-70"
+    >
+      <Icon className="size-4" /> {label}
+      {hint ? (
+        <span className="rounded-full bg-[#F3F4F6] px-1.5 text-[10px] text-[#6B7280]">
+          {hint}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  const initial = name?.[0]?.toUpperCase() ?? "?";
+  const palettes = [
+    "from-[#A855F7] to-[#7C4DFF]",
+    "from-[#10B981] to-[#0D9488]",
+    "from-[#F97316] to-[#EA580C]",
+    "from-[#EC4899] to-[#A855F7]",
+    "from-[#3B82F6] to-[#0EA5E9]",
+  ];
+  const palette = palettes[(initial.charCodeAt(0) || 0) % palettes.length];
+  return (
+    <div
+      className={`flex size-9 items-center justify-center rounded-xl bg-gradient-to-br ${palette} text-[12px] font-bold text-white`}
+    >
+      {initial}
+    </div>
+  );
+}
+
+function CancelModal({
+  booking,
+  timeZone,
+  onClose,
+  onConfirm,
+}: {
+  booking: HostBooking;
+  timeZone: string;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1220]/45 p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-[460px] rounded-2xl bg-white shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
+        <div className="flex items-start gap-4 p-6">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#FEE2E2] text-[#B91C1C]">
+            <X className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold">Cancel this booking?</h3>
+            <p className="mt-1 text-[13px] text-[#6B7280]">
+              The guest will be notified by email. Cancellations can&apos;t be
+              undone — the slot reopens for someone else.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-[#F9FAFB]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mx-6 mb-4 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+          <p className="text-sm font-bold">{booking.eventType.title}</p>
+          <p className="mt-0.5 text-xs text-[#6B7280] tabular-nums">
+            {booking.guestName} ·{" "}
+            {formatDateTime(booking.startTimeUtc, timeZone)} ·{" "}
+            {booking.eventType.durationMinutes} min
+          </p>
+        </div>
+
+        <div className="px-6 pb-2">
+          <label className="block">
+            <span className="text-xs font-bold text-[#374151]">
+              Reason{" "}
+              <span className="font-normal text-[#9CA3AF]">
+                (optional, only you see this)
+              </span>
+            </span>
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="e.g. Sick day, double-booking, guest requested change…"
+              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-white p-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-[#EEE7DF] p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            Keep booking
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConfirm(reason);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#DC2626] px-4 text-[13px] font-bold text-white hover:bg-[#B91C1C] disabled:opacity-60"
+          >
+            <X className="size-4" /> {busy ? "Cancelling..." : "Yes, cancel it"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -284,110 +744,117 @@ function EmptyState({
   tab,
   search,
   user,
-  firstBooking,
 }: {
   tab: Tab;
   search: string;
   user: PublicUser | null;
-  firstBooking: HostBooking | null;
 }) {
   if (search) {
     return (
-      <div className="border-t border-[#EEE7DF] px-4 py-8 text-sm text-[#6B7280]">
+      <div className="mt-4 rounded-2xl border border-[#EEE7DF] bg-white px-6 py-12 text-center text-sm text-[#6B7280] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
         No bookings match &ldquo;{search}&rdquo;.
       </div>
     );
   }
 
-  if (tab === "upcoming") {
-    const link = firstBooking && user
-      ? publicBookingUrl(user.slug, firstBooking.eventType.slug)
-      : null;
-
+  if (tab !== "upcoming") {
     return (
-      <div className="border-t border-[#EEE7DF] px-4 py-10">
-        <p className="font-semibold text-[#111827]">No upcoming bookings yet</p>
-        <p className="mt-1 text-sm text-[#6B7280]">
-          Share your booking link so guests can schedule time with you.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          {link ? (
-            <button
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#FF6267] px-4 text-sm font-bold text-white"
-              onClick={() => {
-                navigator.clipboard.writeText(link);
-                toast.success("Booking link copied");
-              }}
-            >
-              <Copy className="size-3.5" />
-              Copy booking link
-            </button>
-          ) : null}
-          <Link
-            href="/dashboard/event-types"
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-4 text-sm font-bold"
-          >
-            <ExternalLink className="size-3.5" />
-            {link ? "Manage services" : "Create a service"}
-          </Link>
-        </div>
+      <div className="mt-4 rounded-2xl border border-[#EEE7DF] bg-white px-6 py-12 text-center text-sm text-[#6B7280] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+        No {tab} bookings yet.
       </div>
     );
   }
 
   return (
-    <div className="border-t border-[#EEE7DF] px-4 py-8 text-sm text-[#6B7280]">
-      No {tab} bookings found.
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-col items-center px-6 py-14 text-center">
+        <div className="relative">
+          <div className="absolute inset-0 -m-3 rounded-[26px] bg-[#FFF0EF]" />
+          <div className="relative flex size-20 items-center justify-center rounded-[20px] border border-[#FFD2CE] bg-white text-[#FF5F63] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+            <CalendarCheck2 className="size-9" />
+          </div>
+        </div>
+        <h3 className="mt-7 text-[22px] font-bold">No bookings yet</h3>
+        <p className="mt-2 max-w-[420px] text-sm leading-[1.6] text-[#6B7280]">
+          Once guests start booking you, their appointments will appear here.
+          Share your link to get your first booking.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!user) return;
+              const link = `https://bookvella.com/${user.slug}`;
+              try {
+                await navigator.clipboard.writeText(link);
+                toast.success("Booking link copied");
+              } catch {
+                // ignored
+              }
+            }}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+          >
+            <Copy className="size-4" /> Copy booking link
+          </button>
+          <Link
+            href="/dashboard/event-types"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            <Plus className="size-4" /> Manage services
+          </Link>
+        </div>
+
+        <div className="mt-10 grid w-full max-w-[720px] gap-3 text-left sm:grid-cols-3">
+          <TipCard
+            icon={Share2}
+            iconColor="text-[#FF5F63]"
+            iconBorder="border-[#FFD2CE]"
+            title="Share on Instagram"
+            text="Add your link to your bio so DMs become bookings."
+          />
+          <TipCard
+            icon={MessageCircle}
+            iconColor="text-[#A855F7]"
+            iconBorder="border-[#E1CFFA]"
+            title="Drop it in WhatsApp"
+            text="Send it to existing clients next time they ask for a slot."
+          />
+          <TipCard
+            icon={QrCode}
+            iconColor="text-[#0D9488]"
+            iconBorder="border-[#B6E4F2]"
+            title="Print a QR card"
+            text="Hand one to walk-ins so they can book from the chair."
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
-function GuestCell({
-  name,
-  email,
-  muted = false,
+function TipCard({
+  icon: Icon,
+  iconColor,
+  iconBorder,
+  title,
+  text,
 }: {
-  name: string;
-  email: string;
-  muted?: boolean;
+  icon: React.ElementType;
+  iconColor: string;
+  iconBorder: string;
+  title: string;
+  text: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <div
-        className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold ${
-          muted ? "bg-[#FFFBF7] text-[#C2C8D0]" : "bg-[#FFF0EF] text-[#FF5F63]"
-        }`}
+    <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+      <span
+        className={`flex size-9 items-center justify-center rounded-xl bg-white ${iconColor} border ${iconBorder}`}
       >
-        {name[0]}
-      </div>
-      <div>
-        <p className="font-semibold">{name}</p>
-        <p className="text-xs text-[#6B7280]">{email}</p>
-      </div>
+        <Icon className="size-4" />
+      </span>
+      <p className="mt-3 text-[13px] font-bold">{title}</p>
+      <p className="mt-1 text-[11px] leading-[1.5] text-[#6B7280]">{text}</p>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      className={
-        active
-          ? "h-8 rounded-lg border border-[#FF5F63] bg-[#FFF0EF] px-4 text-sm font-semibold text-[#FF5F63]"
-          : "h-8 rounded-lg border border-[#EEE7DF] bg-white px-6 text-sm text-[#6B7280]"
-      }
-      onClick={onClick}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -410,17 +877,14 @@ function formatDateTime(value: string, timeZone: string) {
   }).format(new Date(value));
 }
 
-function formatDate(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone,
-  }).format(new Date(value));
-}
-
 function formatLocation(locationType: string) {
   if (locationType === "PHONE") return "Phone call";
   if (locationType === "IN_PERSON") return "In person";
   return "Video call";
+}
+
+function isThisMonth(value: string, referenceMs: number) {
+  const d = new Date(value);
+  const ref = new Date(referenceMs);
+  return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
 }
