@@ -3,8 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, Circle, Eye, EyeOff, Info, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Circle,
+  Eye,
+  EyeOff,
+  Globe,
+  Info,
+  X,
+} from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   apiRequest,
   AuthResponse,
@@ -14,6 +24,11 @@ import {
   type PublicUser,
   updateStoredUser,
 } from "@/lib/api";
+import {
+  detectBrowserTimezone,
+  formatOffset,
+  timezoneCity,
+} from "@/lib/timezones";
 
 type AuthCardProps = {
   mode: "login" | "register";
@@ -41,8 +56,8 @@ export function AuthCard({
     Boolean(message?.toLowerCase().includes("session")),
   );
   const isRegister = mode === "register";
-  const loading = submitting || state === "loading";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  void state;
 
   useEffect(() => {
     let active = true;
@@ -196,7 +211,10 @@ export function AuthCard({
 
   const formColumn = (
     <div className="relative flex flex-col bg-white px-6 py-8 lg:px-16 lg:py-12">
-      <Link href="/" className="inline-flex items-center gap-2.5 self-start">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2.5 self-start lg:hidden"
+      >
         <BrandLogo />
       </Link>
 
@@ -295,7 +313,8 @@ export function AuthCard({
             ),
             email: readFormText(form, "email"),
             password: readFormText(form, "password"),
-            timezone: guessTimezoneValue(),
+            timezone:
+              readOptionalFormText(form, "timezone") ?? guessTimezoneValue(),
             slug: readOptionalFormText(form, "slug"),
           }
         : {
@@ -441,19 +460,16 @@ function RegisterForm({
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [customSlug, setCustomSlug] = useState<string | null>(null);
+  const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
+  const [timezone, setTimezone] = useState<string>(detectedTimezone);
+  const [editingTimezone, setEditingTimezone] = useState(false);
 
   const computedSlug = useMemo(
     () => slugify(`${firstName} ${lastName}`),
     [firstName, lastName],
   );
-
-  useEffect(() => {
-    if (!slugTouched) {
-      setSlug(computedSlug);
-    }
-  }, [computedSlug, slugTouched]);
+  const slug = customSlug ?? computedSlug;
 
   const slugStatus: { kind: "empty" | "ok" | "bad"; label: string } = !slug
     ? { kind: "empty", label: "Choose a name" }
@@ -538,8 +554,7 @@ function RegisterForm({
             spellCheck={false}
             value={slug}
             onChange={(event) => {
-              setSlug(event.target.value.toLowerCase());
-              setSlugTouched(true);
+              setCustomSlug(event.target.value.toLowerCase());
             }}
             className="h-full min-w-0 flex-1 bg-transparent px-4 text-[15px] font-semibold tabular-nums outline-none"
           />
@@ -551,6 +566,57 @@ function RegisterForm({
           <SlugStatusChip status={slugStatus} />
         </div>
       </div>
+
+      <input type="hidden" name="timezone" value={timezone} />
+
+      {editingTimezone ? (
+        <div>
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+            Your timezone
+          </span>
+          <div className="mt-1.5">
+            <TimezoneCombobox
+              value={timezone}
+              onChange={(value) => {
+                setTimezone(value);
+                setEditingTimezone(false);
+              }}
+              detectedTimezone={detectedTimezone}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTimezone(detectedTimezone);
+              setEditingTimezone(false);
+            }}
+            className="mt-2 text-[11px] font-semibold text-[#6B7280] underline-offset-2 hover:underline"
+          >
+            Use my browser timezone instead
+          </button>
+        </div>
+      ) : (
+        <p className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FFFBF7] px-3 py-2.5 text-[12px] text-[#6B7280]">
+          <Globe className="size-3.5 text-[#9CA3AF]" />
+          <span className="flex-1">
+            Times will use{" "}
+            <span className="font-semibold text-[#0B1220]">
+              {timezoneCity(timezone)}
+            </span>{" "}
+            <span className="tabular-nums text-[#0B1220]">
+              ({formatOffset(timezone)})
+            </span>
+            .
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditingTimezone(true)}
+            className="font-semibold text-[#FF5F63] hover:underline"
+          >
+            Change
+          </button>
+        </p>
+      )}
 
       {error ? (
         <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">

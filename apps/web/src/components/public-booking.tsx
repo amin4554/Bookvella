@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
+import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   apiRequest,
   type AvailableSlot,
@@ -20,6 +21,11 @@ import {
   type HostBooking,
   type PublicEvent,
 } from "@/lib/api";
+import {
+  detectBrowserTimezone,
+  formatOffset,
+  timezoneCity,
+} from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
 type BookingStep = "slots" | "details" | "code" | "success";
@@ -544,18 +550,23 @@ function SlotsStep({
   return (
     <div className="mt-12">
       <h2 className="text-[34px] font-bold leading-tight">Pick a time</h2>
-      <p className="mt-2 text-base text-[#6B7280]">All times shown in your timezone</p>
-      <select
-        value={timezone}
-        onChange={(event) => onTimezoneChange(event.target.value)}
-        className="mt-4 h-10 w-full max-w-[280px] rounded-lg border border-[#D1D5DB] bg-[#FFFBF7] px-3 text-sm text-[#6B7280]"
-      >
-        {[timezone, "Europe/Berlin", "Europe/London", "America/New_York", "UTC"]
-          .filter(unique)
-          .map((value) => (
-            <option key={value}>{value}</option>
-          ))}
-      </select>
+      <p className="mt-2 text-base text-[#6B7280]">
+        Times shown in{" "}
+        <span className="font-semibold text-[#0B1220]">
+          {timezoneCity(timezone)}
+        </span>{" "}
+        <span className="tabular-nums text-[#0B1220]">
+          ({formatOffset(timezone)})
+        </span>
+        .
+      </p>
+      <div className="mt-4 max-w-[360px]">
+        <TimezoneCombobox
+          value={timezone}
+          onChange={onTimezoneChange}
+          tone="compact"
+        />
+      </div>
 
       {loading ? (
         <div className="mt-10 flex items-center gap-3 text-sm text-[#6B7280]">
@@ -1192,15 +1203,7 @@ function formatPublicPrice(cents: number, currency: string) {
 }
 
 function guessTimezone() {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
-  }
-}
-
-function unique(value: string, index: number, array: string[]) {
-  return array.indexOf(value) === index;
+  return detectBrowserTimezone();
 }
 
 function formatLocation(locationType: string) {

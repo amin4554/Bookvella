@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Copy, Upload, ZoomIn, ZoomOut } from "lucide-react";
 import { toast } from "sonner";
@@ -78,7 +79,6 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: readText(form, "name"),
           slug: readText(form, "slug"),
-          timezone: readText(form, "timezone"),
           profileImageUrl: profileImageUrl || null,
           coverImageUrl: coverImageUrl || null,
           headline: readOptionalText(form, "headline"),
@@ -236,60 +236,51 @@ export default function ProfilePage() {
                   placeholder="https://instagram.com/you"
                 />
               </div>
-              <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
-                  <p className="text-sm font-bold">Public profile URL</p>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-[#6B7280]">
-                    <span className="truncate">
-                      {profileUrl(user?.slug)}
-                    </span>
-                    <button
-                      type="button"
-                      className="text-sm font-bold text-[#FF6267]"
-                      onClick={() => {
-                        const url = profileUrl(user?.slug);
-                        navigator.clipboard.writeText(url);
-                        toast.success("Profile link copied");
-                      }}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <details className="mt-3 rounded-xl border border-[#E8DED7] bg-white px-4 py-3">
-                    <summary className="cursor-pointer text-sm font-bold text-[#6B7280]">
-                      Edit public URL
-                    </summary>
-                    <div className="mt-3">
-                      <Field
-                        label="Public URL ending"
-                        name="slug"
-                        defaultValue={user?.slug ?? ""}
-                        placeholder="your-name"
-                      />
-                    </div>
-                  </details>
-                </div>
-                <label className="block">
-                  <span className="text-sm font-bold">Timezone</span>
-                  <select
-                    name="timezone"
-                    defaultValue={user?.timezone ?? "UTC"}
-                    className="mt-2 h-12 w-full rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 outline-none focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
+              <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+                <p className="text-sm font-bold">Public profile URL</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-[#6B7280]">
+                  <span className="truncate">
+                    {profileUrl(user?.slug)}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-sm font-bold text-[#FF6267]"
+                    onClick={() => {
+                      const url = profileUrl(user?.slug);
+                      navigator.clipboard.writeText(url);
+                      toast.success("Profile link copied");
+                    }}
                   >
-                    {[
-                      user?.timezone,
-                      "Europe/Berlin",
-                      "Europe/London",
-                      "America/New_York",
-                      "UTC",
-                    ]
-                      .filter(Boolean)
-                      .filter(unique)
-                      .map((timezone) => (
-                        <option key={timezone}>{timezone}</option>
-                      ))}
-                  </select>
-                </label>
+                    Copy
+                  </button>
+                </div>
+                <details className="mt-3 rounded-xl border border-[#E8DED7] bg-white px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-bold text-[#6B7280]">
+                    Advanced — Edit public URL
+                  </summary>
+                  <p className="mt-2 text-xs text-[#9CA3AF]">
+                    Changing your handle will break older links unless you set
+                    up a redirect.
+                  </p>
+                  <div className="mt-3">
+                    <Field
+                      label="Public URL ending"
+                      name="slug"
+                      defaultValue={user?.slug ?? ""}
+                      placeholder="your-name"
+                    />
+                  </div>
+                </details>
+                <p className="mt-3 text-xs text-[#9CA3AF]">
+                  Need to change your timezone? It moved to{" "}
+                  <Link
+                    href="/dashboard/settings"
+                    className="font-semibold text-[#FF5F63] hover:underline"
+                  >
+                    Settings → Account
+                  </Link>
+                  .
+                </p>
               </div>
             </Panel>
 
@@ -919,10 +910,6 @@ function readText(form: FormData, key: string) {
 function readOptionalText(form: FormData, key: string) {
   const value = readText(form, key);
   return value ? value : null;
-}
-
-function unique<T>(value: T, index: number, array: T[]) {
-  return array.indexOf(value) === index;
 }
 
 function stars(rating: number) {

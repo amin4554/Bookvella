@@ -7,7 +7,6 @@ import {
   Bell,
   Calendar,
   ChevronRight,
-  Globe,
   KeyRound,
   LogOut,
   Mail,
@@ -18,11 +17,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   authedApiRequest,
   type PublicUser,
   updateStoredUser,
 } from "@/lib/api";
+import {
+  detectBrowserTimezone,
+  formatOffset,
+  timezoneCity,
+} from "@/lib/timezones";
 
 type Section =
   | "account"
@@ -40,17 +45,20 @@ const navSections: { id: Section; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function SettingsPage() {
+  const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<Section>("account");
   const [savingAccount, setSavingAccount] = useState(false);
+  const [timezone, setTimezone] = useState<string>(detectedTimezone);
 
   useEffect(() => {
     async function load() {
       try {
         const me = await authedApiRequest<PublicUser>("/auth/me");
         setUser(me);
+        if (me.timezone) setTimezone(me.timezone);
       } catch (caught) {
         setError(
           caught instanceof Error ? caught.message : "Could not load settings",
@@ -60,14 +68,6 @@ export default function SettingsPage() {
       }
     }
     load();
-  }, []);
-
-  const detectedTimezone = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    } catch {
-      return "UTC";
-    }
   }, []);
 
   async function saveAccount(event: FormEvent<HTMLFormElement>) {
@@ -80,7 +80,7 @@ export default function SettingsPage() {
         method: "PATCH",
         body: JSON.stringify({
           name: readText(form, "name"),
-          timezone: readText(form, "timezone") || detectedTimezone,
+          timezone: timezone || detectedTimezone,
         }),
       });
       setUser(updated);
@@ -166,6 +166,8 @@ export default function SettingsPage() {
               loading={loading}
               saving={savingAccount}
               detectedTimezone={detectedTimezone}
+              timezone={timezone}
+              onTimezoneChange={setTimezone}
               onSave={saveAccount}
             />
           ) : null}
@@ -184,14 +186,19 @@ function AccountSection({
   loading,
   saving,
   detectedTimezone,
+  timezone,
+  onTimezoneChange,
   onSave,
 }: {
   user: PublicUser | null;
   loading: boolean;
   saving: boolean;
   detectedTimezone: string;
+  timezone: string;
+  onTimezoneChange: (value: string) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const isDetected = timezone === detectedTimezone;
   return (
     <form onSubmit={onSave}>
       <SettingsPanel
@@ -224,19 +231,40 @@ function AccountSection({
               <div>
                 <label className="block">
                   <span className="text-sm font-bold">Timezone</span>
-                  <div className="mt-2 flex h-12 items-center gap-2 rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-3 text-sm">
-                    <Globe className="size-4 text-[#9CA3AF]" />
-                    <input
-                      name="timezone"
-                      defaultValue={user.timezone || detectedTimezone}
-                      className="flex-1 bg-transparent outline-none"
+                  <div className="mt-2">
+                    <TimezoneCombobox
+                      value={timezone}
+                      onChange={onTimezoneChange}
+                      detectedTimezone={detectedTimezone}
                     />
                   </div>
                   <p className="mt-1 text-xs text-[#9CA3AF]">
-                    Detected from your browser:{" "}
-                    <span className="font-semibold text-[#374151]">
-                      {detectedTimezone}
-                    </span>
+                    {isDetected ? (
+                      <>
+                        Auto-detected from your browser (
+                        <span className="font-semibold text-[#374151]">
+                          {timezoneCity(detectedTimezone)}
+                        </span>
+                        ,{" "}
+                        <span className="font-semibold text-[#374151] tabular-nums">
+                          {formatOffset(detectedTimezone)}
+                        </span>
+                        ). Used for your schedule and guest displays.
+                      </>
+                    ) : (
+                      <>
+                        Your browser timezone is{" "}
+                        <button
+                          type="button"
+                          onClick={() => onTimezoneChange(detectedTimezone)}
+                          className="font-semibold text-[#FF5F63] underline-offset-2 hover:underline"
+                        >
+                          {timezoneCity(detectedTimezone)} ({" "}
+                          {formatOffset(detectedTimezone)} )
+                        </button>{" "}
+                        — click to use it.
+                      </>
+                    )}
                   </p>
                 </label>
               </div>
