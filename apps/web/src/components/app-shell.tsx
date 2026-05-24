@@ -12,6 +12,7 @@ import {
 import {
   CalendarCheck2,
   CalendarClock,
+  CalendarSync,
   Check,
   ChevronUp,
   Copy,
@@ -22,8 +23,9 @@ import {
   LifeBuoy,
   LogOut,
   MessageSquareText,
+  Moon,
   Settings,
-  User,
+  Sun,
   UserCircle2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -37,17 +39,35 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const navItems: {
+// The redesigned sidebar shows 5 primary entries. Profile & Settings live in
+// the bottom user menu (per `designs/pages/services.html` + `profile.html`).
+type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
-}[] = [
+};
+
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Bookings", href: "/dashboard/bookings", icon: CalendarCheck2 },
-  { label: "Services", href: "/dashboard/event-types", icon: Layers },
+  { label: "Services", href: "/dashboard/services", icon: Layers },
   { label: "Availability", href: "/dashboard/availability", icon: CalendarClock },
-  { label: "Profile", href: "/dashboard/profile", icon: User },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  {
+    label: "Calendar sync",
+    href: "/dashboard/settings#calendar",
+    icon: CalendarSync,
+  },
+];
+
+// Mobile bottom nav doesn't show "Calendar sync" since it's just a deep-link
+// to a Settings section. Profile is surfaced instead to keep mobile users one
+// tap away from editing their public page.
+const MOBILE_NAV_ITEMS: NavItem[] = [
+  NAV_ITEMS[0],
+  NAV_ITEMS[1],
+  NAV_ITEMS[2],
+  NAV_ITEMS[3],
+  { label: "Profile", href: "/dashboard/profile", icon: UserCircle2 },
 ];
 
 export function AppShell({
@@ -64,7 +84,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [session, setSession] = useState<ReturnType<typeof getAuthSession>>(null);
+  const [session, setSession] =
+    useState<ReturnType<typeof getAuthSession>>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
@@ -134,7 +155,7 @@ export function AppShell({
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FFFBF7] px-6 text-center text-[#6B7280]">
         <div className="rounded-2xl border border-[#EEE7DF] bg-white px-6 py-5 shadow-sm">
-          Checking your session...
+          Checking your session…
         </div>
       </div>
     );
@@ -142,7 +163,8 @@ export function AppShell({
 
   const userName = session?.user.name ?? "Bookvella host";
   const userSlug = session?.user.slug ?? "your-link";
-  const bookingLink = `https://bookvella.com/${userSlug}`;
+  const userProfileImage = session?.user.profileImageUrl ?? null;
+  const bookingLink = publicAppUrl(`/${userSlug}`);
 
   return (
     <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#0B1220] lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
@@ -152,6 +174,7 @@ export function AppShell({
         userName={userName}
         userInitial={userInitial}
         userSlug={userSlug}
+        userProfileImage={userProfileImage}
         bookingLink={bookingLink}
         onLogout={logout}
       />
@@ -162,8 +185,15 @@ export function AppShell({
             <BrandLogo />
           </div>
           <h1 className="hidden text-lg font-semibold lg:block">{title}</h1>
-          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
-            {userInitial}
+          <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
+            {userProfileImage ? (
+              <div
+                className="size-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${userProfileImage})` }}
+              />
+            ) : (
+              userInitial
+            )}
           </div>
         </header>
 
@@ -183,6 +213,7 @@ function DesktopSidebar({
   userName,
   userInitial,
   userSlug,
+  userProfileImage,
   bookingLink,
   onLogout,
 }: {
@@ -191,6 +222,7 @@ function DesktopSidebar({
   userName: string;
   userInitial: string;
   userSlug: string;
+  userProfileImage: string | null;
   bookingLink: string;
   onLogout: () => void;
 }) {
@@ -198,9 +230,25 @@ function DesktopSidebar({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Tailwind 4 themes via `:root.dark`, set via the `dark` class on <html>.
+  // The lazy initializer is SSR-safe (returns false on the server, reads
+  // localStorage on the first client render).
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("bookvella.theme") === "dark";
+  });
+
+  // Keep the <html class="dark"> in sync with state.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
   useEffect(() => {
     function handleClick(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
         setMenuOpen(false);
       }
     }
@@ -225,6 +273,17 @@ function DesktopSidebar({
     }
   }
 
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      window.localStorage.setItem("bookvella.theme", next ? "dark" : "light");
+    } catch {
+      // ignored
+    }
+  }
+
   return (
     <aside className="hidden flex-col border-r border-[#EEE7DF] bg-white lg:flex">
       <div className="flex h-16 items-center gap-2.5 border-b border-[#EEE7DF] px-5">
@@ -232,24 +291,25 @@ function DesktopSidebar({
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {navItems.map((item) => {
-          const Icon = item.icon;
+        {NAV_ITEMS.map((item) => {
           const selected = item.label === active;
           return (
             <Link
               key={item.label}
               href={item.href}
               className={cn(
+                // Dot-led nav row per design (services.html / profile.html).
                 "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition",
                 selected
                   ? "bg-[#FFEDEA] text-[#FF5F63]"
                   : "text-[#374151] hover:bg-[#FFF6F0] hover:text-[#0B1220]",
               )}
             >
-              <Icon
+              <span
+                aria-hidden
                 className={cn(
-                  "size-4",
-                  selected ? "text-[#FF5F63]" : "text-[#9CA3AF]",
+                  "size-1.5 shrink-0 rounded-full",
+                  selected ? "bg-[#FF5F63]" : "bg-[#D1D5DB]",
                 )}
               />
               <span className="flex-1">{item.label}</span>
@@ -271,8 +331,15 @@ function DesktopSidebar({
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((value) => !value)}
         >
-          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[13px] font-bold text-white">
-            {userInitial}
+          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[13px] font-bold text-white">
+            {userProfileImage ? (
+              <div
+                className="size-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${userProfileImage})` }}
+              />
+            ) : (
+              userInitial
+            )}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-[13px] font-bold">{userName}</p>
@@ -298,7 +365,9 @@ function DesktopSidebar({
               href={`/${userSlug}`}
               target="_blank"
               rel="noreferrer"
-              icon={<ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+              icon={
+                <ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
             >
               View public page
             </MenuRow>
@@ -320,7 +389,9 @@ function DesktopSidebar({
               as={Link}
               href="/dashboard/profile"
               onClick={() => setMenuOpen(false)}
-              icon={<UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+              icon={
+                <UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
             >
               Edit profile
             </MenuRow>
@@ -328,22 +399,55 @@ function DesktopSidebar({
               as={Link}
               href="/dashboard/settings"
               onClick={() => setMenuOpen(false)}
-              icon={<Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+              icon={
+                <Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
             >
               Settings
             </MenuRow>
             <div className="my-1 h-px bg-[#EEE7DF]" />
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={dark}
+              onClick={toggleTheme}
+              className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-[#374151] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+            >
+              {dark ? (
+                <Sun className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              ) : (
+                <Moon className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              )}
+              <span className="flex-1">Dark mode</span>
+              <span
+                className={cn(
+                  "relative h-4 w-7 rounded-full transition",
+                  dark ? "bg-[#FF5F63]" : "bg-[#E5E7EB]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-[2px] size-3 rounded-full bg-white shadow transition",
+                    dark ? "left-[14px]" : "left-[2px]",
+                  )}
+                />
+              </span>
+            </button>
             <MenuRow
               as="a"
-              href="#"
-              icon={<LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+              href="mailto:support@bookvella.com"
+              icon={
+                <LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
             >
               Help &amp; support
             </MenuRow>
             <MenuRow
               as="a"
-              href="#"
-              icon={<MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />}
+              href="mailto:feedback@bookvella.com"
+              icon={
+                <MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
             >
               Send feedback
             </MenuRow>
@@ -374,7 +478,13 @@ type MenuRowProps = {
   [key: string]: any;
 };
 
-function MenuRow({ icon, children, danger, as: As = "button", ...rest }: MenuRowProps) {
+function MenuRow({
+  icon,
+  children,
+  danger,
+  as: As = "button",
+  ...rest
+}: MenuRowProps) {
   return (
     <As
       {...rest}
@@ -399,10 +509,9 @@ function MobileNav({
   active: string;
   bookingCount?: number;
 }) {
-  const items = navItems.slice(0, 5);
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[#EEE7DF] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-      {items.map((item) => {
+      {MOBILE_NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         const selected = item.label === active;
         return (
@@ -426,6 +535,11 @@ function MobileNav({
       })}
     </nav>
   );
+}
+
+function publicAppUrl(path: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+  return `${appUrl.replace(/\/$/, "")}${path}`;
 }
 
 export function EmptyPage({

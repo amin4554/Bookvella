@@ -11,6 +11,7 @@ import {
   EyeOff,
   Globe,
   Info,
+  Loader2,
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -19,9 +20,11 @@ import {
   apiRequest,
   AuthResponse,
   authedApiRequest,
+  checkSlugAvailability,
   getAuthSession,
   saveAuthSession,
   type PublicUser,
+  type SlugAvailability,
   updateStoredUser,
 } from "@/lib/api";
 import {
@@ -471,11 +474,74 @@ function RegisterForm({
   );
   const slug = customSlug ?? computedSlug;
 
-  const slugStatus: { kind: "empty" | "ok" | "bad"; label: string } = !slug
+  // The local "shape" check runs synchronously, so we don't need state for it.
+  // Only the network response and in-flight flag need state.
+  const localCheck = useMemo<SlugAvailability | null>(() => {
+    if (!slug) return null;
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return {
+        input: slug,
+        normalized: slug,
+        available: false,
+        reason: "invalid",
+      };
+    }
+    return null;
+  }, [slug]);
+
+  const [remoteResult, setRemoteResult] = useState<{
+    slug: string;
+    value: SlugAvailability | null;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    // Skip network when the slug is empty or fails the local format check.
+    if (!slug || localCheck) {
+      return;
+    }
+
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
+      if (cancelled) return;
+      setChecking(true);
+      try {
+        const result = await checkSlugAvailability(slug);
+        if (!cancelled) {
+          setRemoteResult({ slug, value: result });
+        }
+      } catch {
+        if (!cancelled) setRemoteResult({ slug, value: null });
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [slug, localCheck]);
+
+  const remoteForCurrent =
+    remoteResult && remoteResult.slug === slug ? remoteResult.value : null;
+  const liveAvailability = localCheck ?? remoteForCurrent;
+
+  const slugStatus: {
+    kind: "empty" | "ok" | "bad" | "checking";
+    label: string;
+  } = !slug
     ? { kind: "empty", label: "Choose a name" }
-    : /^[a-z0-9-]+$/.test(slug)
-      ? { kind: "ok", label: "Available" }
-      : { kind: "bad", label: "Invalid chars" };
+    : localCheck
+      ? { kind: "bad", label: slugReasonLabel(localCheck.reason) }
+      : checking || !remoteForCurrent
+        ? { kind: "checking", label: "Checking…" }
+        : liveAvailability && liveAvailability.available
+          ? { kind: "ok", label: "Available" }
+          : {
+              kind: "bad",
+              label: slugReasonLabel(liveAvailability?.reason ?? null),
+            };
 
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
@@ -651,7 +717,7 @@ function RegisterForm({
 function SlugStatusChip({
   status,
 }: {
-  status: { kind: "empty" | "ok" | "bad"; label: string };
+  status: { kind: "empty" | "ok" | "bad" | "checking"; label: string };
 }) {
   if (status.kind === "ok") {
     return (
@@ -667,11 +733,33 @@ function SlugStatusChip({
       </span>
     );
   }
+  if (status.kind === "checking") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-[10px] font-bold text-[#6B7280]">
+        <Loader2 className="size-3 animate-spin" /> {status.label}
+      </span>
+    );
+  }
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-[10px] font-bold text-[#6B7280]">
       <Circle className="size-3" /> {status.label}
     </span>
   );
+}
+
+function slugReasonLabel(reason: SlugAvailability["reason"]) {
+  switch (reason) {
+    case "taken":
+      return "Taken";
+    case "reserved":
+      return "Reserved";
+    case "too-short":
+      return "Too short";
+    case "invalid":
+      return "Invalid chars";
+    default:
+      return "Unavailable";
+  }
 }
 
 function FieldLabel({

@@ -1,11 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { Copy, Upload, ZoomIn, ZoomOut } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AtSign,
+  Camera,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  EyeOff,
+  Globe,
+  MapPin,
+  Settings as SettingsIcon,
+  Trash2,
+  Upload,
+  UserCheck,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
 import {
   authedApiRequest,
   publicBookingUrl,
@@ -16,17 +31,15 @@ import {
   updateStoredUser,
 } from "@/lib/api";
 
-const fallbackServices = [
-  {
-    title: "Fresh Cut Session",
-    durationMinutes: 45,
-    locationDetails: "Your studio",
-  },
-  {
-    title: "Beard Trim & Shape",
-    durationMinutes: 30,
-    locationDetails: "Your studio",
-  },
+const CATEGORY_OPTIONS = [
+  "Barbering",
+  "Hair & Beauty",
+  "Fitness & Coaching",
+  "Tutoring",
+  "Consulting",
+  "Music & Comedy",
+  "Photography",
+  "Other",
 ];
 
 export default function ProfilePage() {
@@ -35,13 +48,25 @@ export default function ProfilePage() {
   const [reviews, setReviews] = useState<HostReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Controlled fields, so the live preview can mirror them as you type.
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [headline, setHeadline] = useState("");
+  const [location, setLocation] = useState("");
+  const [about, setAbout] = useState("");
+  const [whatToExpect, setWhatToExpect] = useState("");
+  const [website, setWebsite] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [slug, setSlug] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         const [me, services, hostReviews] = await Promise.all([
@@ -49,45 +74,90 @@ export default function ProfilePage() {
           authedApiRequest<EventType[]>("/event-types"),
           authedApiRequest<HostReview[]>("/reviews"),
         ]);
+        if (cancelled) return;
         setUser(me);
+        setName(me.name ?? "");
+        setCategory(me.businessCategory ?? "");
+        setHeadline(me.headline ?? "");
+        setLocation(me.location ?? "");
+        setAbout(me.about ?? "");
+        setWhatToExpect(me.whatToExpect ?? "");
+        setWebsite(me.websiteUrl ?? "");
+        setInstagram(me.instagramUrl ?? "");
+        setSlug(me.slug ?? "");
         setProfileImageUrl(me.profileImageUrl ?? "");
         setCoverImageUrl(me.coverImageUrl ?? "");
         setEvents(services);
         setReviews(hostReviews);
       } catch (caught) {
-        setError(
-          caught instanceof Error ? caught.message : "Could not load profile",
-        );
+        if (!cancelled) {
+          setError(
+            caught instanceof Error ? caught.message : "Could not load profile",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-
     load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Computed profile completeness — drives the progress bar.
+  const completeness = useMemo(() => {
+    const checks: { label: string; ok: boolean }[] = [
+      { label: "name", ok: name.trim().length > 0 },
+      { label: "category", ok: category.trim().length > 0 },
+      { label: "headline", ok: headline.trim().length > 0 },
+      { label: "location", ok: location.trim().length > 0 },
+      { label: "about", ok: about.trim().length > 0 },
+      { label: "what to expect", ok: whatToExpect.trim().length > 0 },
+      { label: "profile photo", ok: Boolean(profileImageUrl) },
+      { label: "cover image", ok: Boolean(coverImageUrl) },
+    ];
+    const done = checks.filter((c) => c.ok).length;
+    const total = checks.length;
+    const missing = checks.filter((c) => !c.ok).map((c) => c.label);
+    return {
+      percent: Math.round((done / total) * 100),
+      done,
+      total,
+      missing,
+    };
+  }, [
+    name,
+    category,
+    headline,
+    location,
+    about,
+    whatToExpect,
+    profileImageUrl,
+    coverImageUrl,
+  ]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
-
-    const form = new FormData(event.currentTarget);
 
     try {
       const updated = await authedApiRequest<PublicUser>("/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
-          name: readText(form, "name"),
-          slug: readText(form, "slug"),
+          name,
+          slug,
           profileImageUrl: profileImageUrl || null,
           coverImageUrl: coverImageUrl || null,
-          headline: readOptionalText(form, "headline"),
-          businessCategory: readOptionalText(form, "businessCategory"),
-          location: readOptionalText(form, "location"),
-          about: readOptionalText(form, "about"),
-          whatToExpect: readOptionalText(form, "whatToExpect"),
-          websiteUrl: readOptionalText(form, "websiteUrl"),
-          instagramUrl: readOptionalText(form, "instagramUrl"),
+          headline: headline.trim() || null,
+          businessCategory: category.trim() || null,
+          location: location.trim() || null,
+          about: about.trim() || null,
+          whatToExpect: whatToExpect.trim() || null,
+          websiteUrl: website.trim() || null,
+          instagramUrl: instagram.trim() || null,
         }),
       });
       setUser(updated);
@@ -102,267 +172,24 @@ export default function ProfilePage() {
     }
   }
 
-  return (
-    <AppShell
-      active="Profile"
-      title="Your public profile"
-      userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
-    >
-      <form onSubmit={save}>
-        <section className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-[34px] font-bold leading-tight">
-              Your public profile
-            </h2>
-            <p className="mt-1 text-base text-[#6B7280]">
-              This is what guests see before booking you.
-            </p>
-          </div>
-          <Button
-            className="h-12 rounded-2xl bg-[#FF6267] px-8 font-bold text-white hover:bg-[#F05258]"
-            disabled={saving || loading}
-          >
-            {saving ? "Saving..." : "Save changes"}
-          </Button>
-        </section>
-
-        {error ? (
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <div className="space-y-6">
-            <Panel eyebrow="Public identity">
-              {loading || !user ? (
-                <Skeleton text="Loading your profile details." />
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-center gap-5">
-                    <Avatar user={user} size="large" />
-                    <div>
-                      <p className="font-bold">Profile photo</p>
-                      <p className="mt-1 text-sm text-[#6B7280]">
-                        Shown on your booking page and emails.
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#FF6267] px-4 text-sm font-bold text-[#FF6267]">
-                          <Upload className="size-4" />
-                          Upload below
-                        </span>
-                        <span className="inline-flex h-10 items-center rounded-xl border border-[#E8DED7] px-4 text-sm font-bold text-[#6B7280]">
-                          Preview below
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field
-                      label="Name or business name"
-                      name="name"
-                      defaultValue={user.name}
-                    />
-                    <Field
-                      label="Service category"
-                      name="businessCategory"
-                      defaultValue={user.businessCategory ?? ""}
-                      placeholder="Barbering"
-                    />
-                  </div>
-                  <Field
-                    label="Headline"
-                    name="headline"
-                    defaultValue={user.headline ?? ""}
-                    placeholder="Precision cuts in Downtown Austin"
-                    hint="Guests see this right under your name."
-                  />
-                  <Field
-                    label="Location or service area"
-                    name="location"
-                    defaultValue={user.location ?? ""}
-                    placeholder="Shoreditch, London"
-                  />
-                  <ImageUploadField
-                    label="Profile picture"
-                    shape="circle"
-                    value={profileImageUrl}
-                    uploading={uploadingProfile}
-                    onClear={() => setProfileImageUrl("")}
-                    onChange={(file) =>
-                      handleImageUpload(file, setUploadingProfile, setProfileImageUrl)
-                    }
-                  />
-                  <ImageUploadField
-                    label="Cover image"
-                    value={coverImageUrl}
-                    uploading={uploadingCover}
-                    onClear={() => setCoverImageUrl("")}
-                    onChange={(file) =>
-                      handleImageUpload(file, setUploadingCover, setCoverImageUrl)
-                    }
-                  />
-                </>
-              )}
-            </Panel>
-
-            <Panel eyebrow="About">
-              <TextArea
-                label="About you"
-                name="about"
-                defaultValue={user?.about ?? ""}
-                placeholder="Tell guests about your experience, style, or approach."
-              />
-              <TextArea
-                label="What to expect"
-                name="whatToExpect"
-                defaultValue={user?.whatToExpect ?? ""}
-                placeholder="Share how the appointment works and how guests can prepare."
-              />
-            </Panel>
-
-            <Panel eyebrow="Links and public URL">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label="Website"
-                  name="websiteUrl"
-                  defaultValue={user?.websiteUrl ?? ""}
-                  placeholder="https://your-site.com"
-                />
-                <Field
-                  label="Instagram"
-                  name="instagramUrl"
-                  defaultValue={user?.instagramUrl ?? ""}
-                  placeholder="https://instagram.com/you"
-                />
-              </div>
-              <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
-                <p className="text-sm font-bold">Public profile URL</p>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-[#6B7280]">
-                  <span className="truncate">
-                    {profileUrl(user?.slug)}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-sm font-bold text-[#FF6267]"
-                    onClick={() => {
-                      const url = profileUrl(user?.slug);
-                      navigator.clipboard.writeText(url);
-                      toast.success("Profile link copied");
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <details className="mt-3 rounded-xl border border-[#E8DED7] bg-white px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-bold text-[#6B7280]">
-                    Advanced — Edit public URL
-                  </summary>
-                  <p className="mt-2 text-xs text-[#9CA3AF]">
-                    Changing your handle will break older links unless you set
-                    up a redirect.
-                  </p>
-                  <div className="mt-3">
-                    <Field
-                      label="Public URL ending"
-                      name="slug"
-                      defaultValue={user?.slug ?? ""}
-                      placeholder="your-name"
-                    />
-                  </div>
-                </details>
-                <p className="mt-3 text-xs text-[#9CA3AF]">
-                  Need to change your timezone? It moved to{" "}
-                  <Link
-                    href="/dashboard/settings"
-                    className="font-semibold text-[#FF5F63] hover:underline"
-                  >
-                    Settings → Account
-                  </Link>
-                  .
-                </p>
-              </div>
-            </Panel>
-
-            <Panel eyebrow="Reviews">
-              {reviews.length === 0 ? (
-                <p className="text-sm leading-6 text-[#6B7280]">
-                  Reviews will appear here after guests leave feedback from a
-                  booking confirmation email.
-                </p>
-              ) : null}
-              {reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className="flex gap-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4"
-                >
-                  <span className="mt-1 text-[#B8C0CC]">::</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-amber-500">
-                      {stars(review.rating)}
-                    </p>
-                    <p className="mt-1 text-sm text-[#6B7280]">
-                      &quot;{review.comment}&quot;
-                    </p>
-                    <p className="mt-2 text-sm font-bold">
-                      {review.guestName} - {review.eventType.title}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-lg px-2 text-xs font-bold text-[#FF6267]"
-                    onClick={() => toggleReview(review)}
-                  >
-                    {review.isVisible ? "Hide" : "Show"}
-                  </button>
-                </div>
-              ))}
-            </Panel>
-          </div>
-
-          <aside className="xl:sticky xl:top-8 xl:self-start">
-            <div className="mb-4 flex items-center justify-between text-sm font-bold text-[#6B7280]">
-              <span>Live preview - what guests see</span>
-              <span className="rounded-full bg-[#D8FFE8] px-4 py-1 text-xs text-[#16A34A]">
-                Live
-              </span>
-            </div>
-            <Preview user={user} events={events} reviews={reviews} />
-            <button
-              type="button"
-              className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-[#FF6267]"
-              onClick={() => {
-                const firstService = events[0];
-                const url =
-                  firstService && user
-                    ? publicBookingUrl(user.slug, firstService.slug)
-                    : `${window.location.origin}/${user?.slug ?? "your-link"}`;
-                navigator.clipboard.writeText(url);
-                toast.success("Public link copied");
-              }}
-            >
-              <Copy className="size-4" />
-              Copy public link
-            </button>
-          </aside>
-        </div>
-      </form>
-    </AppShell>
-  );
-
   async function toggleReview(review: HostReview) {
-    const updated = await authedApiRequest<HostReview>(
-      `/reviews/${review.id}/visibility`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ isVisible: !review.isVisible }),
-      },
-    );
-
-    setReviews((current) =>
-      current.map((item) => (item.id === updated.id ? updated : item)),
-    );
-    toast.success(updated.isVisible ? "Review shown" : "Review hidden");
+    try {
+      const updated = await authedApiRequest<HostReview>(
+        `/reviews/${review.id}/visibility`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ isVisible: !review.isVisible }),
+        },
+      );
+      setReviews((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      toast.success(updated.isVisible ? "Review shown" : "Review hidden");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not update review",
+      );
+    }
   }
 
   async function handleImageUpload(
@@ -372,233 +199,859 @@ export default function ProfilePage() {
   ) {
     setUploading(true);
     setError(null);
-
     try {
       const uploaded = await uploadImage(file);
       setUrl(uploaded.url);
       toast.success("Image uploaded");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not upload image");
+      setError(
+        caught instanceof Error ? caught.message : "Could not upload image",
+      );
     } finally {
       setUploading(false);
     }
   }
+
+  return (
+    <AppShell
+      active="Profile"
+      title="Your public profile"
+      userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
+    >
+      <form onSubmit={save}>
+        {/* title row */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1
+              className="text-[36px] font-extrabold md:text-[42px]"
+              style={{ letterSpacing: "-0.03em", lineHeight: "1.02" }}
+            >
+              Your public profile
+            </h1>
+            <p className="mt-2 text-[14px] text-[#6B7280]">
+              This is what guests see before booking you. Edit anything — your
+              live page updates as you save.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/${slug || user?.slug || ""}`}
+              target="_blank"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            >
+              <ExternalLink className="size-4" /> View public page
+            </Link>
+            <button
+              type="submit"
+              disabled={saving || loading}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+
+        {error ? (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {/* profile completeness */}
+        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-[#EEE7DF] bg-white p-4 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+            <UserCheck className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[14px] font-bold">Profile completeness</p>
+              <p className="text-[12px] font-semibold text-[#6B7280]">
+                <span className="tabular-nums text-[#0B1220]">
+                  {completeness.percent}%
+                </span>{" "}
+                ·{" "}
+                {completeness.missing.length === 0
+                  ? "you're all set"
+                  : `add ${completeness.missing[0]} to keep going`}
+              </p>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+              <div
+                className="h-full bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]"
+                style={{ width: `${completeness.percent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* two columns */}
+        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+          {/* LEFT */}
+          <div className="space-y-6">
+            {/* Public identity */}
+            <Card eyebrow="Public identity" head="How guests recognise you">
+              <div className="space-y-5">
+                <PhotoRow
+                  profileImageUrl={profileImageUrl}
+                  uploading={uploadingProfile}
+                  onChange={(file) =>
+                    handleImageUpload(
+                      file,
+                      setUploadingProfile,
+                      setProfileImageUrl,
+                    )
+                  }
+                  onClear={() => setProfileImageUrl("")}
+                  initial={(user?.name ?? name ?? "B")
+                    .charAt(0)
+                    .toUpperCase()}
+                />
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FieldText
+                    label="Display name"
+                    value={name}
+                    onChange={setName}
+                    placeholder="Marcus Williams"
+                  />
+                  <FieldSelect
+                    label="Service category"
+                    value={category}
+                    onChange={setCategory}
+                    options={CATEGORY_OPTIONS}
+                    placeholder="Pick a category"
+                  />
+                </div>
+
+                <FieldText
+                  label="Headline"
+                  value={headline}
+                  onChange={setHeadline}
+                  placeholder="Precision cuts in Shoreditch, London"
+                  help="Guests see this right under your name. Aim for 4–8 words."
+                />
+
+                <FieldText
+                  label="Location or service area"
+                  value={location}
+                  onChange={setLocation}
+                  icon={<MapPin className="size-4 text-[#9CA3AF]" />}
+                  placeholder="Shoreditch, London · United Kingdom"
+                />
+
+                <CoverUpload
+                  value={coverImageUrl}
+                  uploading={uploadingCover}
+                  onChange={(file) =>
+                    handleImageUpload(file, setUploadingCover, setCoverImageUrl)
+                  }
+                  onClear={() => setCoverImageUrl("")}
+                />
+
+                {/* Advanced — public link handle */}
+                <details className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 open:bg-white">
+                  <summary className="flex cursor-pointer items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <SettingsIcon className="size-4 text-[#9CA3AF]" />
+                      <span className="text-[13px] font-bold">
+                        Advanced — public link handle
+                      </span>
+                    </div>
+                    <ChevronDown className="size-4 text-[#9CA3AF]" />
+                  </summary>
+                  <div className="mt-4">
+                    <FieldEyebrow>Your booking link</FieldEyebrow>
+                    <div className="mt-1.5 flex h-12 items-center overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white focus-within:border-[#FF5F63]">
+                      <span className="flex h-full items-center border-r border-[#E5E7EB] bg-[#F9FAFB] px-4 text-[14px] font-medium tabular-nums text-[#6B7280]">
+                        bookvella.com/
+                      </span>
+                      <input
+                        value={slug}
+                        onChange={(event) =>
+                          setSlug(event.target.value.toLowerCase())
+                        }
+                        className="h-full min-w-0 flex-1 bg-transparent px-4 text-[15px] font-semibold tabular-nums outline-none"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-[#9CA3AF]">
+                      Changing this breaks links you&apos;ve already shared.
+                    </p>
+                  </div>
+                </details>
+              </div>
+            </Card>
+
+            {/* About */}
+            <Card eyebrow="About" head="Tell guests who you are">
+              <div className="space-y-5">
+                <FieldTextarea
+                  label="About you"
+                  value={about}
+                  onChange={setAbout}
+                  rows={4}
+                  help="Short bio. Visible at the top of your public profile."
+                />
+                <FieldTextarea
+                  label="What to expect"
+                  value={whatToExpect}
+                  onChange={setWhatToExpect}
+                  rows={3}
+                  help="Sets expectations before the appointment. Helps reduce no-shows."
+                />
+              </div>
+            </Card>
+
+            {/* Links & social */}
+            <Card
+              eyebrow="Links & social"
+              head="Where else can guests find you?"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FieldText
+                  label="Website"
+                  value={website}
+                  onChange={setWebsite}
+                  icon={<Globe className="size-4 text-[#9CA3AF]" />}
+                  placeholder="https://yoursite.com"
+                />
+                <FieldText
+                  label="Instagram"
+                  value={instagram}
+                  onChange={setInstagram}
+                  icon={<AtSign className="size-4 text-[#9CA3AF]" />}
+                  placeholder="@yourhandle"
+                />
+              </div>
+            </Card>
+
+            {/* Reviews */}
+            <Card
+              eyebrow="Reviews & testimonials"
+              head="Choose what shows on your page"
+              headRight={
+                <p className="text-[12px] text-[#6B7280]">
+                  {reviewsAverage(reviews) != null ? (
+                    <>
+                      <span className="font-bold tabular-nums text-[#0B1220]">
+                        {reviewsAverage(reviews)!.toFixed(1)}
+                      </span>{" "}
+                      · {reviews.length}{" "}
+                      {reviews.length === 1 ? "review" : "reviews"}
+                    </>
+                  ) : (
+                    "No reviews yet"
+                  )}
+                </p>
+              }
+            >
+              {reviews.length === 0 ? (
+                <p className="text-[13px] leading-6 text-[#6B7280]">
+                  Reviews will appear here after guests leave feedback from a
+                  booking confirmation email. You can hide individual reviews
+                  with the toggle.
+                </p>
+              ) : (
+                <div className="divide-y divide-[#EEE7DF]">
+                  {reviews.map((review) => (
+                    <ReviewListRow
+                      key={review.id}
+                      review={review}
+                      onToggle={() => toggleReview(review)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Danger zone */}
+            <section className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#B91C1C]">
+                  <EyeOff className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-[#7F1D1D]">
+                    Hide profile from public
+                  </p>
+                  <p className="mt-1 text-[12px] leading-[1.55] text-[#7F1D1D]/80">
+                    Coming soon — pause your booking page while existing
+                    bookings stay confirmed.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#FECACA] bg-white px-3 text-[12px] font-bold text-[#B91C1C] opacity-60"
+                >
+                  Hide profile
+                </button>
+              </div>
+            </section>
+          </div>
+
+          {/* RIGHT — live preview */}
+          <aside className="xl:sticky xl:top-6 xl:self-start">
+            <div className="flex items-center justify-between">
+              <p className="text-[14px] font-bold">
+                Live preview — what guests see
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[10px] font-bold text-[#16A34A]">
+                <span className="size-1.5 rounded-full bg-[#16A34A]" /> Live
+              </span>
+            </div>
+
+            <div className="mt-3 overflow-hidden rounded-[24px] border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              {/* cover */}
+              <div
+                className="relative h-24"
+                style={{
+                  background: coverImageUrl
+                    ? `url(${coverImageUrl}) center/cover`
+                    : "linear-gradient(135deg,#FF6267 0%,#FF8252 50%,#C661E0 100%)",
+                }}
+              >
+                <div className="absolute -bottom-7 left-5">
+                  <div
+                    className="flex size-14 items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[16px] font-bold text-white ring-4 ring-white"
+                    style={
+                      profileImageUrl
+                        ? {
+                            backgroundImage: `url(${profileImageUrl})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }
+                        : undefined
+                    }
+                  >
+                    {!profileImageUrl
+                      ? (user?.name ?? name ?? "B").charAt(0).toUpperCase()
+                      : null}
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 pb-5 pt-10">
+                <p className="text-[18px] font-bold leading-tight">
+                  {name || "Your name"}
+                </p>
+                <p className="text-[12px] text-[#6B7280]">
+                  {headline || "Add a headline so guests get the gist."}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {category ? <PreviewChip>{category}</PreviewChip> : null}
+                  {location
+                    ? location
+                        .split(/[·,]/)
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => (
+                          <PreviewChip key={part}>{part}</PreviewChip>
+                        ))
+                    : null}
+                </div>
+                {reviewsAverage(reviews) != null ? (
+                  <div className="mt-3 flex items-center gap-1 text-[12px]">
+                    <span className="text-amber-500">
+                      {"★".repeat(
+                        Math.max(
+                          0,
+                          Math.min(5, Math.round(reviewsAverage(reviews)!)),
+                        ),
+                      )}
+                    </span>
+                    <span className="font-bold tabular-nums">
+                      {reviewsAverage(reviews)!.toFixed(1)}
+                    </span>
+                    <span className="tabular-nums text-[#9CA3AF]">
+                      · {reviews.length}{" "}
+                      {reviews.length === 1 ? "review" : "reviews"}
+                    </span>
+                  </div>
+                ) : null}
+
+                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  About
+                </p>
+                <p className="mt-1.5 text-[12px] leading-[1.6] text-[#374151]">
+                  {about ||
+                    "Your bio will appear here. Add a short intro to help guests trust you."}
+                </p>
+
+                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Services
+                </p>
+                <div className="mt-2 space-y-2">
+                  {events.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-[#FFFBF7] p-3 text-[11px] text-[#6B7280]">
+                      No active services yet.{" "}
+                      <Link
+                        href="/dashboard/services/new"
+                        className="font-bold text-[#FF5F63] hover:underline"
+                      >
+                        Add one
+                      </Link>
+                    </p>
+                  ) : (
+                    events.slice(0, 3).map((service) => (
+                      <div
+                        key={service.id}
+                        className="rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] p-2.5"
+                      >
+                        <p className="text-[12px] font-bold">{service.title}</p>
+                        <p className="text-[10px] tabular-nums text-[#6B7280]">
+                          {service.durationMinutes} min ·{" "}
+                          {service.locationDetails ?? "Location after booking"}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[13px] font-bold text-white shadow-sm"
+                >
+                  Book an appointment
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-3 text-center text-[11px] text-[#9CA3AF]">
+              Updates immediately when you save.
+            </p>
+
+            {/* copy link button */}
+            <div className="mt-4 flex items-center justify-between rounded-2xl border border-[#EEE7DF] bg-white p-3.5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              <p className="truncate text-[12px] tabular-nums text-[#6B7280]">
+                bookvella.com/{slug || user?.slug || "your-link"}
+              </p>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFD2CE] bg-[#FFF0EF] px-2.5 text-[11px] font-bold text-[#FF5F63]"
+                onClick={() => {
+                  if (!user) return;
+                  const url =
+                    events.length > 0
+                      ? publicBookingUrl(slug || user.slug, events[0].slug)
+                      : `${window.location.origin}/${slug || user.slug}`;
+                  navigator.clipboard.writeText(url).then(
+                    () => toast.success("Public link copied"),
+                    () => toast.error("Copy failed"),
+                  );
+                }}
+              >
+                <Copy className="size-3" /> Copy
+              </button>
+            </div>
+          </aside>
+        </div>
+      </form>
+    </AppShell>
+  );
 }
 
-function Panel({
+/* ============ photo + cover upload ============ */
+
+function PhotoRow({
+  profileImageUrl,
+  uploading,
+  onChange,
+  onClear,
+  initial,
+}: {
+  profileImageUrl: string;
+  uploading: boolean;
+  onChange: (file: File) => void;
+  onClear: () => void;
+  initial: string;
+}) {
+  const [pendingSrc, setPendingSrc] = useState<string | null>(null);
+
+  return (
+    <>
+      {pendingSrc ? (
+        <CropModal
+          src={pendingSrc}
+          shape="circle"
+          onConfirm={(file) => {
+            setPendingSrc(null);
+            onChange(file);
+          }}
+          onCancel={() => setPendingSrc(null)}
+        />
+      ) : null}
+      <div className="flex flex-wrap items-center gap-5">
+        <div className="relative">
+          <div
+            className="flex size-20 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[24px] font-bold text-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]"
+            style={
+              profileImageUrl
+                ? {
+                    backgroundImage: `url(${profileImageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          >
+            {!profileImageUrl ? initial : null}
+          </div>
+          <label className="absolute -bottom-1.5 -right-1.5 inline-flex size-7 cursor-pointer items-center justify-center rounded-full border border-[#EEE7DF] bg-white text-[#FF5F63] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+            <Camera className="size-3.5" />
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) =>
+                  setPendingSrc(ev.target?.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-bold">Profile photo</p>
+          <p className="mt-1 text-[12px] text-[#6B7280]">
+            Shown on your booking page and emails. 400×400px recommended.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#FFD2CE] bg-[#FFF0EF] px-3 text-[12px] font-bold text-[#FF5F63]">
+              <Upload className="size-3.5" />
+              {uploading ? "Uploading…" : "Upload photo"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) =>
+                    setPendingSrc(ev.target?.result as string);
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {profileImageUrl ? (
+              <button
+                type="button"
+                onClick={onClear}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#6B7280]"
+              >
+                <Trash2 className="size-3.5" /> Remove
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function CoverUpload({
+  value,
+  uploading,
+  onChange,
+  onClear,
+}: {
+  value: string;
+  uploading: boolean;
+  onChange: (file: File) => void;
+  onClear: () => void;
+}) {
+  const [pendingSrc, setPendingSrc] = useState<string | null>(null);
+
+  return (
+    <>
+      {pendingSrc ? (
+        <CropModal
+          src={pendingSrc}
+          shape="rect"
+          onConfirm={(file) => {
+            setPendingSrc(null);
+            onChange(file);
+          }}
+          onCancel={() => setPendingSrc(null)}
+        />
+      ) : null}
+      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-bold">Cover image</p>
+            <p className="mt-0.5 text-[11px] text-[#6B7280]">
+              Sits behind your name on your public page. 2:1 ratio recommended.
+            </p>
+          </div>
+          {value ? (
+            <button
+              type="button"
+              className="text-[11px] font-bold text-[#FF5F63]"
+              onClick={onClear}
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          {value ? (
+            <div
+              className="h-20 w-40 rounded-xl border border-[#E8DED7] bg-cover bg-center"
+              style={{ backgroundImage: `url(${value})` }}
+            />
+          ) : (
+            <div className="grid h-20 w-40 place-items-center rounded-xl border border-dashed border-[#E8DED7] bg-white text-[11px] font-bold text-[#B8C0CC]">
+              No cover yet
+            </div>
+          )}
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-[#FFD2CE] bg-white px-4 text-[12px] font-bold text-[#FF5F63]">
+            <Upload className="size-4" />
+            {uploading ? "Uploading…" : value ? "Replace cover" : "Choose cover"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) =>
+                  setPendingSrc(ev.target?.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ============ helpers ============ */
+
+function ReviewListRow({
+  review,
+  onToggle,
+}: {
+  review: HostReview;
+  onToggle: () => void;
+}) {
+  const initial = (review.guestName || "?").charAt(0).toUpperCase();
+  const stars = "★".repeat(
+    Math.max(0, Math.min(5, Math.round(review.rating))),
+  );
+  return (
+    <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#A855F7] to-[#7C4DFF] text-[12px] font-bold text-white">
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[14px] font-bold">{review.guestName}</p>
+          <span className="text-[12px] text-amber-500">{stars}</span>
+          <span className="text-[11px] tabular-nums text-[#9CA3AF]">
+            {review.eventType.title} · {relativeDate(review.createdAt)}
+          </span>
+          {!review.isVisible ? (
+            <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-bold text-[#6B7280]">
+              Hidden
+            </span>
+          ) : null}
+        </div>
+        <p
+          className={`mt-1.5 text-[13px] leading-[1.6] ${review.isVisible ? "text-[#374151]" : "text-[#6B7280]"}`}
+        >
+          &ldquo;{review.comment}&rdquo;
+        </p>
+      </div>
+      <label className="flex items-center gap-2 text-[12px] font-semibold text-[#374151]">
+        <input
+          type="checkbox"
+          checked={review.isVisible}
+          onChange={onToggle}
+          className="size-4 rounded border-[#D1D5DB] text-[#FF5F63] focus:ring-[#FF5F63]"
+        />
+        Visible
+      </label>
+    </div>
+  );
+}
+
+function Card({
   eyebrow,
+  head,
+  headRight,
   children,
 }: {
   eyebrow: string;
+  head: string;
+  headRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] border border-[#EEE7DF] bg-white p-6 shadow-sm md:p-8">
-      <p className="mb-5 text-xs font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-        {eyebrow}
-      </p>
-      <div className="space-y-4">{children}</div>
+    <section className="rounded-[18px] border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-4">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9CA3AF]">
+            {eyebrow}
+          </p>
+          <h2 className="mt-1 text-[16px] font-extrabold">{head}</h2>
+        </div>
+        {headRight}
+      </div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }
 
-function Preview({
-  user,
-  events,
-  reviews,
-}: {
-  user: PublicUser | null;
-  events: EventType[];
-  reviews: HostReview[];
-}) {
-  const services = events.length ? events : fallbackServices;
-  const name = user?.name ?? "Bookvella host";
-  const visibleReviews = reviews.filter((review) => review.isVisible);
-  const averageRating =
-    visibleReviews.length === 0
-      ? null
-      : visibleReviews.reduce((sum, review) => sum + review.rating, 0) /
-        visibleReviews.length;
-
+function FieldEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[24px] border border-[#EEE7DF] bg-white shadow-sm">
-      <div
-        className="h-28 bg-gradient-to-r from-[#FF6267] to-[#C653D8]"
-        style={
-          user?.coverImageUrl
-            ? {
-                backgroundImage: `url(${user.coverImageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      />
-      <div className="px-6 pb-6">
-        <div className="-mt-9">
-          <Avatar user={user} />
-        </div>
-        <h3 className="mt-4 text-2xl font-bold">{name}</h3>
-        <p className="mt-1 text-sm text-[#6B7280]">
-          {user?.headline ?? "Tell guests what makes booking you worthwhile."}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[user?.businessCategory, user?.location]
-            .filter(Boolean)
-            .map((item) => (
-              <span
-                key={item}
-                className="rounded-full border border-[#E8DED7] bg-[#FFFBF7] px-3 py-1 text-xs font-bold text-[#6B7280]"
-              >
-                {item}
-              </span>
-            ))}
-        </div>
-        {averageRating ? (
-          <p className="mt-4 text-sm text-amber-500">
-            {stars(averageRating)}{" "}
-            <span className="text-[#6B7280]">
-              {averageRating.toFixed(1)} - {visibleReviews.length}{" "}
-              {visibleReviews.length === 1 ? "review" : "reviews"}
-            </span>
-          </p>
-        ) : null}
-        <PreviewSection
-          title="About"
-          text={
-            user?.about ??
-            "Add a short profile so guests feel confident before booking."
-          }
-        />
-        <div className="mt-5">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-            Services
-          </p>
-          <div className="mt-3 space-y-2">
-            {services.slice(0, 2).map((service) => (
-              <div
-                key={service.title}
-                className="flex gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4"
-              >
-                {"imageUrl" in service && service.imageUrl ? (
-                  <div
-                    className="size-14 shrink-0 rounded-xl bg-cover bg-center"
-                    style={{ backgroundImage: `url(${service.imageUrl})` }}
-                  />
-                ) : null}
-                <div>
-                  <p className="font-bold">{service.title}</p>
-                  <p className="mt-1 text-sm text-[#6B7280]">
-                    {service.durationMinutes} min -{" "}
-                    {service.locationDetails ?? "Location shared after booking"}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-5 flex h-12 items-center justify-center rounded-xl bg-[#FF6267] font-bold text-white">
-          Book an appointment
-        </div>
-      </div>
-    </div>
+    <span className="text-[12px] font-bold uppercase tracking-[0.10em] text-[#6B7280]">
+      {children}
+    </span>
   );
 }
 
-function PreviewSection({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="mt-5">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-        {title}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#6B7280]">{text}</p>
-    </div>
-  );
-}
-
-function Avatar({
-  user,
-  size = "default",
-}: {
-  user: PublicUser | null;
-  size?: "default" | "large";
-}) {
-  const className =
-    size === "large"
-      ? "size-20 rounded-[20px] text-3xl"
-      : "size-16 rounded-2xl text-2xl";
-
-  if (user?.profileImageUrl) {
-    return (
-      <div
-        className={`${className} bg-cover bg-center`}
-        style={{ backgroundImage: `url(${user.profileImageUrl})` }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`flex ${className} items-center justify-center bg-gradient-to-br from-[#FF6267] to-[#B450F4] font-bold text-white ring-4 ring-white`}
-    >
-      {user?.name.charAt(0).toUpperCase() ?? "B"}
-    </div>
-  );
-}
-
-function Field({
+function FieldText({
   label,
-  name,
-  defaultValue,
+  value,
+  onChange,
   placeholder,
-  hint,
+  help,
+  icon,
 }: {
   label: string;
-  name: string;
-  defaultValue: string;
+  value: string;
+  onChange: (v: string) => void;
   placeholder?: string;
-  hint?: string;
+  help?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold">{label}</span>
-      <input
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 outline-none placeholder:text-[#9CA3AF] focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
-      />
-      {hint ? (
-        <span className="mt-1 block text-xs text-[#9CA3AF]">{hint}</span>
+      <FieldEyebrow>{label}</FieldEyebrow>
+      <div className="relative mt-1.5">
+        {icon ? (
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2">
+            {icon}
+          </span>
+        ) : null}
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className={`h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${icon ? "pl-10" : ""}`}
+        />
+      </div>
+      {help ? (
+        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
       ) : null}
     </label>
   );
 }
 
-function TextArea({
+function FieldTextarea({
   label,
-  name,
-  defaultValue,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+  help,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+  help?: string;
+}) {
+  return (
+    <label className="block">
+      <FieldEyebrow>{label}</FieldEyebrow>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 py-3 text-sm leading-[1.55] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+      />
+      {help ? (
+        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+      ) : null}
+    </label>
+  );
+}
+
+function FieldSelect({
+  label,
+  value,
+  onChange,
+  options,
   placeholder,
 }: {
   label: string;
-  name: string;
-  defaultValue: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
   placeholder?: string;
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold">{label}</span>
-      <textarea
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        rows={4}
-        className="mt-2 w-full resize-none rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 py-3 leading-7 outline-none placeholder:text-[#9CA3AF] focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
-      />
+      <FieldEyebrow>{label}</FieldEyebrow>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+      >
+        {value ? null : <option value="">{placeholder ?? "Select…"}</option>}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
+
+function PreviewChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#E8DED7] bg-white px-2 py-1 text-[11px] font-semibold text-[#374151]">
+      {children}
+    </span>
+  );
+}
+
+function reviewsAverage(reviews: HostReview[]): number | null {
+  const visible = reviews.filter((r) => r.isVisible);
+  if (visible.length === 0) return null;
+  return visible.reduce((sum, r) => sum + r.rating, 0) / visible.length;
+}
+
+function relativeDate(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Date.now() - then;
+  const day = 86_400_000;
+  if (diff < day) return "today";
+  if (diff < 2 * day) return "yesterday";
+  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`;
+  if (diff < 30 * day) return `${Math.floor(diff / (7 * day))} weeks ago`;
+  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))} months ago`;
+  return `${Math.floor(diff / (365 * day))} years ago`;
+}
+
+/* ============ canvas crop modal (kept from earlier impl) ============ */
 
 function CropModal({
   src,
@@ -705,7 +1158,7 @@ function CropModal({
           onClick={onCancel}
           className="text-sm font-bold text-white/60 hover:text-white"
         >
-          Cancel
+          <X className="size-5" />
         </button>
       </div>
 
@@ -723,7 +1176,7 @@ function CropModal({
           onLoad={initCrop}
           className="h-full w-full object-contain"
         />
-        {ready && (
+        {ready ? (
           <div
             onMouseDown={(e) => {
               e.preventDefault();
@@ -746,7 +1199,7 @@ function CropModal({
               border: "2px solid rgba(255,255,255,0.85)",
             }}
           />
-        )}
+        ) : null}
       </div>
 
       <div className="mt-5 flex w-full max-w-[560px] items-center gap-3">
@@ -769,7 +1222,7 @@ function CropModal({
               y: Math.max(hh, Math.min(height - hh, p.y)),
             }));
           }}
-          className="flex-1 accent-[#FF6267]"
+          className="flex-1 accent-[#FF5F63]"
         />
         <ZoomIn className="size-4 shrink-0 text-white/60" />
       </div>
@@ -777,146 +1230,10 @@ function CropModal({
       <button
         type="button"
         onClick={handleCrop}
-        className="mt-6 h-12 rounded-2xl bg-[#FF6267] px-10 font-bold text-white hover:bg-[#F05258]"
+        className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-10 font-bold text-white hover:brightness-105"
       >
         Apply crop
       </button>
     </div>
   );
-}
-
-function ImageUploadField({
-  label,
-  value,
-  uploading,
-  onChange,
-  onClear,
-  shape = "rect",
-}: {
-  label: string;
-  value: string;
-  uploading: boolean;
-  onChange: (file: File) => void;
-  onClear: () => void;
-  shape?: "circle" | "rect";
-}) {
-  const [pendingSrc, setPendingSrc] = useState<string | null>(null);
-
-  const thumbClass =
-    shape === "circle"
-      ? "rounded-full size-20 border border-[#E8DED7] bg-cover bg-center"
-      : "rounded-2xl size-20 border border-[#E8DED7] bg-cover bg-center";
-
-  const emptyClass =
-    shape === "circle"
-      ? "flex rounded-full size-20 items-center justify-center border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]"
-      : "flex rounded-2xl size-20 items-center justify-center border border-dashed border-[#E8DED7] bg-white text-xs font-bold text-[#B8C0CC]";
-
-  return (
-    <>
-      {pendingSrc ? (
-        <CropModal
-          src={pendingSrc}
-          shape={shape}
-          onConfirm={(file) => {
-            setPendingSrc(null);
-            onChange(file);
-          }}
-          onCancel={() => setPendingSrc(null)}
-        />
-      ) : null}
-      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold">{label}</p>
-            <p className="mt-1 text-xs text-[#6B7280]">
-              JPG, PNG, WEBP, or GIF up to 5 MB.
-            </p>
-          </div>
-          {value ? (
-            <button
-              type="button"
-              className="text-xs font-bold text-[#FF6267]"
-              onClick={onClear}
-            >
-              Remove
-            </button>
-          ) : null}
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          {value ? (
-            <div
-              className={thumbClass}
-              style={{ backgroundImage: `url(${value})` }}
-            />
-          ) : (
-            <div className={emptyClass}>No image</div>
-          )}
-          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#FF6267] bg-white px-4 text-sm font-bold text-[#FF6267]">
-            <Upload className="size-4" />
-            {uploading ? "Uploading..." : "Choose image"}
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="sr-only"
-              disabled={uploading}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) =>
-                  setPendingSrc(ev.target?.result as string);
-                reader.readAsDataURL(file);
-              }}
-            />
-          </label>
-          {value && (
-            <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#E8DED7] bg-white px-4 text-sm font-bold text-[#6B7280]">
-              <Upload className="size-4" />
-              Replace
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="sr-only"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = (ev) =>
-                    setPendingSrc(ev.target?.result as string);
-                  reader.readAsDataURL(file);
-                }}
-              />
-            </label>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-function Skeleton({ text }: { text: string }) {
-  return <p className="text-sm text-[#6B7280]">{text}</p>;
-}
-
-function readText(form: FormData, key: string) {
-  const value = form.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readOptionalText(form: FormData, key: string) {
-  const value = readText(form, key);
-  return value ? value : null;
-}
-
-function stars(rating: number) {
-  return "*****".slice(0, Math.max(0, Math.min(5, Math.round(rating))));
-}
-
-function profileUrl(slug?: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
-  return `${appUrl.replace(/\/$/, "")}/${slug ?? "your-link"}`;
 }

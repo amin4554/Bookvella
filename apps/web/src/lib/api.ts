@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export type LocationType = "VIDEO" | "PHONE" | "IN_PERSON";
 export type BookingStatus = "CONFIRMED" | "CANCELLED";
+export type PriceType = "FIXED" | "FROM" | "RANGE" | "FREE";
 
 export type PublicUser = {
   id: string;
@@ -33,15 +34,21 @@ export type EventType = {
   title: string;
   category: string | null;
   imageUrl: string | null;
+  galleryImageUrls: string[];
   description: string | null;
   whatIncluded: string | null;
+  preparationNotes: string | null;
   locationDetails: string | null;
   durationMinutes: number;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
   locationType: LocationType;
   priceAmount: number | null;
+  priceMaxAmount: number | null;
   priceCurrency: string;
+  priceType: PriceType;
+  isFeatured: boolean;
+  directLinkOnly: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -131,15 +138,20 @@ export type PublicEvent = {
     title: string;
     category: string | null;
     imageUrl: string | null;
+    galleryImageUrls: string[];
     description: string | null;
     whatIncluded: string | null;
+    preparationNotes: string | null;
     locationDetails: string | null;
     durationMinutes: number;
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     locationType: LocationType;
     priceAmount: number | null;
+    priceMaxAmount: number | null;
     priceCurrency: string;
+    priceType: PriceType;
+    isFeatured: boolean;
   };
   reviews: PublicReview[];
   reviewSummary: {
@@ -155,6 +167,58 @@ export type AvailableSlot = {
   endTimeGuest: string;
 };
 
+// The public host bridge page (`bookvella.com/{slug}`) renders this payload.
+export type PublicHostProfile = {
+  host: {
+    name: string;
+    slug: string;
+    timezone: string;
+    profileImageUrl: string | null;
+    coverImageUrl: string | null;
+    headline: string | null;
+    businessCategory: string | null;
+    location: string | null;
+    about: string | null;
+    whatToExpect: string | null;
+    websiteUrl: string | null;
+    instagramUrl: string | null;
+    createdAt: string;
+  };
+  services: {
+    id: string;
+    slug: string;
+    title: string;
+    category: string | null;
+    imageUrl: string | null;
+    galleryImageUrls: string[];
+    description: string | null;
+    durationMinutes: number;
+    locationType: LocationType;
+    locationDetails: string | null;
+    priceAmount: number | null;
+    priceMaxAmount: number | null;
+    priceCurrency: string;
+    priceType: PriceType;
+    isFeatured: boolean;
+  }[];
+  reviewSummary: {
+    averageRating: number | null;
+    reviewCount: number;
+    distribution: Record<"1" | "2" | "3" | "4" | "5", number>;
+  };
+  reviews: {
+    id: string;
+    guestName: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    eventTypeTitle: string;
+  }[];
+  stats: {
+    completedBookings: number;
+  };
+};
+
 export type BookingCodeResponse = {
   verificationId: string;
   expiresAt: string;
@@ -165,6 +229,21 @@ export type BookingCodeResponse = {
 export type ApiError = Error & {
   status?: number;
 };
+
+export type SlugAvailability = {
+  input: string;
+  normalized: string;
+  available: boolean;
+  reason: "invalid" | "too-short" | "reserved" | "taken" | null;
+};
+
+export async function checkSlugAvailability(
+  slug: string,
+): Promise<SlugAvailability> {
+  return apiRequest<SlugAvailability>(
+    `/public/slug-availability?slug=${encodeURIComponent(slug)}`,
+  );
+}
 
 export async function apiRequest<T>(
   path: string,

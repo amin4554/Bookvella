@@ -797,7 +797,7 @@ function EmptyState({
             <Copy className="size-4" /> Copy booking link
           </button>
           <Link
-            href="/dashboard/event-types"
+            href="/dashboard/services"
             className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
           >
             <Plus className="size-4" /> Manage services

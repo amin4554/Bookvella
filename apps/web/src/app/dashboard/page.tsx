@@ -199,7 +199,7 @@ function ActiveDashboard({
             </a>
           ) : null}
           <Link
-            href="/dashboard/event-types"
+            href="/dashboard/services"
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             <Plus className="size-4" /> New service
@@ -618,7 +618,7 @@ function QuickActions({ firstPublicLink }: { firstPublicLink: string | null }) {
           <span className="text-[13px] font-bold">Copy booking link</span>
         </button>
         <Link
-          href="/dashboard/event-types"
+          href="/dashboard/services"
           className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
         >
           <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#A855F7] to-[#7C4DFF] text-white">
@@ -776,7 +776,7 @@ function SetupDashboard({
                 ? hasSchedule
                   ? "/dashboard/profile"
                   : "/dashboard/availability"
-                : "/dashboard/event-types"
+                : "/dashboard/services"
             }
             className="inline-flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-sm font-bold text-white shadow-sm hover:brightness-105"
           >

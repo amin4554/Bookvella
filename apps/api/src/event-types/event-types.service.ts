@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { LocationType, Prisma } from '@prisma/client';
+import { LocationType, PriceType, Prisma } from '@prisma/client';
 import { slugify } from '../common/slug';
 import {
   optionalNonNegativeInteger,
@@ -18,6 +18,7 @@ import type { CreateEventTypeDto, UpdateEventTypeDto } from './dto';
 const MAX_DURATION_MINUTES = 12 * 60;
 const MAX_BUFFER_MINUTES = 24 * 60;
 const MAX_PRICE_CENTS = 100_000_00; // $100,000
+const MAX_GALLERY_IMAGES = 5;
 
 @Injectable()
 export class EventTypesService {
@@ -26,7 +27,11 @@ export class EventTypesService {
   list(userId: string) {
     return this.prisma.eventType.findMany({
       where: { userId },
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [
+        { isFeatured: 'desc' },
+        { isActive: 'desc' },
+        { createdAt: 'desc' },
+      ],
     });
   }
 
@@ -34,6 +39,12 @@ export class EventTypesService {
     const title = requireText(dto.title, 'title');
     const slug = slugify(dto.slug ?? title);
     const locationType = normalizeLocationType(dto.locationType);
+    const priceType = normalizePriceType(dto.priceType);
+    const { priceAmount, priceMaxAmount } = normalizePricePair(
+      priceType,
+      dto.priceAmount,
+      dto.priceMaxAmount,
+    );
 
     try {
       return await this.prisma.eventType.create({
@@ -45,6 +56,7 @@ export class EventTypesService {
           imageUrl: optionalUrl(dto.imageUrl, 'imageUrl'),
           description: optionalText(dto.description),
           whatIncluded: optionalText(dto.whatIncluded),
+          preparationNotes: optionalText(dto.preparationNotes),
           locationDetails: optionalText(dto.locationDetails),
           durationMinutes: requirePositiveInteger(
             dto.durationMinutes,
@@ -64,8 +76,13 @@ export class EventTypesService {
               { max: MAX_BUFFER_MINUTES },
             ) ?? 0,
           locationType,
-          priceAmount: normalizePrice(dto.priceAmount),
+          priceType,
+          priceAmount,
+          priceMaxAmount,
           priceCurrency: normalizeCurrency(dto.priceCurrency),
+          galleryImageUrls: normalizeGallery(dto.galleryImageUrls),
+          isFeatured: dto.isFeatured ?? false,
+          directLinkOnly: dto.directLinkOnly ?? false,
         },
       });
     } catch (error) {
@@ -80,7 +97,7 @@ export class EventTypesService {
   }
 
   async update(userId: string, id: string, dto: UpdateEventTypeDto) {
-    await this.assertOwned(userId, id);
+    const existing = await this.assertOwned(userId, id);
     const data: Prisma.EventTypeUpdateInput = {};
 
     if (dto.title !== undefined) {
@@ -105,6 +122,10 @@ export class EventTypesService {
 
     if (dto.whatIncluded !== undefined) {
       data.whatIncluded = optionalText(dto.whatIncluded);
+    }
+
+    if (dto.preparationNotes !== undefined) {
+      data.preparationNotes = optionalText(dto.preparationNotes);
     }
 
     if (dto.locationDetails !== undefined) {
@@ -147,12 +168,45 @@ export class EventTypesService {
       data.isActive = dto.isActive;
     }
 
-    if (dto.priceAmount !== undefined) {
-      data.priceAmount = normalizePrice(dto.priceAmount);
+    // Price needs to be normalized together so that RANGE has both bounds
+    // and FREE wipes the amount fields.
+    const nextPriceType =
+      dto.priceType !== undefined
+        ? normalizePriceType(dto.priceType)
+        : existing.priceType;
+    const wantsPriceUpdate =
+      dto.priceType !== undefined ||
+      dto.priceAmount !== undefined ||
+      dto.priceMaxAmount !== undefined;
+
+    if (wantsPriceUpdate) {
+      const nextAmount =
+        dto.priceAmount !== undefined ? dto.priceAmount : existing.priceAmount;
+      const nextMax =
+        dto.priceMaxAmount !== undefined
+          ? dto.priceMaxAmount
+          : existing.priceMaxAmount;
+
+      const normalized = normalizePricePair(nextPriceType, nextAmount, nextMax);
+      data.priceType = nextPriceType;
+      data.priceAmount = normalized.priceAmount;
+      data.priceMaxAmount = normalized.priceMaxAmount;
     }
 
     if (dto.priceCurrency !== undefined) {
       data.priceCurrency = normalizeCurrency(dto.priceCurrency);
+    }
+
+    if (dto.galleryImageUrls !== undefined) {
+      data.galleryImageUrls = { set: normalizeGallery(dto.galleryImageUrls) };
+    }
+
+    if (dto.isFeatured !== undefined) {
+      data.isFeatured = Boolean(dto.isFeatured);
+    }
+
+    if (dto.directLinkOnly !== undefined) {
+      data.directLinkOnly = Boolean(dto.directLinkOnly);
     }
 
     try {
@@ -183,12 +237,13 @@ export class EventTypesService {
   private async assertOwned(userId: string, id: string) {
     const eventType = await this.prisma.eventType.findFirst({
       where: { id, userId },
-      select: { id: true },
     });
 
     if (!eventType) {
       throw new NotFoundException('Event type not found');
     }
+
+    return eventType;
   }
 }
 
@@ -202,6 +257,51 @@ function normalizeLocationType(value: LocationType | undefined) {
   }
 
   return value;
+}
+
+function normalizePriceType(value: PriceType | undefined) {
+  if (value === undefined) {
+    return PriceType.FIXED;
+  }
+
+  if (!Object.values(PriceType).includes(value)) {
+    throw new BadRequestException('Invalid priceType');
+  }
+
+  return value;
+}
+
+function normalizePricePair(
+  type: PriceType,
+  amount: number | null | undefined,
+  max: number | null | undefined,
+) {
+  if (type === PriceType.FREE) {
+    return { priceAmount: null, priceMaxAmount: null };
+  }
+
+  const lower = normalizePrice(amount);
+
+  if (type === PriceType.RANGE) {
+    const upper = normalizePrice(max);
+
+    if (lower === null || upper === null) {
+      throw new BadRequestException(
+        'Range pricing requires both a lower and an upper amount',
+      );
+    }
+
+    if (upper < lower) {
+      throw new BadRequestException(
+        'Upper price must be greater than or equal to the lower price',
+      );
+    }
+
+    return { priceAmount: lower, priceMaxAmount: upper };
+  }
+
+  // FIXED and FROM only use the lower amount.
+  return { priceAmount: lower, priceMaxAmount: null };
 }
 
 function isUniqueConstraintError(error: unknown) {
@@ -218,7 +318,7 @@ function normalizePrice(value: number | null | undefined) {
 
   if (!Number.isInteger(value) || value < 0 || value > MAX_PRICE_CENTS) {
     throw new BadRequestException(
-      'priceAmount must be a non-negative integer (cents)',
+      'price amount must be a non-negative integer (cents)',
     );
   }
 
@@ -233,10 +333,51 @@ function normalizeCurrency(value: string | undefined) {
   const upper = value.trim().toUpperCase();
 
   if (!/^[A-Z]{3}$/.test(upper)) {
-    throw new BadRequestException('priceCurrency must be a 3-letter ISO currency code');
+    throw new BadRequestException(
+      'priceCurrency must be a 3-letter ISO currency code',
+    );
   }
 
   return upper;
+}
+
+function normalizeGallery(value: string[] | undefined) {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new BadRequestException('galleryImageUrls must be an array');
+  }
+
+  const cleaned: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') {
+      throw new BadRequestException('Each gallery image must be a string URL');
+    }
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+
+    try {
+      const url = new URL(trimmed);
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+        throw new Error('Invalid protocol');
+      }
+      cleaned.push(url.toString());
+    } catch {
+      throw new BadRequestException(
+        'Each gallery image must be a valid http(s) URL',
+      );
+    }
+  }
+
+  if (cleaned.length > MAX_GALLERY_IMAGES) {
+    throw new BadRequestException(
+      `At most ${MAX_GALLERY_IMAGES} gallery images are allowed`,
+    );
+  }
+
+  return cleaned;
 }
 
 function optionalUrl(value: string | null | undefined, field: string) {

@@ -5,6 +5,19 @@ import { SchedulingService } from './scheduling.service';
 export class SchedulingController {
   constructor(private readonly schedulingService: SchedulingService) {}
 
+  @Get('slug-availability')
+  checkSlugAvailability(@Query('slug') slug?: string) {
+    return this.schedulingService.checkSlugAvailability(slug);
+  }
+
+  // The public host profile (`/public/host/:hostSlug`) backs the
+  // `bookvella.com/{slug}` bridge page that lists every active, non
+  // direct-link-only service plus reviews and trust signals.
+  @Get('host/:hostSlug')
+  getPublicHost(@Param('hostSlug') hostSlug: string) {
+    return this.schedulingService.getPublicHostProfile(hostSlug);
+  }
+
   @Get(':hostSlug/:eventSlug')
   getPublicEvent(
     @Param('hostSlug') hostSlug: string,

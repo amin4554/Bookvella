@@ -87,15 +87,20 @@ export class SchedulingService {
         title: eventType.title,
         category: eventType.category,
         imageUrl: eventType.imageUrl,
+        galleryImageUrls: eventType.galleryImageUrls,
         description: eventType.description,
         whatIncluded: eventType.whatIncluded,
+        preparationNotes: eventType.preparationNotes,
         locationDetails: eventType.locationDetails,
         durationMinutes: eventType.durationMinutes,
         bufferBeforeMinutes: eventType.bufferBeforeMinutes,
         bufferAfterMinutes: eventType.bufferAfterMinutes,
         locationType: eventType.locationType,
         priceAmount: eventType.priceAmount,
+        priceMaxAmount: eventType.priceMaxAmount,
         priceCurrency: eventType.priceCurrency,
+        priceType: eventType.priceType,
+        isFeatured: eventType.isFeatured,
       },
       reviews: eventType.reviews.map((review) => ({
         id: review.id,
@@ -107,6 +112,122 @@ export class SchedulingService {
       reviewSummary: {
         averageRating,
         reviewCount,
+      },
+    };
+  }
+
+  async getPublicHostProfile(hostSlug: string) {
+    const host = await this.prisma.user.findUnique({
+      where: { slug: hostSlug },
+      include: {
+        eventTypes: {
+          where: { isActive: true, directLinkOnly: false },
+          orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
+        },
+      },
+    });
+
+    if (!host) {
+      throw new NotFoundException('Public host not found');
+    }
+
+    // Review aggregates across ALL visible reviews for the host, plus a
+    // breakdown by star count so the public profile can render a distribution
+    // bar without loading every row.
+    const [reviewAgg, byRating, recentReviews, completedBookings] =
+      await Promise.all([
+        this.prisma.review.aggregate({
+          where: { hostUserId: host.id, isVisible: true },
+          _count: { id: true },
+          _avg: { rating: true },
+        }),
+        this.prisma.review.groupBy({
+          by: ['rating'],
+          where: { hostUserId: host.id, isVisible: true },
+          _count: { _all: true },
+        }),
+        this.prisma.review.findMany({
+          where: { hostUserId: host.id, isVisible: true },
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+          include: { eventType: { select: { title: true } } },
+        }),
+        this.prisma.booking.count({
+          where: { hostUserId: host.id, status: 'CONFIRMED' },
+        }),
+      ]);
+
+    const reviewCount = reviewAgg._count.id;
+    const averageRating =
+      reviewCount > 0
+        ? Number((reviewAgg._avg.rating ?? 0).toFixed(1))
+        : null;
+
+    const distribution: Record<1 | 2 | 3 | 4 | 5, number> = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+    for (const row of byRating) {
+      const rating = Math.max(1, Math.min(5, Math.round(row.rating))) as
+        | 1
+        | 2
+        | 3
+        | 4
+        | 5;
+      distribution[rating] += row._count._all;
+    }
+
+    return {
+      host: {
+        name: host.name,
+        slug: host.slug,
+        timezone: host.timezone,
+        profileImageUrl: host.profileImageUrl,
+        coverImageUrl: host.coverImageUrl,
+        headline: host.headline,
+        businessCategory: host.businessCategory,
+        location: host.location,
+        about: host.about,
+        whatToExpect: host.whatToExpect,
+        websiteUrl: host.websiteUrl,
+        instagramUrl: host.instagramUrl,
+        createdAt: host.createdAt.toISOString(),
+      },
+      services: host.eventTypes.map((service) => ({
+        id: service.id,
+        slug: service.slug,
+        title: service.title,
+        category: service.category,
+        imageUrl: service.imageUrl,
+        galleryImageUrls: service.galleryImageUrls,
+        description: service.description,
+        durationMinutes: service.durationMinutes,
+        locationType: service.locationType,
+        locationDetails: service.locationDetails,
+        priceAmount: service.priceAmount,
+        priceMaxAmount: service.priceMaxAmount,
+        priceCurrency: service.priceCurrency,
+        priceType: service.priceType,
+        isFeatured: service.isFeatured,
+      })),
+      reviewSummary: {
+        averageRating,
+        reviewCount,
+        distribution,
+      },
+      reviews: recentReviews.map((review) => ({
+        id: review.id,
+        guestName: review.guestName,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+        eventTypeTitle: review.eventType.title,
+      })),
+      stats: {
+        completedBookings,
       },
     };
   }
@@ -253,7 +374,84 @@ export class SchedulingService {
 
     return slots;
   }
+
+  async checkSlugAvailability(input: string | undefined) {
+    const raw = (input ?? '').trim().toLowerCase();
+    const normalized = raw.replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+
+    if (!normalized) {
+      return {
+        input: raw,
+        normalized,
+        available: false,
+        reason: 'invalid' as const,
+      };
+    }
+
+    if (normalized.length < 3) {
+      return {
+        input: raw,
+        normalized,
+        available: false,
+        reason: 'too-short' as const,
+      };
+    }
+
+    if (RESERVED_SLUGS.has(normalized)) {
+      return {
+        input: raw,
+        normalized,
+        available: false,
+        reason: 'reserved' as const,
+      };
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { slug: normalized },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return {
+        input: raw,
+        normalized,
+        available: false,
+        reason: 'taken' as const,
+      };
+    }
+
+    return {
+      input: raw,
+      normalized,
+      available: true,
+      reason: null,
+    };
+  }
 }
+
+const RESERVED_SLUGS = new Set([
+  'admin',
+  'api',
+  'auth',
+  'availability',
+  'bookings',
+  'cancel',
+  'dashboard',
+  'event-types',
+  'health',
+  'help',
+  'login',
+  'logout',
+  'media',
+  'profile',
+  'public',
+  'register',
+  'reviews',
+  'services',
+  'settings',
+  'support',
+  'uploads',
+]);
 
 function parseDateRange(startValue: string, endValue: string) {
   const start = parseDateInput(startValue, 'start');
