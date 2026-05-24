@@ -64,12 +64,32 @@ export type AvailabilityRule = {
   endMinute: number;
 };
 
+export type AvailabilityOverrideType = "BLOCKED" | "CUSTOM_HOURS";
+
+export type AvailabilityOverrideBlock = {
+  startMinute: number;
+  endMinute: number;
+};
+
 export type AvailabilityOverride = {
   id: string;
   userId: string;
   date: string; // ISO date string YYYY-MM-DDT00:00:00.000Z
+  type: AvailabilityOverrideType;
   isBlocked: boolean;
+  note: string | null;
+  blocks: AvailabilityOverrideBlock[] | null;
+  groupId: string | null;
   createdAt: string;
+};
+
+export type AvailabilitySettings = {
+  minNoticeMinutes: number;
+  bookingHorizonDays: number;
+  slotIntervalMinutes: number;
+  dailyBookingLimit: number | null;
+  showBufferTime: boolean;
+  timezone: string;
 };
 
 export type HostBooking = {
@@ -194,7 +214,11 @@ export type PublicHostProfile = {
     imageUrl: string | null;
     galleryImageUrls: string[];
     description: string | null;
+    whatIncluded: string | null;
+    preparationNotes: string | null;
     durationMinutes: number;
+    bufferBeforeMinutes: number;
+    bufferAfterMinutes: number;
     locationType: LocationType;
     locationDetails: string | null;
     priceAmount: number | null;

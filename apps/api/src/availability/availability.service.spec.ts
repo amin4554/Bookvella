@@ -26,46 +26,82 @@ describe('AvailabilityService – create validation', () => {
 
   it('throws when startMinute is after endMinute', () => {
     expect(() =>
-      service.create('user-1', { dayOfWeek: 1, startMinute: 600, endMinute: 540 }),
+      service.create('user-1', {
+        dayOfWeek: 1,
+        startMinute: 600,
+        endMinute: 540,
+      }),
     ).toThrow(BadRequestException);
   });
 
   it('throws when startMinute equals endMinute', () => {
     expect(() =>
-      service.create('user-1', { dayOfWeek: 1, startMinute: 540, endMinute: 540 }),
+      service.create('user-1', {
+        dayOfWeek: 1,
+        startMinute: 540,
+        endMinute: 540,
+      }),
     ).toThrow(BadRequestException);
   });
 
   it('throws on dayOfWeek = 7 (out of 0–6 range)', () => {
     expect(() =>
-      service.create('user-1', { dayOfWeek: 7, startMinute: 540, endMinute: 600 }),
+      service.create('user-1', {
+        dayOfWeek: 7,
+        startMinute: 540,
+        endMinute: 600,
+      }),
     ).toThrow(BadRequestException);
   });
 
   it('throws on negative dayOfWeek', () => {
     expect(() =>
-      service.create('user-1', { dayOfWeek: -1, startMinute: 540, endMinute: 600 }),
+      service.create('user-1', {
+        dayOfWeek: -1,
+        startMinute: 540,
+        endMinute: 600,
+      }),
     ).toThrow(BadRequestException);
   });
 
   it('throws when endMinute exceeds 1440 (minutes per day)', () => {
     expect(() =>
-      service.create('user-1', { dayOfWeek: 1, startMinute: 0, endMinute: 1441 }),
+      service.create('user-1', {
+        dayOfWeek: 1,
+        startMinute: 0,
+        endMinute: 1441,
+      }),
     ).toThrow(BadRequestException);
   });
 
   it('accepts 1440 as a valid endMinute (end of day)', () => {
-    const rule = { id: 'r-1', userId: 'user-1', dayOfWeek: 1, startMinute: 0, endMinute: 1440 };
+    const rule = {
+      id: 'r-1',
+      userId: 'user-1',
+      dayOfWeek: 1,
+      startMinute: 0,
+      endMinute: 1440,
+    };
     prisma.availabilityRule.create.mockResolvedValue(rule);
 
     // Does NOT throw — returns the prisma promise
     expect(() =>
-      service.create('user-1', { dayOfWeek: 1, startMinute: 0, endMinute: 1440 }),
+      service.create('user-1', {
+        dayOfWeek: 1,
+        startMinute: 0,
+        endMinute: 1440,
+      }),
     ).not.toThrow();
   });
 
   it('accepts a valid rule and delegates to prisma', async () => {
-    const rule = { id: 'r-1', userId: 'user-1', dayOfWeek: 1, startMinute: 540, endMinute: 600 };
+    const rule = {
+      id: 'r-1',
+      userId: 'user-1',
+      dayOfWeek: 1,
+      startMinute: 540,
+      endMinute: 600,
+    };
     prisma.availabilityRule.create.mockResolvedValue(rule);
 
     const result = await service.create('user-1', {
@@ -103,7 +139,7 @@ describe('AvailabilityService – update', () => {
       id: 'rule-1',
       userId: 'user-1',
       dayOfWeek: 1,
-      startMinute: 600,   // existing start
+      startMinute: 600, // existing start
       endMinute: 660,
     });
 

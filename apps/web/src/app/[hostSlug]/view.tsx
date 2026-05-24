@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -7,12 +8,14 @@ import {
   BadgeCheck,
   Banknote,
   CalendarCheck2,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock,
   AtSign,
   Globe,
   Link as LinkIcon,
+  ListChecks,
   MapPin,
   Phone as PhoneIcon,
   Scissors,
@@ -21,10 +24,17 @@ import {
   Sparkles,
   Star,
   Video,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LegalFooter } from "@/components/legal-footer";
-import type { LocationType, PriceType, PublicHostProfile } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import type {
+  AvailableSlot,
+  LocationType,
+  PriceType,
+  PublicHostProfile,
+} from "@/lib/api";
 
 type ServiceItem = PublicHostProfile["services"][number];
 
@@ -62,6 +72,16 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
     if (total === 0) return 0;
     return Math.max(0.5, (n / total) * 100);
   }
+
+  // Service-detail preview modal. Guests click a service to open this before
+  // committing to the booking flow — gives them gallery, includes, prep notes,
+  // filtered reviews, and the next available slot in one shot.
+  const [activeService, setActiveService] = useState<ServiceItem | null>(null);
+  const openServiceDetail = useCallback(
+    (service: ServiceItem) => setActiveService(service),
+    [],
+  );
+  const closeServiceDetail = useCallback(() => setActiveService(null), []);
 
   async function share() {
     const url =
@@ -290,8 +310,8 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       key={service.id}
                       service={service}
                       palette={PALETTES[idx % PALETTES.length]}
-                      hostSlug={host.slug}
                       featured={service.isFeatured && idx === 0}
+                      onOpen={() => openServiceDetail(service)}
                     />
                   ))}
                 </div>
@@ -385,20 +405,20 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                 Pick a service to start
               </h3>
               <p className="mt-1 text-[13px] text-[#6B7280]">
-                All times in your local timezone. Free cancellation up to 2h
-                before.
+                All times shown in your local timezone.
               </p>
 
               {services.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {services.map((service, idx) => (
-                    <Link
+                    <button
                       key={service.id}
-                      href={`/${host.slug}/${service.slug}`}
+                      type="button"
+                      onClick={() => openServiceDetail(service)}
                       className={
                         idx === 0
-                          ? "flex items-center justify-between rounded-xl border border-[#FFD2CE] bg-[#FFF7F5] px-3.5 py-3 hover:bg-[#FFF0EF]"
-                          : "flex items-center justify-between rounded-xl border border-[#EEE7DF] bg-white px-3.5 py-3 hover:bg-[#FFFBF7]"
+                          ? "flex w-full items-center justify-between rounded-xl border border-[#FFD2CE] bg-[#FFF7F5] px-3.5 py-3 text-left hover:bg-[#FFF0EF]"
+                          : "flex w-full items-center justify-between rounded-xl border border-[#EEE7DF] bg-white px-3.5 py-3 text-left hover:bg-[#FFFBF7]"
                       }
                     >
                       <div className="leading-tight">
@@ -415,7 +435,7 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                             : "size-4 text-[#9CA3AF]"
                         }
                       />
-                    </Link>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -501,6 +521,17 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
       </section>
 
       <LegalFooter note={`${firstName(host.name)}'s page is hosted here.`} />
+
+      {activeService ? (
+        <ServiceDetailModal
+          hostSlug={host.slug}
+          service={activeService}
+          reviews={reviews.filter(
+            (r) => r.eventTypeTitle === activeService.title,
+          )}
+          onClose={closeServiceDetail}
+        />
+      ) : null}
     </div>
   );
 }
@@ -512,16 +543,419 @@ const REVIEW_TINTS = [
   "linear-gradient(135deg,#EC4899,#A855F7)",
 ];
 
+const GALLERY_FALLBACK_TINTS = [
+  "linear-gradient(135deg,#F4EAFF 0%,#E1CFFA 60%,#D7CDF8 100%)",
+  "linear-gradient(135deg,#D7F2EA 0%,#B6E4F2 60%,#CFE9E0 100%)",
+  "linear-gradient(135deg,#FFE9C7 0%,#FFD08A 60%,#FFC9C2 100%)",
+];
+
+function ServiceDetailModal({
+  hostSlug,
+  service,
+  reviews,
+  onClose,
+}: {
+  hostSlug: string;
+  service: ServiceItem;
+  reviews: PublicHostProfile["reviews"];
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [nextSlot, setNextSlot] = useState<AvailableSlot | null>(null);
+  const [slotState, setSlotState] = useState<"loading" | "ready" | "none">(
+    "loading",
+  );
+
+  // Lock body scroll while the sheet is open.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // ESC to close.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Pull the next available slot inside the booking horizon so guests see a
+  // concrete "Next available" line before committing to the booking flow.
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      try {
+        const start = new Date();
+        const end = new Date(start.getTime() + 21 * 86_400_000);
+        const guestTimezone =
+          typeof Intl !== "undefined"
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+            : "UTC";
+        const params = new URLSearchParams({
+          start: start.toISOString(),
+          end: end.toISOString(),
+          timezone: guestTimezone,
+        });
+        const slots = await apiRequest<AvailableSlot[]>(
+          `/public/${encodeURIComponent(hostSlug)}/${encodeURIComponent(service.slug)}/slots?${params.toString()}`,
+        );
+        if (!alive) return;
+        if (slots.length > 0) {
+          setNextSlot(slots[0]);
+          setSlotState("ready");
+        } else {
+          setSlotState("none");
+        }
+      } catch {
+        if (alive) setSlotState("none");
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [hostSlug, service.slug]);
+
+  const initialFromTitle = (service.title || "?").charAt(0).toUpperCase();
+  const galleryImages = service.galleryImageUrls.slice(0, 3);
+  const includedLines = useMemo(
+    () => splitIntoLines(service.whatIncluded),
+    [service.whatIncluded],
+  );
+  const priceLabel = formatPriceLabel(service);
+  const bookHref = `/${encodeURIComponent(hostSlug)}/${encodeURIComponent(service.slug)}`;
+
+  const heroBackground = service.imageUrl
+    ? `url(${service.imageUrl}) center/cover`
+    : "linear-gradient(135deg,#FFE0DA 0%,#FFD3A6 60%,#FFC9C2 100%)";
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="service-detail-title"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-[#0B1220]/55 backdrop-blur-sm md:items-center md:p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="flex max-h-[94vh] w-full max-w-[920px] flex-col rounded-t-[24px] bg-white shadow-[0_-24px_64px_-16px_rgba(11,18,32,0.35)] md:max-h-[90vh] md:rounded-[24px]"
+      >
+        {/* Header strip */}
+        <div className="flex items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-3.5 md:px-7">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5F63]">
+              Service detail
+            </span>
+            <p className="hidden truncate text-[12px] tabular-nums text-[#9CA3AF] sm:block">
+              bookvella.com/{hostSlug}/{service.slug}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Body (scrollable) */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Hero + gallery */}
+          <div className="px-5 pt-5 md:px-7 md:pt-7">
+            <div className="grid gap-2 md:grid-cols-[1.4fr_1fr]">
+              <div
+                className="relative h-[200px] overflow-hidden rounded-[14px] md:h-[300px]"
+                style={{ background: heroBackground }}
+              >
+                {!service.imageUrl ? (
+                  <div className="absolute inset-0 flex items-center justify-center text-[40px] font-extrabold text-[#FF5F63]">
+                    {initialFromTitle}
+                  </div>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:grid-rows-2">
+                {galleryImages.length > 0
+                  ? galleryImages.slice(0, 2).map((url, idx) => (
+                      <div
+                        key={url + idx}
+                        className="h-[95px] rounded-[14px] md:h-auto"
+                        style={{ background: `url(${url}) center/cover` }}
+                      />
+                    ))
+                  : [0, 1].map((idx) => (
+                      <div
+                        key={idx}
+                        className="h-[95px] rounded-[14px] md:h-auto"
+                        style={{
+                          background: GALLERY_FALLBACK_TINTS[idx],
+                        }}
+                      />
+                    ))}
+                {galleryImages.length === 1 ? (
+                  <div
+                    className="h-[95px] rounded-[14px] border border-dashed border-[#EEE7DF] bg-[#FFFBF7] md:h-auto"
+                    aria-hidden
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Title row */}
+          <div className="mt-6 px-5 md:px-7">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2
+                  id="service-detail-title"
+                  className="text-[26px] font-extrabold md:text-[32px]"
+                  style={{ letterSpacing: "-0.03em", lineHeight: "1" }}
+                >
+                  {service.title}
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-[#374151]">
+                  <Chip>
+                    <Clock className="size-3.5 text-[#9CA3AF]" />
+                    {service.durationMinutes} min
+                  </Chip>
+                  <Chip>
+                    {locationGlyph(service.locationType)}
+                    {service.locationDetails ||
+                      formatLocationLabel(service.locationType)}
+                  </Chip>
+                  {reviews.length > 0 ? (
+                    <Chip>
+                      <Stars
+                        rating={
+                          reviews.reduce((s, r) => s + r.rating, 0) /
+                          reviews.length
+                        }
+                      />
+                      <span className="tabular-nums">
+                        {(
+                          reviews.reduce((s, r) => s + r.rating, 0) /
+                          reviews.length
+                        ).toFixed(1)}{" "}
+                        · {reviews.length}{" "}
+                        {reviews.length === 1 ? "review" : "reviews"}
+                      </span>
+                    </Chip>
+                  ) : null}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                  Price
+                </p>
+                <p
+                  className="text-[28px] font-extrabold md:text-[32px]"
+                  style={{
+                    color: "#FF5F63",
+                    letterSpacing: "-0.03em",
+                    lineHeight: "1",
+                  }}
+                >
+                  {priceLabel ?? "Free"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          {service.description ? (
+            <div className="mt-6 px-5 md:px-7">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                About this service
+              </p>
+              <p className="mt-2 text-[15px] leading-[1.7] text-[#374151]">
+                {service.description}
+              </p>
+            </div>
+          ) : null}
+
+          {/* Includes + before-you-arrive */}
+          {(includedLines.length > 0 || service.preparationNotes) ? (
+            <div className="mt-6 grid gap-4 px-5 md:grid-cols-2 md:px-7">
+              {includedLines.length > 0 ? (
+                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[#16A34A]">
+                      <ListChecks className="size-4" />
+                    </span>
+                    <p className="text-[13px] font-bold">What&apos;s included</p>
+                  </div>
+                  <ul className="mt-3 space-y-2 text-[13.5px] text-[#374151]">
+                    {includedLines.map((line, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <Check className="mt-0.5 size-4 shrink-0 text-[#16A34A]" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {service.preparationNotes ? (
+                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[#FF5F63]">
+                      <Sparkles className="size-4" />
+                    </span>
+                    <p className="text-[13px] font-bold">Before you arrive</p>
+                  </div>
+                  <p className="mt-3 whitespace-pre-line text-[13.5px] leading-[1.65] text-[#374151]">
+                    {service.preparationNotes}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Meta strip — cancellation tile removed per host policy. */}
+          <div className="mt-4 px-5 md:px-7">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <MetaTile
+                label="Duration"
+                value={`${service.durationMinutes} minutes`}
+              />
+              <MetaTile
+                label="Format"
+                value={formatLocationLabel(service.locationType)}
+              />
+              <MetaTile label="Confirmation" value="Email verified" />
+            </div>
+          </div>
+
+          {/* Reviews for this service */}
+          {reviews.length > 0 ? (
+            <div className="mt-6 px-5 md:px-7">
+              <div className="flex items-end justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Reviews for this service
+                </p>
+                <p className="text-[11px] tabular-nums text-[#9CA3AF]">
+                  {reviews.length}{" "}
+                  {reviews.length === 1 ? "review" : "reviews"}
+                </p>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {reviews.slice(0, 4).map((review, idx) => (
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    tint={REVIEW_TINTS[idx % REVIEW_TINTS.length]}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Next available slot teaser */}
+          <div className="mb-6 mt-6 px-5 md:px-7">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-white text-[#16A34A]">
+                  <CalendarCheck2 className="size-4" />
+                </span>
+                <div className="leading-tight">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                    Next available
+                  </p>
+                  <p className="text-[14px] font-bold tabular-nums">
+                    {slotState === "loading"
+                      ? "Checking availability…"
+                      : slotState === "none" || !nextSlot
+                        ? "Pick a time to see open slots"
+                        : formatSlotLabel(nextSlot)}
+                  </p>
+                </div>
+              </div>
+              <p className="hidden text-[11px] text-[#9CA3AF] sm:block">
+                Times shown in your timezone
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sticky footer CTA */}
+        <div className="flex items-center justify-between gap-3 border-t border-[#EEE7DF] bg-white px-5 py-3.5 md:px-7">
+          <div className="leading-tight">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+              You&apos;re booking
+            </p>
+            <p className="text-[13.5px] font-bold">
+              {service.title}
+              {priceLabel ? ` · ${priceLabel}` : ""}
+            </p>
+          </div>
+          <Link
+            href={bookHref}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+          >
+            Continue to book <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#EEE7DF] bg-white p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+        {label}
+      </p>
+      <p className="mt-0.5 text-[13.5px] font-bold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function splitIntoLines(text: string | null): string[] {
+  if (!text) return [];
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/^[-*•]\s*/, ""))
+    .filter(Boolean);
+}
+
+function formatSlotLabel(slot: AvailableSlot): string {
+  // `startTimeGuest` is an ISO-like "YYYY-MM-DDTHH:MM:SS" string in the guest's
+  // timezone (no Z suffix). Parse pieces directly so we don't shift back to UTC.
+  const m =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(slot.startTimeGuest);
+  if (!m) return new Date(slot.startTimeUtc).toLocaleString();
+  const year = Number(m[1]);
+  const month = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const date = new Date(year, month, day);
+  const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+  const monthLabel = date.toLocaleDateString("en-US", { month: "short" });
+  return `${weekday}, ${day} ${monthLabel} · ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function ServiceRow({
   service,
   palette,
-  hostSlug,
   featured,
+  onOpen,
 }: {
   service: ServiceItem;
   palette: (typeof PALETTES)[number];
-  hostSlug: string;
   featured: boolean;
+  onOpen: () => void;
 }) {
   const locationIcon = locationGlyph(service.locationType);
   return (
@@ -588,16 +1022,17 @@ function ServiceRow({
             Availability
           </p>
           <p className="text-[14px] font-bold">Pick a time</p>
-          <Link
-            href={`/${hostSlug}/${service.slug}`}
+          <button
+            type="button"
+            onClick={onOpen}
             className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-[13px] font-bold ${
               featured
                 ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white shadow-sm"
                 : "border border-[#0B1220] bg-white text-[#0B1220] hover:bg-[#0B1220] hover:text-white"
             }`}
           >
-            Book this <ArrowRight className="size-4" />
-          </Link>
+            View &amp; book <ArrowRight className="size-4" />
+          </button>
         </div>
       </div>
     </article>

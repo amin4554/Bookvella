@@ -18,6 +18,8 @@ import type { AvailableSlot, GetAvailableSlotsInput } from './scheduling.types';
 
 const MAX_RANGE_DAYS = 31;
 
+type OverrideBlock = { startMinute: number; endMinute: number };
+
 @Injectable()
 export class SchedulingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -62,9 +64,7 @@ export class SchedulingService {
 
     const reviewCount = reviewAgg._count.id;
     const averageRating =
-      reviewCount > 0
-        ? Number((reviewAgg._avg.rating ?? 0).toFixed(1))
-        : null;
+      reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
 
     return {
       host: {
@@ -159,9 +159,7 @@ export class SchedulingService {
 
     const reviewCount = reviewAgg._count.id;
     const averageRating =
-      reviewCount > 0
-        ? Number((reviewAgg._avg.rating ?? 0).toFixed(1))
-        : null;
+      reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
 
     const distribution: Record<1 | 2 | 3 | 4 | 5, number> = {
       1: 0,
@@ -204,7 +202,11 @@ export class SchedulingService {
         imageUrl: service.imageUrl,
         galleryImageUrls: service.galleryImageUrls,
         description: service.description,
+        whatIncluded: service.whatIncluded,
+        preparationNotes: service.preparationNotes,
         durationMinutes: service.durationMinutes,
+        bufferBeforeMinutes: service.bufferBeforeMinutes,
+        bufferAfterMinutes: service.bufferAfterMinutes,
         locationType: service.locationType,
         locationDetails: service.locationDetails,
         priceAmount: service.priceAmount,
@@ -251,7 +253,6 @@ export class SchedulingService {
             availabilityRules: true,
             availabilityOverrides: {
               where: {
-                isBlocked: true,
                 date: { gte: start, lte: end },
               },
             },
@@ -266,26 +267,65 @@ export class SchedulingService {
 
     assertValidTimeZone(eventType.user.timezone, 'host timezone');
 
-    if (eventType.user.availabilityRules.length === 0) {
+    const host = eventType.user;
+    // Booking-rules settings — fall back to sensible defaults when the user
+    // record is missing these (e.g. in unit-test mocks).
+    const minNoticeMinutes = numberOr(host.minNoticeMinutes, 0);
+    const bookingHorizonDays = numberOr(host.bookingHorizonDays, null);
+    const slotIntervalMinutes = numberOr(
+      host.slotIntervalMinutes,
+      eventType.durationMinutes,
+    );
+    const dailyBookingLimit = numberOr(host.dailyBookingLimit, null);
+
+    // Apply minimum-notice / booking-horizon to the candidate window.
+    const now = new Date();
+    const earliest = new Date(now.getTime() + minNoticeMinutes * 60_000);
+    const effectiveStart = start > earliest ? start : earliest;
+    const effectiveEnd =
+      bookingHorizonDays && Number.isFinite(bookingHorizonDays)
+        ? minDate(
+            end,
+            new Date(now.getTime() + bookingHorizonDays * 86_400_000),
+          )
+        : end;
+
+    if (effectiveStart >= effectiveEnd) {
       return [];
     }
 
-    // Build a Set of blocked date strings in host timezone (YYYY-MM-DD)
-    const blockedDates = new Set(
-      eventType.user.availabilityOverrides.map((o) =>
-        o.date.toISOString().slice(0, 10),
-      ),
-    );
+    if (
+      host.availabilityRules.length === 0 &&
+      host.availabilityOverrides.length === 0
+    ) {
+      return [];
+    }
+
+    const overridesByDate = new Map<
+      string,
+      { type: 'BLOCKED' | 'CUSTOM_HOURS'; blocks: OverrideBlock[] }
+    >();
+    for (const override of host.availabilityOverrides) {
+      const key = override.date.toISOString().slice(0, 10);
+      const type =
+        // Older rows pre-migration may only have isBlocked=true and no type.
+        (override.type as 'BLOCKED' | 'CUSTOM_HOURS' | undefined) ??
+        (override.isBlocked ? 'BLOCKED' : 'CUSTOM_HOURS');
+      const blocks = readOverrideBlocks(
+        (override as { blocks?: unknown }).blocks,
+      );
+      overridesByDate.set(key, { type, blocks });
+    }
 
     const bookings = await this.prisma.booking.findMany({
       where: {
         hostUserId: eventType.userId,
         status: BookingStatus.CONFIRMED,
         startTimeUtc: {
-          lt: end,
+          lt: effectiveEnd,
         },
         endTimeUtc: {
-          gt: start,
+          gt: effectiveStart,
         },
       },
       include: {
@@ -305,49 +345,94 @@ export class SchedulingService {
         booking.eventType.bufferAfterMinutes * 60_000,
     }));
 
+    // Pre-compute existing bookings per host-local date so we can enforce the
+    // daily booking limit without re-scanning the booking list inside the loop.
+    const bookingsPerDate = new Map<string, number>();
+    if (dailyBookingLimit) {
+      for (const booking of bookings) {
+        const parts = getZonedParts(booking.startTimeUtc, host.timezone);
+        const key = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+        bookingsPerDate.set(key, (bookingsPerDate.get(key) ?? 0) + 1);
+      }
+    }
+
     const rulesByDay = new Map(
       Array.from({ length: 7 }, (_, day) => [
         day,
-        eventType.user.availabilityRules.filter(
-          (rule) => rule.dayOfWeek === day,
-        ),
+        host.availabilityRules.filter((rule) => rule.dayOfWeek === day),
       ]),
     );
     const slots: AvailableSlot[] = [];
-    const hostTimezone = eventType.user.timezone;
-    const startLocal = localDateOnly(getZonedParts(start, hostTimezone));
-    const endLocal = localDateOnly(getZonedParts(end, hostTimezone));
+    const hostTimezone = host.timezone;
+    const startLocal = localDateOnly(
+      getZonedParts(effectiveStart, hostTimezone),
+    );
+    const endLocal = localDateOnly(getZonedParts(effectiveEnd, hostTimezone));
 
     for (
       let date = startLocal;
       compareLocalDates(date, endLocal) <= 0;
       date = addLocalDays(date, 1)
     ) {
-      // Skip dates the host has blocked out
       const dateKey = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
-      if (blockedDates.has(dateKey)) {
+      const override = overridesByDate.get(dateKey);
+
+      if (override?.type === 'BLOCKED') {
         continue;
       }
 
-      const rules = rulesByDay.get(localDayOfWeek(date)) ?? [];
+      // Pick the windows for this date: CUSTOM_HOURS override replaces the
+      // weekly schedule entirely, otherwise the recurring rules apply.
+      const windows: OverrideBlock[] =
+        override?.type === 'CUSTOM_HOURS'
+          ? override.blocks
+          : (rulesByDay.get(localDayOfWeek(date)) ?? []).map((rule) => ({
+              startMinute: rule.startMinute,
+              endMinute: rule.endMinute,
+            }));
 
-      for (const rule of rules) {
+      if (windows.length === 0) {
+        continue;
+      }
+
+      const alreadyBookedToday = bookingsPerDate.get(dateKey) ?? 0;
+      const remainingForDay =
+        dailyBookingLimit !== null && dailyBookingLimit !== undefined
+          ? Math.max(0, dailyBookingLimit - alreadyBookedToday)
+          : Infinity;
+
+      if (remainingForDay === 0) {
+        continue;
+      }
+
+      let slotsAddedForDay = 0;
+
+      for (const window of windows) {
         const windowStart = maxDate(
-          zonedTimeToUtc(date, rule.startMinute, hostTimezone),
-          start,
+          zonedTimeToUtc(date, window.startMinute, hostTimezone),
+          effectiveStart,
         );
         const windowEnd = minDate(
-          zonedTimeToUtc(date, rule.endMinute, hostTimezone),
-          end,
+          zonedTimeToUtc(date, window.endMinute, hostTimezone),
+          effectiveEnd,
         );
 
-        const stepMs = eventType.durationMinutes * 60_000;
+        const durationMs = eventType.durationMinutes * 60_000;
+        const stepMs = slotIntervalMinutes * 60_000;
+
         for (
-          let slotStartMs = alignToStep(windowStart.getTime(), eventType.durationMinutes);
-          slotStartMs + stepMs <= windowEnd.getTime();
+          let slotStartMs = alignToStep(
+            windowStart.getTime(),
+            slotIntervalMinutes,
+          );
+          slotStartMs + durationMs <= windowEnd.getTime();
           slotStartMs += stepMs
         ) {
-          const slotEndMs = slotStartMs + eventType.durationMinutes * 60_000;
+          if (slotsAddedForDay >= remainingForDay) {
+            break;
+          }
+
+          const slotEndMs = slotStartMs + durationMs;
           const candidateBusy = {
             startMs: slotStartMs - eventType.bufferBeforeMinutes * 60_000,
             endMs: slotEndMs + eventType.bufferAfterMinutes * 60_000,
@@ -368,6 +453,7 @@ export class SchedulingService {
             startTimeGuest: formatZonedIso(slotStart, guestTimezone),
             endTimeGuest: formatZonedIso(slotEnd, guestTimezone),
           });
+          slotsAddedForDay++;
         }
       }
     }
@@ -531,4 +617,35 @@ function intervalsOverlap(
   right: { startMs: number; endMs: number },
 ) {
   return left.startMs < right.endMs && right.startMs < left.endMs;
+}
+
+function numberOr<T extends number | null>(
+  value: number | null | undefined,
+  fallback: T,
+): number | (T extends null ? null : never) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return fallback as number | (T extends null ? null : never);
+}
+
+function readOverrideBlocks(value: unknown): OverrideBlock[] {
+  if (!Array.isArray(value)) return [];
+  const result: OverrideBlock[] = [];
+  for (const entry of value) {
+    if (
+      entry &&
+      typeof entry === 'object' &&
+      typeof (entry as { startMinute?: unknown }).startMinute === 'number' &&
+      typeof (entry as { endMinute?: unknown }).endMinute === 'number'
+    ) {
+      const start = (entry as { startMinute: number }).startMinute;
+      const end = (entry as { endMinute: number }).endMinute;
+      if (start < end) {
+        result.push({ startMinute: start, endMinute: end });
+      }
+    }
+  }
+  result.sort((a, b) => a.startMinute - b.startMinute);
+  return result;
 }

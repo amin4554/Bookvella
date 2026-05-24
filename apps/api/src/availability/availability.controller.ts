@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,7 +14,11 @@ import { AuthGuard } from '../auth/auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 import { AvailabilityService } from './availability.service';
 import type {
+  AvailabilitySettingsDto,
+  CreateAvailabilityOverrideDto,
   CreateAvailabilityRuleDto,
+  ReplaceAvailabilityRulesDto,
+  UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
 } from './dto';
 
@@ -35,6 +40,14 @@ export class AvailabilityController {
     return this.availabilityService.create(request.user!.sub, dto);
   }
 
+  @Put('rules')
+  replace(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: ReplaceAvailabilityRulesDto,
+  ) {
+    return this.availabilityService.replaceRules(request.user!.sub, dto);
+  }
+
   @Patch('rules/:id')
   update(
     @Req() request: AuthenticatedRequest,
@@ -49,7 +62,7 @@ export class AvailabilityController {
     return this.availabilityService.remove(request.user!.sub, id);
   }
 
-  // ── Blackout date overrides ────────────────────────────────────────────────
+  // ── Date overrides ────────────────────────────────────────────────────────
 
   @Get('overrides')
   listOverrides(@Req() request: AuthenticatedRequest) {
@@ -59,12 +72,18 @@ export class AvailabilityController {
   @Post('overrides')
   addOverride(
     @Req() request: AuthenticatedRequest,
-    @Body() body: { date?: string },
+    @Body() body: CreateAvailabilityOverrideDto,
   ) {
-    return this.availabilityService.addOverride(
-      request.user!.sub,
-      body.date ?? '',
-    );
+    return this.availabilityService.addOverride(request.user!.sub, body);
+  }
+
+  @Patch('overrides/:id')
+  updateOverride(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UpdateAvailabilityOverrideDto,
+  ) {
+    return this.availabilityService.updateOverride(request.user!.sub, id, body);
   }
 
   @Delete('overrides/:id')
@@ -73,5 +92,20 @@ export class AvailabilityController {
     @Param('id') id: string,
   ) {
     return this.availabilityService.removeOverride(request.user!.sub, id);
+  }
+
+  // ── Booking-rules settings ────────────────────────────────────────────────
+
+  @Get('settings')
+  getSettings(@Req() request: AuthenticatedRequest) {
+    return this.availabilityService.getSettings(request.user!.sub);
+  }
+
+  @Patch('settings')
+  updateSettings(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: AvailabilitySettingsDto,
+  ) {
+    return this.availabilityService.updateSettings(request.user!.sub, body);
   }
 }

@@ -27,6 +27,11 @@ enum PriceType {
   FREE
 }
 
+enum AvailabilityOverrideType {
+  BLOCKED
+  CUSTOM_HOURS
+}
+
 model User {
   id               String   @id @default(uuid())
   email            String   @unique
@@ -45,6 +50,11 @@ model User {
   whatToExpect     String?  @map("what_to_expect")
   websiteUrl       String?  @map("website_url")
   instagramUrl     String?  @map("instagram_url")
+  minNoticeMinutes    Int     @default(120) @map("min_notice_minutes")
+  bookingHorizonDays  Int     @default(56)  @map("booking_horizon_days")
+  slotIntervalMinutes Int     @default(15)  @map("slot_interval_minutes")
+  dailyBookingLimit   Int?    @map("daily_booking_limit")
+  showBufferTime      Boolean @default(false) @map("show_buffer_time")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -140,14 +150,19 @@ model AvailabilityRule {
 model AvailabilityOverride {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  date      DateTime @db.Date @map("date")   // date only, no time component
+  date      DateTime @db.Date @map("date")
+  type      AvailabilityOverrideType @default(BLOCKED) @map("type")
   isBlocked Boolean  @default(true) @map("is_blocked")
+  note      String?
+  blocks    Json?    @map("blocks") // [{startMinute, endMinute}] for CUSTOM_HOURS
+  groupId   String?  @map("group_id") // shared id for multi-day exception ranges
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([groupId])
   @@map("availability_overrides")
 }
 

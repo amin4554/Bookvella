@@ -7,10 +7,12 @@ import {
   Clock,
   Info,
   Lock,
+  MailCheck,
   MapPin,
   Phone,
   Scissors,
-  ShieldCheck,
+  Tag,
+  Timer,
   UserRound,
   Video,
 } from "lucide-react";
@@ -28,7 +30,9 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
   });
 
   return (
-    <aside className="space-y-5 md:sticky md:top-[80px] md:max-h-[calc(100vh-100px)] md:self-start md:overflow-y-auto md:pr-1">
+    <aside
+      className="space-y-5 md:sticky md:top-[80px] md:max-h-[calc(100vh-100px)] md:self-start md:overflow-y-auto md:pr-5 md:[scrollbar-gutter:stable] md:[scrollbar-width:thin]"
+    >
       <Link
         href={`/${host.slug}`}
         className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#6B7280] hover:text-[#0B1220]"
@@ -66,8 +70,14 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
           </h1>
           <p className="text-[20px] font-bold text-[#FF5F63]">{priceLabel}</p>
         </div>
+        {eventType.category ? (
+          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#E8DED7] bg-white px-2.5 py-1 text-[11.5px] font-semibold text-[#374151]">
+            <Tag className="size-3.5 text-[#9CA3AF]" />
+            {eventType.category}
+          </span>
+        ) : null}
         {eventType.description ? (
-          <p className="mt-1.5 text-[13.5px] leading-[1.6] text-[#374151]">
+          <p className="mt-3 text-[13.5px] leading-[1.6] text-[#374151]">
             {eventType.description}
           </p>
         ) : null}
@@ -95,11 +105,20 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             <UserRound className="size-4 text-[#0D9488]" />
             <span>One guest per session</span>
           </li>
+          {eventType.bufferBeforeMinutes + eventType.bufferAfterMinutes > 0 ? (
+            <li className="flex items-center gap-2.5">
+              <Timer className="size-4 text-[#A855F7]" />
+              <span>
+                {formatBuffer(
+                  eventType.bufferBeforeMinutes,
+                  eventType.bufferAfterMinutes,
+                )}
+              </span>
+            </li>
+          ) : null}
           <li className="flex items-center gap-2.5">
-            <ShieldCheck className="size-4 text-[#10B981]" />
-            <span>
-              Free cancellation up to <strong>2h before</strong>
-            </span>
+            <MailCheck className="size-4 text-[#10B981]" />
+            <span>Email-verified booking · one-click cancel link</span>
           </li>
         </ul>
       </div>
@@ -228,7 +247,7 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
                         {review.guestName}
                       </p>
                       <p className="text-[10px] text-[#9CA3AF]">
-                        {eventType.title}
+                        {eventType.title} · {relativeTime(review.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -262,4 +281,25 @@ function LocationIcon({ type }: { type: PublicEvent["eventType"]["locationType"]
   if (type === "VIDEO") return <Video className="size-4 text-[#A855F7]" />;
   if (type === "PHONE") return <Phone className="size-4 text-[#A855F7]" />;
   return <MapPin className="size-4 text-[#A855F7]" />;
+}
+
+function formatBuffer(before: number, after: number): string {
+  if (before > 0 && after > 0) {
+    return `${before} min before · ${after} min cleanup after`;
+  }
+  if (before > 0) return `${before} min prep time before`;
+  return `${after} min cleanup after`;
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Date.now() - then;
+  const day = 86_400_000;
+  if (diff < day) return "today";
+  if (diff < 2 * day) return "yesterday";
+  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`;
+  if (diff < 30 * day) return `${Math.floor(diff / (7 * day))} weeks ago`;
+  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))} months ago`;
+  return `${Math.floor(diff / (365 * day))} years ago`;
 }

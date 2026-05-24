@@ -3,14 +3,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AvailabilityOverrideType, Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
+  AvailabilityBlockDto,
+  AvailabilitySettingsDto,
+  CreateAvailabilityOverrideDto,
   CreateAvailabilityRuleDto,
+  ReplaceAvailabilityRulesDto,
+  UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
 } from './dto';
 
 const MINUTES_PER_DAY = 24 * 60;
+const MAX_RANGE_DAYS = 366;
+const MAX_BLOCKS_PER_OVERRIDE = 6;
 
 @Injectable()
 export class AvailabilityService {
@@ -85,7 +93,57 @@ export class AvailabilityService {
     return { success: true };
   }
 
-  // ── Blackout date overrides ────────────────────────────────────────────────
+  // Replace the entire weekly schedule in a single transaction. Lets the UI
+  // submit a fully edited set of weekly rules without sequencing many calls.
+  async replaceRules(userId: string, dto: ReplaceAvailabilityRulesDto) {
+    const incoming = dto.rules ?? [];
+    const normalized = incoming.map((rule) => {
+      const next = normalizeRule(rule, { requireAll: true });
+      return {
+        dayOfWeek: next.dayOfWeek!,
+        startMinute: next.startMinute!,
+        endMinute: next.endMinute!,
+      };
+    });
+
+    // Reject overlapping windows within the same day so generated slots can
+    // never come from two competing rules.
+    const byDay = new Map<
+      number,
+      Array<{ startMinute: number; endMinute: number }>
+    >();
+    for (const rule of normalized) {
+      const list = byDay.get(rule.dayOfWeek) ?? [];
+      list.push(rule);
+      byDay.set(rule.dayOfWeek, list);
+    }
+    for (const list of byDay.values()) {
+      list.sort((a, b) => a.startMinute - b.startMinute);
+      for (let i = 1; i < list.length; i++) {
+        if (list[i].startMinute < list[i - 1].endMinute) {
+          throw new BadRequestException(
+            'Time ranges on the same day cannot overlap',
+          );
+        }
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.availabilityRule.deleteMany({ where: { userId } });
+      if (normalized.length === 0) {
+        return [];
+      }
+      await tx.availabilityRule.createMany({
+        data: normalized.map((rule) => ({ userId, ...rule })),
+      });
+      return tx.availabilityRule.findMany({
+        where: { userId },
+        orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+      });
+    });
+  }
+
+  // ── Date overrides ─────────────────────────────────────────────────────────
 
   listOverrides(userId: string) {
     return this.prisma.availabilityOverride.findMany({
@@ -94,53 +152,201 @@ export class AvailabilityService {
     });
   }
 
-  async addOverride(userId: string, dateStr: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      throw new BadRequestException('date must be in YYYY-MM-DD format');
+  async addOverride(userId: string, dto: CreateAvailabilityOverrideDto) {
+    const startDate = parseDateOnly(dto.date, 'date');
+    const endDate =
+      dto.endDate && dto.endDate.trim()
+        ? parseDateOnly(dto.endDate, 'endDate')
+        : startDate;
+    const type: AvailabilityOverrideType = dto.type ?? 'BLOCKED';
+    const note = dto.note?.trim() || null;
+    const blocks = type === 'CUSTOM_HOURS' ? normalizeBlocks(dto.blocks) : null;
+
+    if (endDate < startDate) {
+      throw new BadRequestException('endDate must be on or after date');
     }
 
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const dayCount =
+      Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
 
-    if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException('date is not a valid calendar date');
+    if (dayCount > MAX_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Override range cannot exceed ${MAX_RANGE_DAYS} days`,
+      );
     }
 
-    // Reject dates in the past
-    const todayUtc = new Date();
-    todayUtc.setUTCHours(0, 0, 0, 0);
-
-    if (date < todayUtc) {
-      throw new BadRequestException('Cannot block a date in the past');
+    const todayUtc = startOfUtcToday();
+    if (endDate < todayUtc) {
+      throw new BadRequestException(
+        'Cannot create an override fully in the past',
+      );
     }
 
-    try {
-      return await this.prisma.availabilityOverride.create({
-        data: { userId, date, isBlocked: true },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+    const groupId = dayCount > 1 ? randomUUID() : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const created = [] as Array<{ id: string }>;
+      for (
+        let cursor = new Date(startDate.getTime());
+        cursor <= endDate;
+        cursor = new Date(cursor.getTime() + 86_400_000)
       ) {
-        // Already blocked — return the existing record
-        return this.prisma.availabilityOverride.findFirst({
-          where: { userId, date },
+        // Replace any existing override for this date with the new one. Hosts
+        // expect "block this day" to override an earlier override on the same
+        // date rather than silently fail.
+        await tx.availabilityOverride.deleteMany({
+          where: { userId, date: cursor },
         });
+        const row = await tx.availabilityOverride.create({
+          data: {
+            userId,
+            date: cursor,
+            type,
+            isBlocked: type === 'BLOCKED',
+            note,
+            blocks: blocks ?? undefined,
+            groupId,
+          },
+        });
+        created.push({ id: row.id });
       }
-      throw error;
-    }
+      return tx.availabilityOverride.findMany({
+        where: { id: { in: created.map((c) => c.id) } },
+        orderBy: { date: 'asc' },
+      });
+    });
   }
 
-  async removeOverride(userId: string, id: string) {
-    const result = await this.prisma.availabilityOverride.deleteMany({
+  async updateOverride(
+    userId: string,
+    id: string,
+    dto: UpdateAvailabilityOverrideDto,
+  ) {
+    const existing = await this.prisma.availabilityOverride.findFirst({
       where: { id, userId },
     });
 
-    if (result.count === 0) {
+    if (!existing) {
       throw new NotFoundException('Override not found');
     }
 
+    const data: Prisma.AvailabilityOverrideUpdateInput = {};
+
+    if (dto.type !== undefined) {
+      data.type = dto.type;
+      data.isBlocked = dto.type === 'BLOCKED';
+    }
+
+    if (dto.note !== undefined) {
+      data.note = dto.note?.trim() || null;
+    }
+
+    if (dto.blocks !== undefined) {
+      const next = normalizeBlocks(dto.blocks);
+      data.blocks = next ?? Prisma.JsonNull;
+    }
+
+    return this.prisma.availabilityOverride.update({
+      where: { id },
+      data,
+    });
+  }
+
+  // Delete every override that shares an id or groupId so removing a multi-day
+  // exception clears the whole range in one call.
+  async removeOverride(userId: string, id: string) {
+    const existing = await this.prisma.availabilityOverride.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Override not found');
+    }
+
+    if (existing.groupId) {
+      await this.prisma.availabilityOverride.deleteMany({
+        where: { userId, groupId: existing.groupId },
+      });
+    } else {
+      await this.prisma.availabilityOverride.delete({ where: { id } });
+    }
+
     return { success: true };
+  }
+
+  // ── Booking-rules settings (per host) ──────────────────────────────────────
+
+  async getSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        minNoticeMinutes: true,
+        bookingHorizonDays: true,
+        slotIntervalMinutes: true,
+        dailyBookingLimit: true,
+        showBufferTime: true,
+        timezone: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  async updateSettings(userId: string, dto: AvailabilitySettingsDto) {
+    const data: Prisma.UserUpdateInput = {};
+
+    if (dto.minNoticeMinutes !== undefined) {
+      data.minNoticeMinutes = clampInt(
+        dto.minNoticeMinutes,
+        'minNoticeMinutes',
+        0,
+        14 * 24 * 60,
+      );
+    }
+
+    if (dto.bookingHorizonDays !== undefined) {
+      data.bookingHorizonDays = clampInt(
+        dto.bookingHorizonDays,
+        'bookingHorizonDays',
+        1,
+        365,
+      );
+    }
+
+    if (dto.slotIntervalMinutes !== undefined) {
+      const allowed = new Set([5, 10, 15, 20, 30, 60]);
+      if (!allowed.has(dto.slotIntervalMinutes)) {
+        throw new BadRequestException(
+          'slotIntervalMinutes must be one of 5, 10, 15, 20, 30, 60',
+        );
+      }
+      data.slotIntervalMinutes = dto.slotIntervalMinutes;
+    }
+
+    if (dto.dailyBookingLimit !== undefined) {
+      if (dto.dailyBookingLimit === null) {
+        data.dailyBookingLimit = null;
+      } else {
+        data.dailyBookingLimit = clampInt(
+          dto.dailyBookingLimit,
+          'dailyBookingLimit',
+          1,
+          200,
+        );
+      }
+    }
+
+    if (dto.showBufferTime !== undefined) {
+      data.showBufferTime = !!dto.showBufferTime;
+    }
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+
+    return this.getSettings(userId);
   }
 }
 
@@ -205,4 +411,75 @@ function normalizeMinute(
   }
 
   return value;
+}
+
+function normalizeBlocks(blocks: AvailabilityBlockDto[] | undefined) {
+  if (!blocks || blocks.length === 0) {
+    return [] as Array<{ startMinute: number; endMinute: number }>;
+  }
+
+  if (blocks.length > MAX_BLOCKS_PER_OVERRIDE) {
+    throw new BadRequestException(
+      `Override cannot have more than ${MAX_BLOCKS_PER_OVERRIDE} time blocks`,
+    );
+  }
+
+  const normalized = blocks.map((block, index) => {
+    const start = normalizeMinute(
+      block.startMinute,
+      `blocks[${index}].startMinute`,
+      true,
+    )!;
+    const end = normalizeMinute(
+      block.endMinute,
+      `blocks[${index}].endMinute`,
+      true,
+    )!;
+
+    if (start >= end) {
+      throw new BadRequestException(
+        `blocks[${index}].startMinute must be before endMinute`,
+      );
+    }
+
+    return { startMinute: start, endMinute: end };
+  });
+
+  normalized.sort((a, b) => a.startMinute - b.startMinute);
+  for (let i = 1; i < normalized.length; i++) {
+    if (normalized[i].startMinute < normalized[i - 1].endMinute) {
+      throw new BadRequestException('Override time blocks cannot overlap');
+    }
+  }
+
+  return normalized;
+}
+
+function parseDateOnly(value: string | undefined, field: string) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new BadRequestException(`${field} must be in YYYY-MM-DD format`);
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException(`${field} is not a valid calendar date`);
+  }
+  return date;
+}
+
+function startOfUtcToday() {
+  const now = new Date();
+  now.setUTCHours(0, 0, 0, 0);
+  return now;
+}
+
+function clampInt(value: unknown, field: string, min: number, max: number) {
+  if (!Number.isFinite(value) || !Number.isInteger(value)) {
+    throw new BadRequestException(`${field} must be an integer`);
+  }
+  const n = value as number;
+  if (n < min || n > max) {
+    throw new BadRequestException(`${field} must be between ${min} and ${max}`);
+  }
+  return n;
 }
