@@ -3,10 +3,32 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
-import { BookingStatus, Prisma } from '@prisma/client';
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
-import { assertTimeZone } from '../common/time-zone';
+import {
+  BookingReminderStatus,
+  BookingStatus,
+  DailyAgendaStatus,
+  NotificationChannel,
+  NotificationType,
+  Prisma,
+} from '@prisma/client';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from 'crypto';
+import { CalendarService } from '../calendar/calendar.service';
+import {
+  addLocalDays,
+  assertTimeZone,
+  getZonedParts,
+  zonedTimeToUtc,
+} from '../common/time-zone';
 import { optionalText, requireText } from '../common/validation';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,14 +42,38 @@ import type {
 
 const MAX_BUFFER_LOOKAROUND_MS = 24 * 60 * 60 * 1000;
 const VERIFICATION_CODE_TTL_MINUTES = 10;
+const REMINDER_WORKER_INTERVAL_MS = 60 * 1000;
+const REMINDER_BATCH_SIZE = 25;
+const DAILY_AGENDA_SEND_MINUTE = 7 * 60;
+const DAILY_AGENDA_WINDOW_MINUTES = 10;
 
 @Injectable()
-export class BookingsService {
+export class BookingsService implements OnModuleInit, OnModuleDestroy {
+  private reminderWorker: NodeJS.Timeout | null = null;
+  private processingReminders = false;
+  private processingDailyAgendas = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedulingService: SchedulingService,
     private readonly emailService: EmailService,
+    private readonly calendarService?: CalendarService,
   ) {}
+
+  onModuleInit() {
+    this.reminderWorker = setInterval(() => {
+      void this.processDueReminders();
+      void this.processDailyAgendas();
+    }, REMINDER_WORKER_INTERVAL_MS);
+    this.reminderWorker.unref();
+  }
+
+  onModuleDestroy() {
+    if (this.reminderWorker) {
+      clearInterval(this.reminderWorker);
+      this.reminderWorker = null;
+    }
+  }
 
   listHostBookings(hostUserId: string) {
     return this.prisma.booking.findMany({
@@ -45,6 +91,163 @@ export class BookingsService {
         },
       },
       orderBy: [{ startTimeUtc: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async exportCustomersCsv(hostUserId: string) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { hostUserId },
+      include: {
+        eventType: {
+          select: {
+            priceAmount: true,
+          },
+        },
+      },
+      orderBy: [{ startTimeUtc: 'desc' }, { createdAt: 'desc' }],
+    });
+    const customers = new Map<
+      string,
+      {
+        name: string;
+        email: string;
+        phone: string;
+        bookingCount: number;
+        lastBooking: Date | null;
+        totalSpendCents: number;
+        timezone: string;
+      }
+    >();
+
+    for (const booking of bookings) {
+      const email = booking.guestEmail.trim().toLowerCase();
+      const existing = customers.get(email);
+      const totalSpendCents =
+        (existing?.totalSpendCents ?? 0) + (booking.eventType.priceAmount ?? 0);
+      const lastBooking =
+        !existing?.lastBooking || booking.startTimeUtc > existing.lastBooking
+          ? booking.startTimeUtc
+          : existing.lastBooking;
+
+      customers.set(email, {
+        name:
+          !existing ||
+          booking.startTimeUtc >= (existing.lastBooking ?? new Date(0))
+            ? booking.guestName
+            : existing.name,
+        email,
+        phone: booking.guestPhone ?? existing?.phone ?? '',
+        bookingCount: (existing?.bookingCount ?? 0) + 1,
+        lastBooking,
+        totalSpendCents,
+        timezone:
+          !existing ||
+          booking.startTimeUtc >= (existing.lastBooking ?? new Date(0))
+            ? booking.guestTimezone
+            : existing.timezone,
+      });
+    }
+
+    return toCsv([
+      [
+        'name',
+        'email',
+        'phone',
+        'booking_count',
+        'last_booking',
+        'total_spend',
+        'timezone',
+      ],
+      ...Array.from(customers.values()).map((customer) => [
+        customer.name,
+        customer.email,
+        customer.phone,
+        String(customer.bookingCount),
+        customer.lastBooking?.toISOString() ?? '',
+        (customer.totalSpendCents / 100).toFixed(2),
+        customer.timezone,
+      ]),
+    ]);
+  }
+
+  async getBookingFeed(hostUserId: string) {
+    const existing = await this.prisma.bookingFeed.findUnique({
+      where: { userId: hostUserId },
+    });
+    const token = existing
+      ? decryptFeedToken(existing.tokenEncrypted)
+      : createFeedToken();
+
+    if (!existing) {
+      await this.prisma.bookingFeed.create({
+        data: {
+          userId: hostUserId,
+          tokenHash: hashFeedToken(token),
+          tokenEncrypted: encryptFeedToken(token),
+        },
+      });
+    }
+
+    return {
+      feedUrl: buildFeedUrl(token),
+    };
+  }
+
+  async rotateBookingFeed(hostUserId: string) {
+    const token = createFeedToken();
+    await this.prisma.bookingFeed.upsert({
+      where: { userId: hostUserId },
+      create: {
+        userId: hostUserId,
+        tokenHash: hashFeedToken(token),
+        tokenEncrypted: encryptFeedToken(token),
+        rotatedAt: new Date(),
+      },
+      update: {
+        tokenHash: hashFeedToken(token),
+        tokenEncrypted: encryptFeedToken(token),
+        rotatedAt: new Date(),
+      },
+    });
+
+    return {
+      feedUrl: buildFeedUrl(token),
+    };
+  }
+
+  async renderIcsFeed(rawToken: string) {
+    const token = rawToken.replace(/\.ics$/i, '');
+    const feed = await this.prisma.bookingFeed.findUnique({
+      where: { tokenHash: hashFeedToken(token) },
+      include: { user: true },
+    });
+
+    if (!feed) {
+      throw new NotFoundException('Calendar feed not found');
+    }
+
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        hostUserId: feed.userId,
+        status: BookingStatus.CONFIRMED,
+      },
+      include: { eventType: true },
+      orderBy: { startTimeUtc: 'asc' },
+    });
+
+    return buildIcsCalendar({
+      hostName: displayName(feed.user),
+      bookings: bookings.map((booking) => ({
+        id: booking.id,
+        eventTitle: booking.eventType.title,
+        guestName: booking.guestName,
+        guestEmail: booking.guestEmail,
+        startTimeUtc: booking.startTimeUtc,
+        endTimeUtc: booking.endTimeUtc,
+        location:
+          booking.eventType.locationDetails ??
+          formatLocation(booking.eventType.locationType),
+      })),
     });
   }
 
@@ -80,10 +283,12 @@ export class BookingsService {
         eventType: true,
       },
     });
+    await this.cancelBookingReminder(booking.id);
 
     await this.sendBookingCancellation({
+      hostUserId,
       hostEmail: booking.host.email,
-      hostName: booking.host.name,
+      hostName: displayName(booking.host),
       eventTitle: booking.eventType.title,
       guestName: booking.guestName,
       guestEmail: booking.guestEmail,
@@ -92,6 +297,7 @@ export class BookingsService {
       hostTimezone: booking.host.timezone,
       cancellationReason,
     });
+    await this.calendarService?.writeBookingCancelled(booking.id);
 
     return cancelledBooking;
   }
@@ -137,7 +343,7 @@ export class BookingsService {
         `Your Bookvella verification code is ${code}.`,
         '',
         `Event: ${eventType.title}`,
-        `Host: ${eventType.user.name}`,
+        `Host: ${displayName(eventType.user)}`,
         `Time: ${startTimeUtc.toISOString()}`,
         '',
         `This code expires in ${VERIFICATION_CODE_TTL_MINUTES} minutes.`,
@@ -148,7 +354,7 @@ export class BookingsService {
         code,
         rows: [
           ['Service', eventType.title],
-          ['Host', eventType.user.name],
+          ['Host', displayName(eventType.user)],
           ['Expires', `${VERIFICATION_CODE_TTL_MINUTES} minutes`],
         ],
       }),
@@ -235,9 +441,16 @@ export class BookingsService {
       },
     );
 
+    await this.scheduleBookingReminder({
+      bookingId: booking.id,
+      hostUserId: eventType.userId,
+      startTimeUtc,
+    });
+
     await this.sendBookingConfirmations({
+      hostUserId: eventType.userId,
       hostEmail: eventType.user.email,
-      hostName: eventType.user.name,
+      hostName: displayName(eventType.user),
       eventTitle: eventType.title,
       eventSlug,
       hostSlug,
@@ -253,6 +466,7 @@ export class BookingsService {
       location:
         eventType.locationDetails ?? formatLocation(eventType.locationType),
     });
+    await this.calendarService?.writeBookingCreated(booking.id);
 
     return booking;
   }
@@ -272,7 +486,7 @@ export class BookingsService {
       status: booking.status,
       guestName: booking.guestName,
       eventTitle: booking.eventType.title,
-      hostName: booking.host.name,
+      hostName: displayName(booking.host),
       startTimeUtc: booking.startTimeUtc.toISOString(),
       endTimeUtc: booking.endTimeUtc.toISOString(),
       guestTimezone: booking.guestTimezone,
@@ -295,12 +509,17 @@ export class BookingsService {
 
     await this.prisma.booking.update({
       where: { id: booking.id },
-      data: { status: BookingStatus.CANCELLED, cancellationReason: 'Guest cancelled' },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancellationReason: 'Guest cancelled',
+      },
     });
+    await this.cancelBookingReminder(booking.id);
 
     await this.sendBookingCancellation({
+      hostUserId: booking.host.id,
       hostEmail: booking.host.email,
-      hostName: booking.host.name,
+      hostName: displayName(booking.host),
       eventTitle: booking.eventType.title,
       guestName: booking.guestName,
       guestEmail: booking.guestEmail,
@@ -309,8 +528,415 @@ export class BookingsService {
       hostTimezone: booking.host.timezone,
       cancellationReason: 'Guest cancelled',
     });
+    await this.calendarService?.writeBookingCancelled(booking.id);
 
     return { success: true };
+  }
+
+  async processDueReminders() {
+    if (this.processingReminders) {
+      return { processed: 0 };
+    }
+
+    this.processingReminders = true;
+
+    try {
+      const dueReminders = await this.prisma.bookingReminder.findMany({
+        where: {
+          status: BookingReminderStatus.PENDING,
+          sendAt: {
+            lte: new Date(),
+          },
+        },
+        include: {
+          booking: {
+            include: {
+              eventType: true,
+              host: true,
+            },
+          },
+        },
+        orderBy: { sendAt: 'asc' },
+        take: REMINDER_BATCH_SIZE,
+      });
+
+      let processed = 0;
+
+      for (const reminder of dueReminders) {
+        const claimed = await this.prisma.bookingReminder.updateMany({
+          where: {
+            bookingId: reminder.bookingId,
+            status: BookingReminderStatus.PENDING,
+          },
+          data: {
+            status: BookingReminderStatus.PROCESSING,
+            lastError: null,
+          },
+        });
+
+        if (claimed.count === 0) {
+          continue;
+        }
+
+        try {
+          if (reminder.booking.status !== BookingStatus.CONFIRMED) {
+            await this.prisma.bookingReminder.update({
+              where: { bookingId: reminder.bookingId },
+              data: {
+                status: BookingReminderStatus.CANCELLED,
+              },
+            });
+            processed += 1;
+            continue;
+          }
+
+          const preference = await this.getHostReminderPreference(
+            reminder.booking.hostUserId,
+          );
+
+          if (!preference.enabled) {
+            await this.prisma.bookingReminder.update({
+              where: { bookingId: reminder.bookingId },
+              data: {
+                status: BookingReminderStatus.CANCELLED,
+              },
+            });
+            processed += 1;
+            continue;
+          }
+
+          await this.sendBookingReminder({
+            guestEmail: reminder.booking.guestEmail,
+            guestName: reminder.booking.guestName,
+            guestTimezone: reminder.booking.guestTimezone,
+            hostName: displayName(reminder.booking.host),
+            eventTitle: reminder.booking.eventType.title,
+            startTimeUtc: reminder.booking.startTimeUtc,
+            location:
+              reminder.booking.eventType.locationDetails ??
+              formatLocation(reminder.booking.eventType.locationType),
+          });
+
+          await this.prisma.bookingReminder.update({
+            where: { bookingId: reminder.bookingId },
+            data: {
+              status: BookingReminderStatus.SENT,
+              sentAt: new Date(),
+            },
+          });
+          processed += 1;
+        } catch (error) {
+          await this.prisma.bookingReminder.update({
+            where: { bookingId: reminder.bookingId },
+            data: {
+              status: BookingReminderStatus.FAILED,
+              lastError: errorMessage(error),
+            },
+          });
+        }
+      }
+
+      return { processed };
+    } finally {
+      this.processingReminders = false;
+    }
+  }
+
+  async processDailyAgendas(now = new Date()) {
+    if (this.processingDailyAgendas) {
+      return { processed: 0 };
+    }
+
+    this.processingDailyAgendas = true;
+
+    try {
+      const candidateHosts = await this.prisma.user.findMany({
+        where: {
+          bookings: {
+            some: {
+              status: BookingStatus.CONFIRMED,
+              startTimeUtc: {
+                gte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+                lt: new Date(now.getTime() + 48 * 60 * 60 * 1000),
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          businessDisplayName: true,
+          timezone: true,
+        },
+      });
+      let processed = 0;
+
+      for (const host of candidateHosts) {
+        const local = getZonedParts(now, host.timezone);
+        const localMinute = local.hour * 60 + local.minute;
+
+        if (
+          localMinute < DAILY_AGENDA_SEND_MINUTE ||
+          localMinute >= DAILY_AGENDA_SEND_MINUTE + DAILY_AGENDA_WINDOW_MINUTES
+        ) {
+          continue;
+        }
+
+        if (
+          !(await this.isHostEmailEnabled(
+            host.id,
+            NotificationType.DAILY_AGENDA,
+          ))
+        ) {
+          continue;
+        }
+
+        const agendaDate = localDateAsUtcDate(local);
+
+        try {
+          await this.prisma.dailyAgendaDelivery.create({
+            data: {
+              userId: host.id,
+              agendaDate,
+              status: DailyAgendaStatus.PROCESSING,
+            },
+          });
+        } catch (error) {
+          if (isUniqueConstraintError(error)) {
+            continue;
+          }
+
+          throw error;
+        }
+
+        try {
+          const startUtc = zonedTimeToUtc(local, 0, host.timezone);
+          const endUtc = zonedTimeToUtc(
+            addLocalDays(local, 1),
+            0,
+            host.timezone,
+          );
+          const bookings = await this.prisma.booking.findMany({
+            where: {
+              hostUserId: host.id,
+              status: BookingStatus.CONFIRMED,
+              startTimeUtc: {
+                gte: startUtc,
+                lt: endUtc,
+              },
+            },
+            include: {
+              eventType: {
+                select: {
+                  title: true,
+                  locationType: true,
+                  locationDetails: true,
+                },
+              },
+            },
+            orderBy: { startTimeUtc: 'asc' },
+          });
+
+          if (bookings.length > 0) {
+            await this.sendDailyAgendaEmail({
+              hostEmail: host.email,
+              hostName: displayName(host),
+              hostTimezone: host.timezone,
+              bookings: bookings.map((booking) => ({
+                guestName: booking.guestName,
+                guestEmail: booking.guestEmail,
+                eventTitle: booking.eventType.title,
+                startTimeUtc: booking.startTimeUtc,
+                location:
+                  booking.eventType.locationDetails ??
+                  formatLocation(booking.eventType.locationType),
+              })),
+            });
+          }
+
+          await this.prisma.dailyAgendaDelivery.update({
+            where: {
+              userId_agendaDate: {
+                userId: host.id,
+                agendaDate,
+              },
+            },
+            data: {
+              status: DailyAgendaStatus.SENT,
+              sentAt: new Date(),
+              lastError: null,
+            },
+          });
+          processed += 1;
+        } catch (error) {
+          await this.prisma.dailyAgendaDelivery.update({
+            where: {
+              userId_agendaDate: {
+                userId: host.id,
+                agendaDate,
+              },
+            },
+            data: {
+              status: DailyAgendaStatus.FAILED,
+              lastError: errorMessage(error),
+            },
+          });
+        }
+      }
+
+      return { processed };
+    } finally {
+      this.processingDailyAgendas = false;
+    }
+  }
+
+  private async scheduleBookingReminder(input: {
+    bookingId: string;
+    hostUserId: string;
+    startTimeUtc: Date;
+  }) {
+    const preference = await this.getHostReminderPreference(input.hostUserId);
+
+    if (!preference.enabled) {
+      return;
+    }
+
+    const sendAt = new Date(
+      input.startTimeUtc.getTime() - preference.timingMinutes * 60_000,
+    );
+
+    if (sendAt <= new Date()) {
+      return;
+    }
+
+    await this.prisma.bookingReminder.upsert({
+      where: { bookingId: input.bookingId },
+      create: {
+        bookingId: input.bookingId,
+        sendAt,
+        status: BookingReminderStatus.PENDING,
+      },
+      update: {
+        sendAt,
+        status: BookingReminderStatus.PENDING,
+        sentAt: null,
+        lastError: null,
+      },
+    });
+  }
+
+  private async cancelBookingReminder(bookingId: string) {
+    await this.prisma.bookingReminder.updateMany({
+      where: {
+        bookingId,
+        status: {
+          in: [
+            BookingReminderStatus.PENDING,
+            BookingReminderStatus.PROCESSING,
+            BookingReminderStatus.FAILED,
+          ],
+        },
+      },
+      data: {
+        status: BookingReminderStatus.CANCELLED,
+      },
+    });
+  }
+
+  private async getHostReminderPreference(hostUserId: string) {
+    const preference = await this.prisma.notificationPreference.findUnique({
+      where: {
+        userId_channel_type: {
+          userId: hostUserId,
+          channel: NotificationChannel.EMAIL,
+          type: NotificationType.REMINDER_BEFORE,
+        },
+      },
+    });
+
+    return {
+      enabled: preference?.enabled ?? true,
+      timingMinutes: preference?.timingMinutes ?? 120,
+    };
+  }
+
+  private async sendBookingReminder(input: {
+    guestEmail: string;
+    guestName: string;
+    guestTimezone: string;
+    hostName: string;
+    eventTitle: string;
+    startTimeUtc: Date;
+    location: string;
+  }) {
+    const guestWhen = formatForEmail(input.startTimeUtc, input.guestTimezone);
+
+    await this.emailService.sendMail({
+      to: input.guestEmail,
+      subject: `Reminder: ${input.eventTitle}`,
+      text: [
+        `Hi ${input.guestName},`,
+        '',
+        `This is a reminder for your upcoming ${input.eventTitle} booking with ${input.hostName}.`,
+        '',
+        `Time: ${guestWhen}`,
+        `Location: ${input.location}`,
+        '',
+        'Bookvella',
+      ].join('\n'),
+      html: brandedEmailHtml({
+        title: 'Upcoming booking reminder',
+        intro: `Your ${input.eventTitle} booking with ${input.hostName} is coming up.`,
+        rows: [
+          ['Time', guestWhen],
+          ['Location', input.location],
+        ],
+      }),
+    });
+  }
+
+  private async sendDailyAgendaEmail(input: {
+    hostEmail: string;
+    hostName: string;
+    hostTimezone: string;
+    bookings: {
+      guestName: string;
+      guestEmail: string;
+      eventTitle: string;
+      startTimeUtc: Date;
+      location: string;
+    }[];
+  }) {
+    const lines = input.bookings.flatMap((booking, index) => [
+      `${index + 1}. ${formatForEmail(booking.startTimeUtc, input.hostTimezone)}`,
+      `   ${booking.eventTitle} with ${booking.guestName} <${booking.guestEmail}>`,
+      `   ${booking.location}`,
+    ]);
+
+    await this.emailService.sendMail({
+      to: input.hostEmail,
+      subject: "Today's Bookvella agenda",
+      text: [
+        `Hi ${input.hostName},`,
+        '',
+        "Here's your Bookvella agenda for today:",
+        '',
+        ...lines,
+        '',
+        'Bookvella',
+      ].join('\n'),
+      html: brandedEmailHtml({
+        title: "Today's agenda",
+        intro: `You have ${input.bookings.length} confirmed booking${
+          input.bookings.length === 1 ? '' : 's'
+        } today.`,
+        rows: input.bookings.map((booking) => [
+          formatForEmail(booking.startTimeUtc, input.hostTimezone),
+          `${booking.eventTitle} with ${booking.guestName} - ${booking.location}`,
+        ]),
+      }),
+    });
   }
 
   private async getPublicEventType(hostSlug: string, eventSlug: string) {
@@ -320,6 +946,7 @@ export class BookingsService {
         isActive: true,
         user: {
           slug: hostSlug,
+          isActive: true,
         },
       },
       include: {
@@ -404,6 +1031,7 @@ export class BookingsService {
   }
 
   private async sendBookingConfirmations(input: {
+    hostUserId: string;
     hostEmail: string;
     hostName: string;
     eventTitle: string;
@@ -450,7 +1078,7 @@ export class BookingsService {
       ...(input.guestNote ? ['', `Guest note: ${input.guestNote}`] : []),
     ].join('\n');
 
-    await Promise.all([
+    const deliveries = [
       this.emailService.sendMail({
         to: input.guestEmail,
         subject: `Confirmed: ${input.eventTitle}`,
@@ -469,27 +1097,40 @@ export class BookingsService {
           ],
         }),
       }),
-      this.emailService.sendMail({
-        to: input.hostEmail,
-        subject: `New booking: ${input.eventTitle}`,
-        text: hostText,
-        html: brandedEmailHtml({
-          title: 'New booking confirmed',
-          intro: `${input.guestName} booked ${input.eventTitle}.`,
-          rows: [
-            ['Guest', `${input.guestName} <${input.guestEmail}>`],
-            ['Time', hostWhen],
-            ['Location', input.location],
-            ...(input.guestNote
-              ? ([['Guest note', input.guestNote]] as [string, string][])
-              : []),
-          ],
+    ];
+
+    if (
+      await this.isHostEmailEnabled(
+        input.hostUserId,
+        NotificationType.NEW_BOOKING,
+      )
+    ) {
+      deliveries.push(
+        this.emailService.sendMail({
+          to: input.hostEmail,
+          subject: `New booking: ${input.eventTitle}`,
+          text: hostText,
+          html: brandedEmailHtml({
+            title: 'New booking confirmed',
+            intro: `${input.guestName} booked ${input.eventTitle}.`,
+            rows: [
+              ['Guest', `${input.guestName} <${input.guestEmail}>`],
+              ['Time', hostWhen],
+              ['Location', input.location],
+              ...(input.guestNote
+                ? ([['Guest note', input.guestNote]] as [string, string][])
+                : []),
+            ],
+          }),
         }),
-      }),
-    ]);
+      );
+    }
+
+    await Promise.all(deliveries);
   }
 
   private async sendBookingCancellation(input: {
+    hostUserId: string;
     hostEmail: string;
     hostName: string;
     eventTitle: string;
@@ -522,7 +1163,7 @@ export class BookingsService {
       ...reasonLines,
     ].join('\n');
 
-    await Promise.all([
+    const deliveries = [
       this.emailService.sendMail({
         to: input.guestEmail,
         subject: `Cancelled: ${input.eventTitle}`,
@@ -538,24 +1179,50 @@ export class BookingsService {
           ],
         }),
       }),
-      this.emailService.sendMail({
-        to: input.hostEmail,
-        subject: `Cancelled booking: ${input.eventTitle}`,
-        text: hostText,
-        html: brandedEmailHtml({
-          title: 'Booking cancelled',
-          intro: `${input.guestName}'s booking was cancelled.`,
-          rows: [
-            ['Service', input.eventTitle],
-            ['Guest', `${input.guestName} <${input.guestEmail}>`],
-            ['Time', hostWhen],
-            ...(input.cancellationReason
-              ? ([['Reason', input.cancellationReason]] as [string, string][])
-              : []),
-          ],
+    ];
+
+    if (
+      await this.isHostEmailEnabled(
+        input.hostUserId,
+        NotificationType.CANCELLATION,
+      )
+    ) {
+      deliveries.push(
+        this.emailService.sendMail({
+          to: input.hostEmail,
+          subject: `Cancelled booking: ${input.eventTitle}`,
+          text: hostText,
+          html: brandedEmailHtml({
+            title: 'Booking cancelled',
+            intro: `${input.guestName}'s booking was cancelled.`,
+            rows: [
+              ['Service', input.eventTitle],
+              ['Guest', `${input.guestName} <${input.guestEmail}>`],
+              ['Time', hostWhen],
+              ...(input.cancellationReason
+                ? ([['Reason', input.cancellationReason]] as [string, string][])
+                : []),
+            ],
+          }),
         }),
-      }),
-    ]);
+      );
+    }
+
+    await Promise.all(deliveries);
+  }
+
+  private async isHostEmailEnabled(hostUserId: string, type: NotificationType) {
+    const preference = await this.prisma.notificationPreference.findUnique({
+      where: {
+        userId_channel_type: {
+          userId: hostUserId,
+          channel: NotificationChannel.EMAIL,
+          type,
+        },
+      },
+    });
+
+    return preference?.enabled ?? true;
   }
 
   private async hasBookingConflict(
@@ -668,6 +1335,13 @@ function formatLocation(locationType: string) {
   return 'Video call';
 }
 
+function displayName(user: {
+  name: string;
+  businessDisplayName?: string | null;
+}) {
+  return user.businessDisplayName?.trim() || user.name;
+}
+
 function buildReviewUrl(input: {
   hostSlug: string;
   eventSlug: string;
@@ -760,4 +1434,137 @@ function intervalsOverlap(
   right: { startMs: number; endMs: number },
 ) {
   return left.startMs < right.endMs && right.startMs < left.endMs;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toCsv(rows: string[][]) {
+  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+}
+
+function csvCell(value: string) {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function createFeedToken() {
+  return randomBytes(32).toString('base64url');
+}
+
+function hashFeedToken(token: string) {
+  return createHash('sha256').update(token).digest('base64url');
+}
+
+function buildFeedUrl(token: string) {
+  const apiUrl =
+    process.env.PUBLIC_API_URL ??
+    process.env.API_URL ??
+    'http://localhost:3000';
+  return `${apiUrl.replace(/\/$/, '')}/public/feeds/${token}.ics`;
+}
+
+function encryptFeedToken(value: string) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', feedEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(value, 'utf8'),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+  return `v1:${iv.toString('base64url')}:${tag.toString('base64url')}:${ciphertext.toString('base64url')}`;
+}
+
+function decryptFeedToken(value: string) {
+  const [version, iv, tag, ciphertext] = value.split(':');
+
+  if (version !== 'v1' || !iv || !tag || !ciphertext) {
+    throw new Error('Invalid encrypted feed token');
+  }
+
+  const decipher = createDecipheriv(
+    'aes-256-gcm',
+    feedEncryptionKey(),
+    Buffer.from(iv, 'base64url'),
+  );
+  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, 'base64url')),
+    decipher.final(),
+  ]).toString('utf8');
+}
+
+function feedEncryptionKey() {
+  return createHash('sha256')
+    .update(
+      process.env.BOOKING_FEED_TOKEN_KEY ??
+        process.env.JWT_PRIVATE_KEY ??
+        'bookvella-feed-dev',
+    )
+    .digest();
+}
+
+function buildIcsCalendar(input: {
+  hostName: string;
+  bookings: {
+    id: string;
+    eventTitle: string;
+    guestName: string;
+    guestEmail: string;
+    startTimeUtc: Date;
+    endTimeUtc: Date;
+    location: string;
+  }[];
+}) {
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Bookvella//Bookings//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsText(`Bookvella - ${input.hostName}`)}`,
+    ...input.bookings.flatMap((booking) => [
+      'BEGIN:VEVENT',
+      `UID:${icsText(`${booking.id}@bookvella`)}`,
+      `DTSTAMP:${icsDate(new Date())}`,
+      `DTSTART:${icsDate(booking.startTimeUtc)}`,
+      `DTEND:${icsDate(booking.endTimeUtc)}`,
+      `SUMMARY:${icsText(booking.eventTitle)}`,
+      `DESCRIPTION:${icsText(`Guest: ${booking.guestName} <${booking.guestEmail}>`)}`,
+      `LOCATION:${icsText(booking.location)}`,
+      'END:VEVENT',
+    ]),
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n');
+}
+
+function icsDate(date: Date) {
+  return date
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
+}
+
+function icsText(value: string) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\r?\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function localDateAsUtcDate(date: {
+  year: number;
+  month: number;
+  day: number;
+}) {
+  return new Date(Date.UTC(date.year, date.month - 1, date.day));
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }

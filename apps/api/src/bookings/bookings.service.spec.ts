@@ -4,6 +4,9 @@ import { BookingsService } from './bookings.service';
 
 function makePrisma() {
   return {
+    user: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     booking: {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -13,6 +16,19 @@ function makePrisma() {
     otpVerification: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    notificationPreference: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    bookingReminder: {
+      upsert: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+    },
+    dailyAgendaDelivery: {
+      create: jest.fn(),
       update: jest.fn(),
     },
   };
@@ -45,10 +61,14 @@ function makeBooking(overrides: Record<string, unknown> = {}) {
       title: 'Intro Call',
       bufferBeforeMinutes: 0,
       bufferAfterMinutes: 0,
+      locationType: 'VIDEO',
+      locationDetails: null,
     },
     host: {
+      id: 'host-1',
       email: 'host@example.com',
       name: 'Host',
+      businessDisplayName: null,
       timezone: 'UTC',
     },
     ...overrides,
@@ -104,6 +124,63 @@ describe('BookingsService – cancelHostBooking', () => {
     expect(prisma.booking.update).toHaveBeenCalledTimes(1);
     expect(email.sendMail).toHaveBeenCalledTimes(2); // host + guest
   });
+
+  it('keeps guest cancellation email but skips host email when disabled', async () => {
+    const booking = makeBooking();
+    const cancelled = { ...booking, status: BookingStatus.CANCELLED };
+    prisma.booking.findFirst.mockResolvedValue(booking);
+    prisma.booking.update.mockResolvedValue(cancelled);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: false,
+    });
+
+    await service.cancelHostBooking('host-1', 'booking-1', {
+      reason: 'Host unavailable',
+    });
+
+    expect(email.sendMail).toHaveBeenCalledTimes(1);
+    expect(email.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'guest@example.com' }),
+    );
+  });
+});
+
+describe('BookingsService reminders', () => {
+  it('claims and sends due booking reminders', async () => {
+    const prisma = makePrisma();
+    const email = makeEmailService();
+    const booking = makeBooking();
+    prisma.bookingReminder.findMany.mockResolvedValue([
+      {
+        bookingId: booking.id,
+        sendAt: new Date(Date.now() - 60_000),
+        status: 'PENDING',
+        booking,
+      },
+    ]);
+    const service = new BookingsService(
+      prisma as any,
+      makeSchedulingService() as any,
+      email as any,
+    );
+
+    await expect(service.processDueReminders()).resolves.toEqual({
+      processed: 1,
+    });
+
+    expect(email.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'guest@example.com',
+        subject: 'Reminder: Intro Call',
+      }),
+    );
+    expect(prisma.bookingReminder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { bookingId: 'booking-1' },
+        data: expect.objectContaining({ status: 'SENT' }),
+      }),
+    );
+  });
 });
 
 // ─── listHostBookings ─────────────────────────────────────────────────────────
@@ -124,6 +201,49 @@ describe('BookingsService – listHostBookings', () => {
     expect(result).toEqual(bookings);
     expect(prisma.booking.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { hostUserId: 'host-1' } }),
+    );
+  });
+});
+
+describe('BookingsService daily agenda', () => {
+  it('sends one agenda email per host local day inside the send window', async () => {
+    const prisma = makePrisma();
+    const email = makeEmailService();
+    const booking = makeBooking({
+      startTimeUtc: new Date('2026-06-01T10:00:00.000Z'),
+    });
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 'host-1',
+        email: 'host@example.com',
+        name: 'Host',
+        businessDisplayName: null,
+        timezone: 'UTC',
+      },
+    ]);
+    prisma.booking.findMany.mockResolvedValue([booking]);
+    const service = new BookingsService(
+      prisma as any,
+      makeSchedulingService() as any,
+      email as any,
+    );
+
+    await expect(
+      service.processDailyAgendas(new Date('2026-06-01T07:05:00.000Z')),
+    ).resolves.toEqual({ processed: 1 });
+
+    expect(prisma.dailyAgendaDelivery.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'host-1',
+        agendaDate: new Date('2026-06-01T00:00:00.000Z'),
+        status: 'PROCESSING',
+      },
+    });
+    expect(email.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'host@example.com',
+        subject: "Today's Bookvella agenda",
+      }),
     );
   });
 });

@@ -8,8 +8,12 @@ export type PublicUser = {
   id: string;
   email: string;
   hasPassword: boolean;
+  passwordSetAt: string | null;
   hasGoogleSignIn: boolean;
+  hasTwoFactor: boolean;
+  isActive: boolean;
   name: string;
+  businessDisplayName: string | null;
   slug: string;
   timezone: string;
   profileImageUrl: string | null;
@@ -142,6 +146,7 @@ export type HostReview = PublicReview & {
 export type PublicEvent = {
   host: {
     name: string;
+    businessDisplayName: string | null;
     slug: string;
     timezone: string;
     profileImageUrl: string | null;
@@ -193,6 +198,7 @@ export type AvailableSlot = {
 export type PublicHostProfile = {
   host: {
     name: string;
+    businessDisplayName: string | null;
     slug: string;
     timezone: string;
     profileImageUrl: string | null;
@@ -261,6 +267,24 @@ export type SlugAvailability = {
   normalized: string;
   available: boolean;
   reason: "invalid" | "too-short" | "reserved" | "taken" | null;
+};
+
+export type NotificationPreferenceType =
+  | "new_booking"
+  | "cancellation"
+  | "daily_agenda"
+  | "reminder_before"
+  | "product_updates";
+
+export type NotificationPreference = {
+  channel: "email" | "sms";
+  type: NotificationPreferenceType;
+  enabled: boolean;
+  timingMinutes: number | null;
+};
+
+export type NotificationPreferencesResponse = {
+  preferences: NotificationPreference[];
 };
 
 export async function checkSlugAvailability(

@@ -35,6 +35,8 @@ import {
   authedApiRequest,
   checkSlugAvailability,
   type HostBooking,
+  type NotificationPreference,
+  type NotificationPreferencesResponse,
   type PublicUser,
   publicBookingUrl,
   updateStoredUser,
@@ -58,10 +60,6 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-// Notification preferences are not yet persisted server-side — they live in
-// localStorage so the host's toggle state survives a reload while the backend
-// catches up. See Bookvella-Agent-Continuation-Brief.md "Settings — remaining
-// backend work" for the actual data model that needs to land.
 type NotificationKey =
   | "newBooking"
   | "cancellation"
@@ -83,6 +81,37 @@ const REMINDER_OPTIONS = [
   { value: "30m", label: "30 minutes before" },
   { value: "off", label: "Off" },
 ];
+
+const NOTIFICATION_TYPE_BY_KEY: Record<
+  NotificationKey,
+  NotificationPreference["type"]
+> = {
+  newBooking: "new_booking",
+  cancellation: "cancellation",
+  dailyAgenda: "daily_agenda",
+  reminderBefore: "reminder_before",
+  productUpdates: "product_updates",
+};
+
+const REMINDER_MINUTES_BY_VALUE: Record<string, number | null> = {
+  "2h": 120,
+  "1h": 60,
+  "30m": 30,
+  off: null,
+};
+
+function reminderValueFromMinutes(minutes: number | null) {
+  switch (minutes) {
+    case 30:
+      return "30m";
+    case 60:
+      return "1h";
+    case 120:
+      return "2h";
+    default:
+      return "2h";
+  }
+}
 
 export default function SettingsPage() {
   const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
@@ -946,55 +975,144 @@ function NotificationsSection() {
     NOTIFICATION_DEFAULTS,
   );
   const [reminder, setReminder] = useState("2h");
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState<NotificationKey | null>(null);
 
-  // Persist preferences locally so a reload doesn't reset toggles. Server-side
-  // notification preferences (and the actual send-side honoring of them) are
-  // tracked in the agent brief as a remaining backend task.
-  //
-  // The load runs inside a microtask so we don't call setState synchronously
-  // from the effect body (React 19 / Next 16 lint rule).
   useEffect(() => {
     let alive = true;
-    const handle = window.setTimeout(() => {
-      if (!alive) return;
+
+    async function loadPreferences() {
       try {
-        const raw = localStorage.getItem("bookvella.settings.notifications");
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as {
-          prefs?: Partial<Record<NotificationKey, boolean>>;
-          reminder?: string;
-        };
-        if (parsed.prefs) {
-          setPrefs((current) => ({ ...current, ...parsed.prefs }));
+        const response =
+          await authedApiRequest<NotificationPreferencesResponse>(
+            "/auth/me/notifications",
+          );
+        if (alive) {
+          applyNotificationResponse(response);
         }
-        if (typeof parsed.reminder === "string") setReminder(parsed.reminder);
       } catch {
-        // ignore — fall back to defaults
+        if (alive) {
+          toast.error("Could not load notification preferences");
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
       }
-    }, 0);
+    }
+
+    void loadPreferences();
+
     return () => {
       alive = false;
-      window.clearTimeout(handle);
     };
+
+    function applyNotificationResponse(
+      response: NotificationPreferencesResponse,
+    ) {
+      const nextPrefs = { ...NOTIFICATION_DEFAULTS };
+
+      for (const [key, type] of Object.entries(
+        NOTIFICATION_TYPE_BY_KEY,
+      ) as [NotificationKey, NotificationPreference["type"]][]) {
+        const preference = response.preferences.find(
+          (item) => item.channel === "email" && item.type === type,
+        );
+
+        if (!preference) continue;
+
+        nextPrefs[key] = preference.enabled;
+
+        if (key === "reminderBefore") {
+          setReminder(
+            preference.enabled
+              ? reminderValueFromMinutes(preference.timingMinutes)
+              : "off",
+          );
+        }
+      }
+
+      setPrefs(nextPrefs);
+    }
   }, []);
 
-  function persist(next: Record<NotificationKey, boolean>, nextReminder: string) {
+  async function savePreference(
+    key: NotificationKey,
+    nextPrefs: Record<NotificationKey, boolean>,
+    nextReminder: string,
+  ) {
+    setSavingKey(key);
+
     try {
-      localStorage.setItem(
-        "bookvella.settings.notifications",
-        JSON.stringify({ prefs: next, reminder: nextReminder }),
+      const response = await authedApiRequest<NotificationPreferencesResponse>(
+        "/auth/me/notifications",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            preferences: [
+              {
+                channel: "email",
+                type: NOTIFICATION_TYPE_BY_KEY[key],
+                enabled:
+                  key === "reminderBefore"
+                    ? nextReminder !== "off"
+                    : nextPrefs[key],
+                timingMinutes:
+                  key === "reminderBefore"
+                    ? REMINDER_MINUTES_BY_VALUE[nextReminder]
+                    : null,
+              },
+            ],
+          }),
+        },
       );
+
+      const savedPreference = response.preferences.find(
+        (item) =>
+          item.channel === "email" &&
+          item.type === NOTIFICATION_TYPE_BY_KEY[key],
+      );
+
+      if (savedPreference) {
+        setPrefs((current) => ({
+          ...current,
+          [key]: savedPreference.enabled,
+        }));
+
+        if (key === "reminderBefore") {
+          setReminder(
+            savedPreference.enabled
+              ? reminderValueFromMinutes(savedPreference.timingMinutes)
+              : "off",
+          );
+        }
+      }
+
+      toast.success("Notification preference saved");
     } catch {
-      // ignore
+      toast.error("Could not save notification preference");
+    } finally {
+      setSavingKey(null);
     }
   }
 
   function togglePref(key: NotificationKey) {
+    if (loading || savingKey) return;
+
     setPrefs((current) => {
       const next = { ...current, [key]: !current[key] };
-      persist(next, reminder);
+      void savePreference(key, next, reminder);
       return next;
     });
+  }
+
+  function updateReminder(value: string) {
+    if (loading || savingKey) return;
+
+    const nextPrefs = { ...prefs, reminderBefore: value !== "off" };
+    setReminder(value);
+    setPrefs(nextPrefs);
+    void savePreference("reminderBefore", nextPrefs, value);
   }
 
   return (
@@ -1002,14 +1120,17 @@ function NotificationsSection() {
       <SectionHeader
         eyebrow="Notifications"
         title="What we send you"
-        description="Preferences are saved on this device for now. Server-side honoring is on the roadmap."
+        description="Preferences are saved to your account and used for host-facing booking emails."
       />
       <Card>
         <Row
           title="New booking"
           sub="Email when a guest confirms a booking."
         >
-          <Toggle on={prefs.newBooking} onChange={() => togglePref("newBooking")} />
+          <Toggle
+            on={prefs.newBooking}
+            onChange={() => togglePref("newBooking")}
+          />
         </Row>
         <Row
           title="Cancellation"
@@ -1035,10 +1156,7 @@ function NotificationsSection() {
         >
           <Select
             value={reminder}
-            onChange={(v) => {
-              setReminder(v);
-              persist(prefs, v);
-            }}
+            onChange={updateReminder}
             options={REMINDER_OPTIONS}
             minWidth="min-w-[180px]"
           />

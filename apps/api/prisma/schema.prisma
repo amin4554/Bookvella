@@ -32,13 +32,62 @@ enum AvailabilityOverrideType {
   CUSTOM_HOURS
 }
 
+enum NotificationChannel {
+  EMAIL
+  SMS
+}
+
+enum NotificationType {
+  NEW_BOOKING
+  CANCELLATION
+  DAILY_AGENDA
+  REMINDER_BEFORE
+  PRODUCT_UPDATES
+}
+
+enum BookingReminderStatus {
+  PENDING
+  PROCESSING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum DailyAgendaStatus {
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+}
+
+enum ConnectedCalendarState {
+  ACTIVE
+  PAUSED
+  SYNC_ERROR
+  TOKEN_EXPIRED
+}
+
+enum CalendarEventSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  DELETED
+}
+
 model User {
   id               String   @id @default(uuid())
   email            String   @unique
   passwordHash     String   @map("password_hash")
   passwordSetAt    DateTime? @map("password_set_at")
   googleSub        String?  @unique @map("google_sub")
+  totpSecret       String?  @map("totp_secret")
+  totpEnabledAt    DateTime? @map("totp_enabled_at")
   name             String
+  businessDisplayName String? @map("business_display_name")
   slug             String   @unique
   timezone         String   @default("UTC")
   profileImageUrl  String?  @map("profile_image_url")
@@ -55,16 +104,25 @@ model User {
   slotIntervalMinutes Int     @default(15)  @map("slot_interval_minutes")
   dailyBookingLimit   Int?    @map("daily_booking_limit")
   showBufferTime      Boolean @default(false) @map("show_buffer_time")
+  isActive            Boolean @default(true) @map("is_active")
+  deactivatedAt       DateTime? @map("deactivated_at")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   sessions               UserSession[]
   passwordResetTokens    PasswordResetToken[]
+  accountEmailChanges    AccountEmailChange[]
+  backupCodes            UserBackupCode[]
+  notificationPreferences NotificationPreference[]
   eventTypes             EventType[]
   availabilityRules      AvailabilityRule[]
   availabilityOverrides  AvailabilityOverride[]
   bookings               Booking[]
   reviews                Review[]
+  dailyAgendaDeliveries  DailyAgendaDelivery[]
+  connectedCalendars     ConnectedCalendar[]
+  bookingFeed            BookingFeed?
+  accountDeletionRequest AccountDeletionRequest?
 
   @@map("users")
 }
@@ -84,10 +142,58 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model AccountEmailChange {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  newEmail  String   @map("new_email")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("account_email_changes")
+}
+
+model UserBackupCode {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  codeHash  String   @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@index([userId])
+  @@map("user_backup_codes")
+}
+
+model NotificationPreference {
+  userId        String              @map("user_id")
+  channel       NotificationChannel
+  type          NotificationType
+  enabled       Boolean             @default(true)
+  timingMinutes Int?                @map("timing_minutes")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, channel, type])
+  @@map("notification_preferences")
+}
+
 model UserSession {
   id               String   @id @default(uuid())
   userId           String   @map("user_id")
   refreshTokenHash String   @map("refresh_token_hash")
+  userAgent        String?  @map("user_agent")
+  ipAddress        String?  @map("ip_address")
+  ipRegion         String?  @map("ip_region")
   expiresAt        DateTime @map("expires_at")
   isActive         Boolean  @default(true) @map("is_active")
   lastUsedAt       DateTime @default(now()) @map("last_used_at")
@@ -186,10 +292,131 @@ model Booking {
   eventType EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
   host      User      @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
   review    Review?
+  reminder  BookingReminder?
+  calendarSyncs CalendarEventSync[]
 
   @@index([hostUserId, startTimeUtc])
   @@index([eventTypeId])
   @@map("bookings")
+}
+
+model BookingReminder {
+  bookingId String                @id @map("booking_id")
+  sendAt    DateTime              @map("send_at")
+  status    BookingReminderStatus @default(PENDING)
+  sentAt    DateTime?             @map("sent_at")
+  lastError String?               @map("last_error")
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@map("booking_reminders")
+}
+
+model DailyAgendaDelivery {
+  userId     String            @map("user_id")
+  agendaDate DateTime          @db.Date @map("agenda_date")
+  status     DailyAgendaStatus @default(PROCESSING)
+  sentAt     DateTime?         @map("sent_at")
+  lastError  String?           @map("last_error")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, agendaDate])
+  @@index([status, agendaDate])
+  @@map("daily_agenda_deliveries")
+}
+
+model ConnectedCalendar {
+  id                    String                 @id @default(uuid())
+  userId                String                 @map("user_id")
+  provider              CalendarProvider
+  accountEmail          String                 @map("account_email")
+  accessTokenEncrypted  String                 @map("access_token_encrypted")
+  refreshTokenEncrypted String?                @map("refresh_token_encrypted")
+  accessTokenExpiresAt  DateTime?              @map("access_token_expires_at")
+  scopes                String[]               @default([])
+  conflictsOn           Boolean                @default(true) @map("conflicts_on")
+  writeBackCalendarId   String?                @map("write_back_calendar_id")
+  markBufferBusy        Boolean                @default(true) @map("mark_buffer_busy")
+  includeGuestDetails   Boolean                @default(true) @map("include_guest_details")
+  state                 ConnectedCalendarState @default(ACTIVE)
+  lastSyncedAt          DateTime?              @map("last_synced_at")
+  lastSyncError         String?                @map("last_sync_error")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conflictCalendars ConflictCalendar[]
+  eventSyncs        CalendarEventSync[]
+
+  @@unique([userId, provider, accountEmail])
+  @@index([userId, provider])
+  @@map("connected_calendars")
+}
+
+model ConflictCalendar {
+  id                  String   @id @default(uuid())
+  connectedCalendarId String   @map("connected_calendar_id")
+  providerCalendarId  String   @map("provider_calendar_id")
+  name                String
+  color               String?
+  enabled             Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  connectedCalendar ConnectedCalendar @relation(fields: [connectedCalendarId], references: [id], onDelete: Cascade)
+
+  @@unique([connectedCalendarId, providerCalendarId])
+  @@map("conflict_calendars")
+}
+
+model CalendarEventSync {
+  id                  String                  @id @default(uuid())
+  bookingId           String                  @map("booking_id")
+  connectedCalendarId String                  @map("connected_calendar_id")
+  providerEventId     String?                 @map("provider_event_id")
+  providerCalendarId  String?                 @map("provider_calendar_id")
+  syncStatus          CalendarEventSyncStatus @default(PENDING) @map("sync_status")
+  lastError           String?                 @map("last_error")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+
+  booking           Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  connectedCalendar ConnectedCalendar @relation(fields: [connectedCalendarId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, connectedCalendarId])
+  @@index([connectedCalendarId])
+  @@map("calendar_event_syncs")
+}
+
+model BookingFeed {
+  userId         String   @id @map("user_id")
+  tokenHash      String   @unique @map("token_hash")
+  tokenEncrypted String   @map("token_encrypted")
+  createdAt      DateTime @default(now()) @map("created_at")
+  rotatedAt      DateTime? @map("rotated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("booking_feeds")
+}
+
+model AccountDeletionRequest {
+  userId      String   @id @map("user_id")
+  tokenHash   String   @unique @map("token_hash")
+  expiresAt   DateTime @map("expires_at")
+  confirmedAt DateTime? @map("confirmed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("account_deletion_requests")
 }
 
 model OtpVerification {

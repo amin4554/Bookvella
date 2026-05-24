@@ -2,6 +2,7 @@ export type RegisterDto = {
   email?: string;
   password?: string;
   name?: string;
+  businessDisplayName?: string | null;
   slug?: string;
   timezone?: string;
 };
@@ -9,6 +10,7 @@ export type RegisterDto = {
 export type LoginDto = {
   email?: string;
   password?: string;
+  totpCode?: string;
 };
 
 export type RefreshTokenDto = {
@@ -33,8 +35,40 @@ export type ResetPasswordDto = {
   newPassword?: string;
 };
 
+export type RequestEmailChangeDto = {
+  newEmail?: string;
+};
+
+export type ConfirmEmailChangeDto = {
+  token?: string;
+};
+
+export type TotpVerifyDto = {
+  code?: string;
+};
+
+export type TotpDisableDto = {
+  code?: string;
+};
+
+export type NotificationPreferenceDto = {
+  channel?: string;
+  type?: string;
+  enabled?: boolean;
+  timingMinutes?: number | null;
+};
+
+export type UpdateNotificationPreferencesDto = {
+  preferences?: NotificationPreferenceDto[];
+};
+
+export type ConfirmAccountDeletionDto = {
+  token?: string;
+};
+
 export type UpdateMeDto = {
   name?: string;
+  businessDisplayName?: string | null;
   slug?: string;
   timezone?: string;
   profileImageUrl?: string | null;
@@ -46,6 +80,7 @@ export type UpdateMeDto = {
   whatToExpect?: string | null;
   websiteUrl?: string | null;
   instagramUrl?: string | null;
+  isActive?: boolean;
 };
 
 export type GoogleAuthDto = {

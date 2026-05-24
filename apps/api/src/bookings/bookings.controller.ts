@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { BookingsService } from './bookings.service';
 import type { CreatePublicBookingDto, RequestBookingCodeDto } from './dto';
 
@@ -22,6 +23,19 @@ export class BookingsController {
     @Body() dto: CreatePublicBookingDto,
   ) {
     return this.bookingsService.createPublicBooking(hostSlug, eventSlug, dto);
+  }
+
+  @Get('feeds/:token')
+  async feed(
+    @Param('token') token: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    response.setHeader(
+      'Content-Disposition',
+      'inline; filename="bookvella.ics"',
+    );
+    return this.bookingsService.renderIcsFeed(token);
   }
 
   @Get('bookings/guest-cancel/:token')

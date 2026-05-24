@@ -16,8 +16,12 @@ export type PublicUser = {
   id: string;
   email: string;
   hasPassword: boolean;
+  passwordSetAt: string | null;
   hasGoogleSignIn: boolean;
+  hasTwoFactor: boolean;
+  isActive: boolean;
   name: string;
+  businessDisplayName: string | null;
   slug: string;
   timezone: string;
   profileImageUrl: string | null;

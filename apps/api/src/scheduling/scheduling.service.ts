@@ -1,9 +1,12 @@
 import {
   BadRequestException,
+  GoneException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
+import { CalendarService } from '../calendar/calendar.service';
 import {
   addLocalDays,
   assertTimeZone,
@@ -22,7 +25,10 @@ type OverrideBlock = { startMinute: number; endMinute: number };
 
 @Injectable()
 export class SchedulingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly calendarService?: CalendarService,
+  ) {}
 
   async getPublicEvent(hostSlug: string, eventSlug: string) {
     const eventType = await this.prisma.eventType.findFirst({
@@ -31,6 +37,7 @@ export class SchedulingService {
         isActive: true,
         user: {
           slug: hostSlug,
+          isActive: true,
         },
       },
       include: {
@@ -69,6 +76,7 @@ export class SchedulingService {
     return {
       host: {
         name: eventType.user.name,
+        businessDisplayName: eventType.user.businessDisplayName,
         slug: eventType.user.slug,
         timezone: eventType.user.timezone,
         profileImageUrl: eventType.user.profileImageUrl,
@@ -131,6 +139,10 @@ export class SchedulingService {
       throw new NotFoundException('Public host not found');
     }
 
+    if (!host.isActive) {
+      throw new GoneException('Public profile is currently unavailable');
+    }
+
     // Review aggregates across ALL visible reviews for the host, plus a
     // breakdown by star count so the public profile can render a distribution
     // bar without loading every row.
@@ -181,6 +193,7 @@ export class SchedulingService {
     return {
       host: {
         name: host.name,
+        businessDisplayName: host.businessDisplayName,
         slug: host.slug,
         timezone: host.timezone,
         profileImageUrl: host.profileImageUrl,
@@ -245,6 +258,7 @@ export class SchedulingService {
         isActive: true,
         user: {
           slug: input.hostSlug,
+          isActive: true,
         },
       },
       include: {
@@ -344,6 +358,13 @@ export class SchedulingService {
         booking.endTimeUtc.getTime() +
         booking.eventType.bufferAfterMinutes * 60_000,
     }));
+    const externalBusyIntervals =
+      (await this.calendarService?.getBusyIntervals(
+        host.id,
+        effectiveStart,
+        effectiveEnd,
+      )) ?? [];
+    busyIntervals.push(...externalBusyIntervals);
 
     // Pre-compute existing bookings per host-local date so we can enforce the
     // daily booking limit without re-scanning the booking list inside the loop.

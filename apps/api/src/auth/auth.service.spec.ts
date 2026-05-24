@@ -1,6 +1,6 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { createPrivateKey, sign } from 'crypto';
+import { createHash, createPrivateKey, sign } from 'crypto';
 import { AuthService } from './auth.service';
 
 // Minimal User shape matching what Prisma returns
@@ -12,7 +12,13 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     slug: 'alice',
     timezone: 'UTC',
     passwordHash: '',
+    passwordSetAt: new Date('2026-01-01T00:00:00.000Z'),
     googleSub: null,
+    totpSecret: null,
+    totpEnabledAt: null,
+    isActive: true,
+    deactivatedAt: null,
+    businessDisplayName: null,
     profileImageUrl: null,
     coverImageUrl: null,
     headline: null,
@@ -42,6 +48,33 @@ function makePrisma() {
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    accountEmailChange: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    userBackupCode: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      createMany: jest.fn().mockResolvedValue({ count: 10 }),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    notificationPreference: {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    accountDeletionRequest: {
+      upsert: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    $transaction: jest.fn(async (callbackOrQueries) =>
+      Array.isArray(callbackOrQueries)
+        ? Promise.all(callbackOrQueries)
+        : callbackOrQueries(makePrisma()),
+    ),
   };
 }
 
@@ -84,12 +117,14 @@ describe('AuthService – verifyAccessToken', () => {
       email: 'alice@example.com',
       slug: 'alice',
       iat: now - 100,
-      exp: now - 1,           // already expired
+      exp: now - 1, // already expired
     };
     const header = Buffer.from(
       JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'test' }),
     ).toString('base64url');
-    const body = Buffer.from(JSON.stringify(expiredPayload)).toString('base64url');
+    const body = Buffer.from(JSON.stringify(expiredPayload)).toString(
+      'base64url',
+    );
     const privateKey = createPrivateKey((service as any).privateKeyPem);
     const sig = sign(
       'RSA-SHA256',
@@ -97,9 +132,9 @@ describe('AuthService – verifyAccessToken', () => {
       privateKey,
     ).toString('base64url');
 
-    expect(() =>
-      service.verifyAccessToken(`${header}.${body}.${sig}`),
-    ).toThrow(UnauthorizedException);
+    expect(() => service.verifyAccessToken(`${header}.${body}.${sig}`)).toThrow(
+      UnauthorizedException,
+    );
   });
 });
 
@@ -128,9 +163,13 @@ describe('AuthService – login', () => {
     // Build a real PBKDF2 hash for "correct-password"
     const { pbkdf2Sync, randomBytes } = require('crypto');
     const salt = randomBytes(16).toString('base64url');
-    const hash = pbkdf2Sync('correct-password', salt, 310000, 32, 'sha256').toString(
-      'base64url',
-    );
+    const hash = pbkdf2Sync(
+      'correct-password',
+      salt,
+      310000,
+      32,
+      'sha256',
+    ).toString('base64url');
     const passwordHash = `pbkdf2_sha256$310000$${salt}$${hash}`;
 
     prisma.user.findUnique.mockResolvedValue(makeUser({ passwordHash }));
@@ -144,6 +183,21 @@ describe('AuthService – login', () => {
     await expect(
       service.login({ email: 'not-an-email', password: 'password123' }),
     ).rejects.toThrow();
+  });
+
+  it('requires a two-factor code when TOTP is enabled', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({
+        passwordHash: createTestPasswordHash('password123'),
+        totpSecret: 'JBSWY3DPEHPK3PXP',
+        totpEnabledAt: new Date(),
+      }),
+    );
+
+    await expect(
+      service.login({ email: 'alice@example.com', password: 'password123' }),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(prisma.userSession.create).not.toHaveBeenCalled();
   });
 });
 
@@ -212,3 +266,383 @@ describe('AuthService – register', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('AuthService email change', () => {
+  let service: AuthService;
+  let prisma: ReturnType<typeof makePrisma>;
+  let emailService: { sendMail: jest.Mock };
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    emailService = {
+      sendMail: jest.fn().mockResolvedValue({ delivered: true }),
+    };
+    service = new AuthService(prisma as any, emailService as any);
+  });
+
+  it('creates a single-use confirmation token and sends it to the new email', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.requestEmailChange(
+        {
+          sub: 'user-1',
+          email: 'alice@example.com',
+          slug: 'alice',
+          iat: 1,
+          exp: 2,
+        },
+        { newEmail: ' New@Example.com ' },
+      ),
+    ).resolves.toMatchObject({ success: true });
+
+    expect(prisma.accountEmailChange.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', usedAt: null },
+      data: { usedAt: expect.any(Date) },
+    });
+    expect(prisma.accountEmailChange.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        newEmail: 'new@example.com',
+        tokenHash: expect.any(String),
+        expiresAt: expect.any(Date),
+      },
+    });
+    expect(emailService.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'new@example.com',
+        subject: 'Confirm your new Bookvella email',
+      }),
+    );
+  });
+
+  it('confirms a pending email change, revokes sessions, and notifies the old email', async () => {
+    const token = '123456';
+    const pending = {
+      id: 'change-1',
+      userId: 'user-1',
+      newEmail: 'new@example.com',
+      tokenHash: hashTestEmailChangeToken('user-1', 'new@example.com', token),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      usedAt: null,
+      createdAt: new Date(),
+      user: makeUser(),
+    };
+    const tx = makePrisma();
+    tx.user.update.mockResolvedValue(makeUser({ email: 'new@example.com' }));
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    prisma.accountEmailChange.findFirst.mockResolvedValue(pending);
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.confirmEmailChange(
+        {
+          sub: 'user-1',
+          email: 'alice@example.com',
+          slug: 'alice',
+          iat: 1,
+          exp: 2,
+        },
+        { token },
+      ),
+    ).resolves.toMatchObject({
+      success: true,
+      user: expect.objectContaining({ email: 'new@example.com' }),
+    });
+
+    expect(tx.accountEmailChange.update).toHaveBeenCalledWith({
+      where: { id: 'change-1' },
+      data: { usedAt: expect.any(Date) },
+    });
+    expect(tx.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', isActive: true },
+      data: { isActive: false, lastUsedAt: expect.any(Date) },
+    });
+    expect(emailService.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'alice@example.com',
+        subject: 'Your Bookvella email was changed',
+      }),
+    );
+  });
+});
+
+describe('AuthService Google disconnect', () => {
+  let service: AuthService;
+  let prisma: ReturnType<typeof makePrisma>;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    service = new AuthService(prisma as any);
+  });
+
+  it('disconnects Google sign-in when the account has a password', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({ googleSub: 'google-sub-1' }),
+    );
+    prisma.user.update.mockResolvedValue(makeUser({ googleSub: null }));
+
+    await expect(
+      service.disconnectGoogle({
+        sub: 'user-1',
+        email: 'alice@example.com',
+        slug: 'alice',
+        iat: 1,
+        exp: 2,
+      }),
+    ).resolves.toMatchObject({
+      hasGoogleSignIn: false,
+    });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { googleSub: null },
+    });
+  });
+
+  it('requires a password before disconnecting Google sign-in', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({ googleSub: 'google-sub-1', passwordSetAt: null }),
+    );
+
+    await expect(
+      service.disconnectGoogle({
+        sub: 'user-1',
+        email: 'alice@example.com',
+        slug: 'alice',
+        iat: 1,
+        exp: 2,
+      }),
+    ).rejects.toThrow('Add a password before disconnecting Google sign-in');
+  });
+});
+
+describe('AuthService two-factor enrollment', () => {
+  let service: AuthService;
+  let prisma: ReturnType<typeof makePrisma>;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    service = new AuthService(prisma as any);
+  });
+
+  it('starts TOTP enrollment with a generated secret and otpauth URL', async () => {
+    prisma.user.findUnique.mockResolvedValue(makeUser());
+
+    await expect(
+      service.enrollTotp({
+        sub: 'user-1',
+        email: 'alice@example.com',
+        slug: 'alice',
+        iat: 1,
+        exp: 2,
+      }),
+    ).resolves.toMatchObject({
+      secret: expect.any(String),
+      otpauthUrl: expect.stringContaining('otpauth://totp/'),
+    });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        totpSecret: expect.any(String),
+        totpEnabledAt: null,
+      },
+    });
+    expect(prisma.userBackupCode.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+  });
+});
+
+describe('AuthService sessions', () => {
+  let service: AuthService;
+  let prisma: ReturnType<typeof makePrisma>;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    service = new AuthService(prisma as any);
+  });
+
+  it('captures session metadata and marks the current session in the list', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue(makeUser());
+
+    const issued = await service.register(
+      {
+        email: 'alice@example.com',
+        password: 'password123',
+        name: 'Alice',
+        timezone: 'UTC',
+      },
+      {
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36',
+        ipAddress: '127.0.0.1',
+      },
+    );
+    const createdSession = prisma.userSession.create.mock.calls[0][0].data;
+
+    expect(createdSession).toMatchObject({
+      userAgent: expect.stringContaining('Chrome'),
+      ipAddress: '127.0.0.1',
+      ipRegion: 'Local network',
+    });
+
+    prisma.userSession.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        userId: 'user-1',
+        refreshTokenHash: createdSession.refreshTokenHash,
+        userAgent: createdSession.userAgent,
+        ipAddress: createdSession.ipAddress,
+        ipRegion: createdSession.ipRegion,
+        expiresAt: new Date(Date.now() + 60_000),
+        isActive: true,
+        lastUsedAt: new Date(),
+        createdAt: new Date(),
+      },
+    ]);
+
+    await expect(
+      service.listSessions(
+        {
+          sub: 'user-1',
+          email: 'alice@example.com',
+          slug: 'alice',
+          iat: 1,
+          exp: 2,
+        },
+        issued.refreshToken,
+      ),
+    ).resolves.toMatchObject([
+      {
+        id: 'session-1',
+        isCurrent: true,
+        browser: 'Chrome',
+        os: 'Windows',
+        deviceLabel: 'Chrome on Windows',
+        ipRegion: 'Local network',
+      },
+    ]);
+  });
+});
+
+describe('AuthService notification preferences', () => {
+  let service: AuthService;
+  let prisma: ReturnType<typeof makePrisma>;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    service = new AuthService(prisma as any);
+  });
+
+  it('returns defaults merged with saved notification preferences', async () => {
+    prisma.notificationPreference.findMany.mockResolvedValue([
+      {
+        userId: 'user-1',
+        channel: 'EMAIL',
+        type: 'PRODUCT_UPDATES',
+        enabled: true,
+        timingMinutes: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    await expect(
+      service.getNotificationPreferences({
+        sub: 'user-1',
+        email: 'alice@example.com',
+        slug: 'alice',
+        iat: 1,
+        exp: 2,
+      }),
+    ).resolves.toMatchObject({
+      preferences: expect.arrayContaining([
+        {
+          channel: 'email',
+          type: 'new_booking',
+          enabled: true,
+          timingMinutes: null,
+        },
+        {
+          channel: 'email',
+          type: 'product_updates',
+          enabled: true,
+          timingMinutes: null,
+        },
+      ]),
+    });
+  });
+
+  it('upserts notification preferences through the authenticated settings endpoint', async () => {
+    prisma.notificationPreference.upsert.mockResolvedValue({});
+
+    await expect(
+      service.updateNotificationPreferences(
+        {
+          sub: 'user-1',
+          email: 'alice@example.com',
+          slug: 'alice',
+          iat: 1,
+          exp: 2,
+        },
+        {
+          preferences: [
+            {
+              channel: 'email',
+              type: 'reminder_before',
+              enabled: true,
+              timingMinutes: 60,
+            },
+          ],
+        },
+      ),
+    ).resolves.toMatchObject({
+      preferences: expect.any(Array),
+    });
+
+    expect(prisma.notificationPreference.upsert).toHaveBeenCalledWith({
+      where: {
+        userId_channel_type: {
+          userId: 'user-1',
+          channel: 'EMAIL',
+          type: 'REMINDER_BEFORE',
+        },
+      },
+      create: {
+        userId: 'user-1',
+        channel: 'EMAIL',
+        type: 'REMINDER_BEFORE',
+        enabled: true,
+        timingMinutes: 60,
+      },
+      update: {
+        enabled: true,
+        timingMinutes: 60,
+      },
+    });
+  });
+});
+
+function hashTestEmailChangeToken(
+  userId: string,
+  newEmail: string,
+  token: string,
+) {
+  return createHash('sha256')
+    .update(`${userId}\0${newEmail}\0${token}`)
+    .digest('base64url');
+}
+
+function createTestPasswordHash(password: string) {
+  const { pbkdf2Sync, randomBytes } = require('crypto');
+  const salt = randomBytes(16).toString('base64url');
+  const hash = pbkdf2Sync(password, salt, 310000, 32, 'sha256').toString(
+    'base64url',
+  );
+  return `pbkdf2_sha256$310000$${salt}$${hash}`;
+}
