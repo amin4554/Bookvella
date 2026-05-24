@@ -9,6 +9,7 @@ import {
   type HostBooking,
   type PublicEvent,
 } from "@/lib/api";
+import { LegalFooter } from "@/components/legal-footer";
 import { detectBrowserTimezone } from "@/lib/timezones";
 import { ServiceAside } from "./service-aside";
 import { Stepper, type BookingStep } from "./stepper";
@@ -393,6 +394,7 @@ export function PublicBooking({
           ) : null}
         </main>
       </div>
+      <LegalFooter />
     </div>
   );
 }

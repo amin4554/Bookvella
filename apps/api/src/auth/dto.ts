@@ -19,6 +19,20 @@ export type LogoutDto = {
   refreshToken?: string;
 };
 
+export type ChangePasswordDto = {
+  currentPassword?: string;
+  newPassword?: string;
+};
+
+export type RequestPasswordResetDto = {
+  email?: string;
+};
+
+export type ResetPasswordDto = {
+  token?: string;
+  newPassword?: string;
+};
+
 export type UpdateMeDto = {
   name?: string;
   slug?: string;

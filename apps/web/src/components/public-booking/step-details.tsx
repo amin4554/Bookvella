@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { Check } from "lucide-react";
 import type { PublicEvent } from "@/lib/api";
 import {
@@ -126,11 +127,14 @@ export function StepDetails({
             </span>
             <span className="leading-snug">
               I agree to Bookvella&apos;s{" "}
-              <a className="font-bold text-[#FF5F63] hover:underline" href="#">
+              <Link className="font-bold text-[#FF5F63] hover:underline" href="/legal/terms">
                 terms
-              </a>{" "}
-              and acknowledge how my details are used to confirm and remind me
-              of this booking.
+              </Link>{" "}
+              and acknowledge the{" "}
+              <Link className="font-bold text-[#FF5F63] hover:underline" href="/legal/privacy">
+                Privacy Policy
+              </Link>{" "}
+              for booking confirmation and reminder emails.
             </span>
           </label>
 

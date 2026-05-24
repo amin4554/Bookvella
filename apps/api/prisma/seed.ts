@@ -1,6 +1,6 @@
 import '../src/config/load-env';
 import { BookingStatus, LocationType, PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { hashPassword } from '../src/auth/password';
 
 const prisma = new PrismaClient();
 
@@ -15,11 +15,12 @@ async function main() {
     },
   });
 
-  const passwordHash = await bcrypt.hash(demoPassword, 12);
+  const passwordHash = hashPassword(demoPassword);
   const host = await prisma.user.create({
     data: {
       email: demoEmail,
       passwordHash,
+      passwordSetAt: new Date(),
       name: 'Marcus Williams',
       slug: demoSlug,
       timezone: 'America/New_York',

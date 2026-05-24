@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Check, Star } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { LegalFooter } from "@/components/legal-footer";
 
 export default function Home() {
   return (
@@ -11,7 +12,7 @@ export default function Home() {
       <HowItWorks />
       <Examples />
       <ClosingCta />
-      <SiteFooter />
+      <LegalFooter />
     </main>
   );
 }
@@ -544,34 +545,5 @@ function ClosingCta() {
         </div>
       </div>
     </section>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer className="bg-[#0B1220] text-white">
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-6 px-6 py-7">
-        <div className="flex items-center gap-2.5">
-          <BrandLogo inverse />
-        </div>
-        <nav className="flex flex-wrap items-center gap-x-8 gap-y-2 text-[13px] text-white/70">
-          <a href="#" className="hover:text-white">
-            About
-          </a>
-          <a href="#" className="hover:text-white">
-            Privacy
-          </a>
-          <a href="#" className="hover:text-white">
-            Terms
-          </a>
-          <a href="#" className="hover:text-white">
-            Contact
-          </a>
-        </nav>
-        <p className="text-[12px] text-white/50">
-          © 2026 Bookvella. Made with care.
-        </p>
-      </div>
-    </footer>
   );
 }

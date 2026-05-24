@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarX, CheckCircle, Clock3 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { LegalFooter } from "@/components/legal-footer";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api";
 
@@ -28,16 +29,19 @@ export default function CancelPage() {
 
 function CancelPageShell() {
   return (
-    <div className="min-h-screen bg-[#FFFBF7] px-4 py-12">
-      <div className="mx-auto w-full max-w-[480px]">
-        <div className="mb-8 flex justify-center">
-          <BrandLogo />
-        </div>
+    <div className="min-h-screen bg-[#FFFBF7]">
+      <div className="px-4 py-12">
+        <div className="mx-auto w-full max-w-[480px]">
+          <div className="mb-8 flex justify-center">
+            <BrandLogo />
+          </div>
 
-        <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
-          <p className="text-sm text-[#6B7280]">Loading booking details...</p>
+          <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
+            <p className="text-sm text-[#6B7280]">Loading booking details...</p>
+          </div>
         </div>
       </div>
+      <LegalFooter />
     </div>
   );
 }
@@ -51,13 +55,12 @@ function CancelPageContent() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const invalidToken = !token;
+  const visibleLoading = !invalidToken && loading;
+  const visibleError = invalidToken ? "Invalid cancellation link." : error;
 
   useEffect(() => {
-    if (!token) {
-      setError("Invalid cancellation link.");
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     apiRequest<BookingSummary>(`/public/bookings/guest-cancel/${token}`)
       .then((data) => {
@@ -96,27 +99,28 @@ function CancelPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] px-4 py-12">
+    <div className="min-h-screen bg-[#FFFBF7]">
+      <div className="px-4 py-12">
       <div className="mx-auto w-full max-w-[480px]">
         <div className="mb-8 flex justify-center">
           <BrandLogo />
         </div>
 
-        {loading && (
+        {visibleLoading && (
           <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
             <p className="text-sm text-[#6B7280]">Loading booking details...</p>
           </div>
         )}
 
-        {!loading && error && (
+        {!visibleLoading && visibleError && (
           <div className="rounded-[24px] border border-red-200 bg-white p-8 text-center shadow-sm">
             <CalendarX className="mx-auto mb-4 size-10 text-red-400" />
             <h1 className="text-xl font-bold">Link not found</h1>
-            <p className="mt-2 text-sm text-[#6B7280]">{error}</p>
+            <p className="mt-2 text-sm text-[#6B7280]">{visibleError}</p>
           </div>
         )}
 
-        {!loading && !error && cancelled && (
+        {!visibleLoading && !visibleError && cancelled && (
           <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
             <CheckCircle className="mx-auto mb-4 size-10 text-[#16A34A]" />
             <h1 className="text-xl font-bold">Booking cancelled</h1>
@@ -127,7 +131,7 @@ function CancelPageContent() {
           </div>
         )}
 
-        {!loading && !error && !cancelled && booking && (
+        {!visibleLoading && !visibleError && !cancelled && booking && (
           <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 shadow-sm">
             <h1 className="text-2xl font-bold">Cancel your booking?</h1>
             <p className="mt-1 text-sm text-[#6B7280]">
@@ -178,6 +182,8 @@ function CancelPageContent() {
           </div>
         )}
       </div>
+      </div>
+      <LegalFooter />
     </div>
   );
 }

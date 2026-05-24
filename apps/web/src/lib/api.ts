@@ -7,6 +7,8 @@ export type PriceType = "FIXED" | "FROM" | "RANGE" | "FREE";
 export type PublicUser = {
   id: string;
   email: string;
+  hasPassword: boolean;
+  hasGoogleSignIn: boolean;
   name: string;
   slug: string;
   timezone: string;

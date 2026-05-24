@@ -31,6 +31,7 @@ model User {
   id               String   @id @default(uuid())
   email            String   @unique
   passwordHash     String   @map("password_hash")
+  passwordSetAt    DateTime? @map("password_set_at")
   googleSub        String?  @unique @map("google_sub")
   name             String
   slug             String   @unique
@@ -48,6 +49,7 @@ model User {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   sessions               UserSession[]
+  passwordResetTokens    PasswordResetToken[]
   eventTypes             EventType[]
   availabilityRules      AvailabilityRule[]
   availabilityOverrides  AvailabilityOverride[]
@@ -55,6 +57,21 @@ model User {
   reviews                Review[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model UserSession {

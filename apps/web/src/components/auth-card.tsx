@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { LegalInlineLinks } from "@/components/legal-footer";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   apiRequest,
@@ -276,8 +277,9 @@ export function AuthCard({
       </div>
 
       <p className="mt-12 text-center text-[11px] text-[#9CA3AF] lg:mt-auto lg:text-left">
-        © 2026 Bookvella. Made for independent pros.
+        Copyright 2026 Bookvella. Made for independent pros.
       </p>
+      <LegalInlineLinks className="mt-2 justify-center lg:justify-start" />
     </div>
   );
 
@@ -393,12 +395,12 @@ function LoginForm({
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
             Password
           </span>
-          <a
-            href="#"
+          <Link
+            href="/forgot-password"
             className="text-xs font-semibold text-[#FF5F63] hover:underline"
           >
             Forgot password?
-          </a>
+          </Link>
         </div>
         <div className="relative mt-1.5">
           <input
@@ -701,13 +703,13 @@ function RegisterForm({
 
       <p className="text-center text-[12px] leading-relaxed text-[#9CA3AF]">
         By signing up you agree to our{" "}
-        <a href="#" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
+        <Link href="/legal/terms" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
           Terms of Service
-        </a>{" "}
+        </Link>{" "}
         and{" "}
-        <a href="#" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
+        <Link href="/legal/privacy" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
           Privacy Policy
-        </a>
+        </Link>
         .
       </p>
     </form>

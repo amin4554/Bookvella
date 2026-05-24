@@ -29,6 +29,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { LegalFooter } from "@/components/legal-footer";
 import {
   authedApiRequest,
   clearAuthSession,
@@ -167,43 +168,46 @@ export function AppShell({
   const bookingLink = publicAppUrl(`/${userSlug}`);
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#0B1220] lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
-      <DesktopSidebar
-        active={active}
-        bookingCount={bookingCount}
-        userName={userName}
-        userInitial={userInitial}
-        userSlug={userSlug}
-        userProfileImage={userProfileImage}
-        bookingLink={bookingLink}
-        onLogout={logout}
-      />
+    <>
+      <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#0B1220] lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
+        <DesktopSidebar
+          active={active}
+          bookingCount={bookingCount}
+          userName={userName}
+          userInitial={userInitial}
+          userSlug={userSlug}
+          userProfileImage={userProfileImage}
+          bookingLink={bookingLink}
+          onLogout={logout}
+        />
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#EEE7DF] bg-white px-5 lg:hidden">
-          <div className="lg:hidden">
-            <BrandLogo />
-          </div>
-          <h1 className="hidden text-lg font-semibold lg:block">{title}</h1>
-          <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
-            {userProfileImage ? (
-              <div
-                className="size-full bg-cover bg-center"
-                style={{ backgroundImage: `url(${userProfileImage})` }}
-              />
-            ) : (
-              userInitial
-            )}
-          </div>
-        </header>
+        <div className="min-w-0">
+          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#EEE7DF] bg-white px-5 lg:hidden">
+            <div className="lg:hidden">
+              <BrandLogo />
+            </div>
+            <h1 className="hidden text-lg font-semibold lg:block">{title}</h1>
+            <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
+              {userProfileImage ? (
+                <div
+                  className="size-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${userProfileImage})` }}
+                />
+              ) : (
+                userInitial
+              )}
+            </div>
+          </header>
 
-        <MobileNav active={active} bookingCount={bookingCount} />
+          <MobileNav active={active} bookingCount={bookingCount} />
 
-        <main className="px-5 py-8 lg:px-10 lg:py-10">
-          <div className="mx-auto max-w-[1380px]">{children}</div>
-        </main>
+          <main className="px-5 py-8 lg:px-10 lg:py-10">
+            <div className="mx-auto max-w-[1380px]">{children}</div>
+          </main>
+        </div>
       </div>
-    </div>
+      <LegalFooter />
+    </>
   );
 }
 
@@ -434,8 +438,8 @@ function DesktopSidebar({
               </span>
             </button>
             <MenuRow
-              as="a"
-              href="mailto:support@bookvella.com"
+              as={Link}
+              href="/legal/contact"
               icon={
                 <LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
               }

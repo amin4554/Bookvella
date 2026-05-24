@@ -10,28 +10,32 @@ import {
   createPrivateKey,
   createPublicKey,
   generateKeyPairSync,
-  pbkdf2Sync,
   randomBytes,
   sign,
-  timingSafeEqual,
   verify,
 } from 'crypto';
 import { slugify } from '../common/slug';
 import { optionalText, requireText } from '../common/validation';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AccessTokenPayload, PublicUser } from './auth.types';
 import type {
+  ChangePasswordDto,
   GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
   UpdateMeDto,
 } from './dto';
+import { hashPassword, verifyPassword } from './password';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 90;
 const MAX_ACTIVE_SESSIONS = 2;
+const PASSWORD_RESET_TTL_MINUTES = 30;
 
 type GoogleTokenInfo = {
   aud?: string;
@@ -49,7 +53,10 @@ export class AuthService {
   private readonly privateKeyPem: string;
   private readonly publicKeyPem: string;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService = new EmailService(),
+  ) {
     const privateKey = normalizePem(process.env.JWT_PRIVATE_KEY);
     const publicKey = normalizePem(process.env.JWT_PUBLIC_KEY);
 
@@ -87,6 +94,7 @@ export class AuthService {
         data: {
           email,
           passwordHash: hashPassword(password),
+          passwordSetAt: new Date(),
           name,
           slug,
           timezone,
@@ -113,8 +121,21 @@ export class AuthService {
     const password = requirePassword(dto.password);
     const user = await this.prisma.user.findUnique({ where: { email } });
 
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!user?.passwordSetAt) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const passwordCheck = verifyPassword(password, user.passwordHash);
+
+    if (!passwordCheck.valid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (passwordCheck.needsRehash) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: hashPassword(password) },
+      });
     }
 
     return this.issueTokenPair(user);
@@ -154,6 +175,7 @@ export class AuthService {
       data: {
         email,
         passwordHash: hashPassword(createRefreshToken()),
+        passwordSetAt: null,
         googleSub: profile.sub,
         name,
         slug: await this.createUniqueSlug(name),
@@ -236,6 +258,85 @@ export class AuthService {
     return {
       success: result.count > 0,
     };
+  }
+
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const email = normalizeEmail(dto.email);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      const token = createResetToken();
+      const now = new Date();
+      const expiresAt = new Date(
+        now.getTime() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000,
+      );
+
+      await this.prisma.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: now,
+        },
+      });
+
+      await this.prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: hashResetToken(token),
+          expiresAt,
+        },
+      });
+
+      await this.sendPasswordResetEmail(user, token, expiresAt);
+    }
+
+    return {
+      success: true,
+      message:
+        'If that email belongs to a Bookvella account, a reset link has been sent.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const token = requireText(dto.token, 'token');
+    const newPassword = requirePassword(dto.newPassword);
+    const reset = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: hashResetToken(token) },
+      include: { user: true },
+    });
+
+    if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
+      throw new BadRequestException(
+        'Password reset link is invalid or expired',
+      );
+    }
+
+    const now = new Date();
+    await this.prisma.passwordResetToken.update({
+      where: { id: reset.id },
+      data: { usedAt: now },
+    });
+    await this.prisma.user.update({
+      where: { id: reset.userId },
+      data: {
+        passwordHash: hashPassword(newPassword),
+        passwordSetAt: now,
+      },
+    });
+    await this.prisma.userSession.updateMany({
+      where: {
+        userId: reset.userId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+        lastUsedAt: now,
+      },
+    });
+
+    return { success: true };
   }
 
   async me(payload: AccessTokenPayload) {
@@ -321,6 +422,38 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  async changePassword(payload: AccessTokenPayload, dto: ChangePasswordDto) {
+    const newPassword = requirePassword(dto.newPassword);
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.passwordSetAt) {
+      const currentPassword = requirePassword(dto.currentPassword);
+      const passwordCheck = verifyPassword(currentPassword, user.passwordHash);
+
+      if (!passwordCheck.valid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    } else if (!user.googleSub) {
+      throw new BadRequestException('This account cannot set a password here');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(newPassword),
+        passwordSetAt: new Date(),
+      },
+    });
+
+    return toPublicUser(updated);
   }
 
   getJwks() {
@@ -508,6 +641,38 @@ export class AuthService {
 
     return `${baseSlug}-${randomBytes(3).toString('hex')}`;
   }
+
+  private async sendPasswordResetEmail(
+    user: User,
+    token: string,
+    expiresAt: Date,
+  ) {
+    const resetUrl = buildPasswordResetUrl(token);
+    const text = [
+      `Hi ${user.name},`,
+      '',
+      'We received a request to reset your Bookvella password.',
+      `Use this link within ${PASSWORD_RESET_TTL_MINUTES} minutes:`,
+      resetUrl,
+      '',
+      'If you did not request this, you can ignore this email.',
+      '',
+      'Bookvella',
+    ].join('\n');
+
+    await this.emailService.sendMail({
+      to: user.email,
+      subject: 'Reset your Bookvella password',
+      text,
+      html: [
+        `<p>Hi ${escapeHtml(user.name)},</p>`,
+        '<p>We received a request to reset your Bookvella password.</p>',
+        `<p><a href="${escapeHtml(resetUrl)}">Reset your password</a></p>`,
+        `<p>This link expires at ${escapeHtml(expiresAt.toISOString())}.</p>`,
+        '<p>If you did not request this, you can ignore this email.</p>',
+      ].join(''),
+    });
+  }
 }
 
 function normalizePem(value?: string) {
@@ -563,42 +728,31 @@ function normalizeTimezone(value?: string) {
   }
 }
 
-function hashPassword(password: string) {
-  const salt = randomBytes(16).toString('base64url');
-  const hash = pbkdf2Sync(password, salt, 310000, 32, 'sha256').toString(
-    'base64url',
-  );
-
-  return `pbkdf2_sha256$310000$${salt}$${hash}`;
-}
-
-function verifyPassword(password: string, storedHash: string) {
-  const [algorithm, iterations, salt, hash] = storedHash.split('$');
-
-  if (algorithm !== 'pbkdf2_sha256' || !iterations || !salt || !hash) {
-    return false;
-  }
-
-  const candidate = pbkdf2Sync(
-    password,
-    salt,
-    Number(iterations),
-    32,
-    'sha256',
-  );
-  const stored = Buffer.from(hash, 'base64url');
-
-  return (
-    candidate.length === stored.length && timingSafeEqual(candidate, stored)
-  );
-}
-
 function createRefreshToken() {
+  return randomBytes(48).toString('base64url');
+}
+
+function createResetToken() {
   return randomBytes(48).toString('base64url');
 }
 
 function hashRefreshToken(refreshToken: string) {
   return createHash('sha256').update(refreshToken).digest('base64url');
+}
+
+function hashResetToken(token: string) {
+  return createHash('sha256').update(token).digest('base64url');
+}
+
+function buildPasswordResetUrl(token: string) {
+  const baseUrl =
+    process.env.PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    'http://localhost:3001';
+  const url = new URL('/reset-password', baseUrl);
+  url.searchParams.set('token', token);
+  return url.toString();
 }
 
 function refreshExpiryDate() {
@@ -615,6 +769,8 @@ function toPublicUser(user: User): PublicUser {
   return {
     id: user.id,
     email: user.email,
+    hasPassword: Boolean(user.passwordSetAt),
+    hasGoogleSignIn: Boolean(user.googleSub),
     name: user.name,
     slug: user.slug,
     timezone: user.timezone,
@@ -628,4 +784,21 @@ function toPublicUser(user: User): PublicUser {
     websiteUrl: user.websiteUrl,
     instagramUrl: user.instagramUrl,
   };
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      default:
+        return '&#39;';
+    }
+  });
 }

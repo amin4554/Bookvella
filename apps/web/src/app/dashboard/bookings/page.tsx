@@ -26,7 +26,6 @@ import {
   authedApiRequest,
   type HostBooking,
   type PublicUser,
-  publicBookingUrl,
 } from "@/lib/api";
 
 type Tab = "upcoming" | "past" | "cancelled";

@@ -19,11 +19,14 @@ import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
 import type {
+  ChangePasswordDto,
   GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
   UpdateMeDto,
 } from './dto';
 
@@ -89,6 +92,25 @@ export class AuthController {
     } finally {
       clearAuthCookies(response);
     }
+  }
+
+  @Post('password/forgot')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password/reset')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @Post('password/change')
+  @UseGuards(AuthGuard)
+  changePassword(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(request.user!, dto);
   }
 
   @Get('me')

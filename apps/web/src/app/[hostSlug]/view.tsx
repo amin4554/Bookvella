@@ -23,6 +23,7 @@ import {
   Video,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LegalFooter } from "@/components/legal-footer";
 import type { LocationType, PriceType, PublicHostProfile } from "@/lib/api";
 
 type ServiceItem = PublicHostProfile["services"][number];
@@ -499,33 +500,7 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
         </div>
       </section>
 
-      {/* footer */}
-      <footer className="border-t border-[#EEE7DF] bg-white">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-5 py-6 text-[12px] text-[#9CA3AF]">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo/icon.svg" alt="" className="size-6 rounded-md" />
-            <span>
-              {firstName(host.name)}&apos;s page is hosted on{" "}
-              <Link
-                href="/"
-                className="font-bold text-[#0B1220] hover:underline"
-              >
-                Bookvella
-              </Link>
-            </span>
-          </div>
-          <p>
-            Have a service of your own?{" "}
-            <Link
-              href="/register"
-              className="font-bold text-[#FF5F63] hover:underline"
-            >
-              Create a free page →
-            </Link>
-          </p>
-        </div>
-      </footer>
+      <LegalFooter note={`${firstName(host.name)}'s page is hosted here.`} />
     </div>
   );
 }

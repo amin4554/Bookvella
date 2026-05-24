@@ -7,7 +7,10 @@ import {
   Bell,
   Calendar,
   ChevronRight,
+  Eye,
+  EyeOff,
   KeyRound,
+  Loader2,
   LogOut,
   Mail,
   Shield,
@@ -171,7 +174,15 @@ export default function SettingsPage() {
               onSave={saveAccount}
             />
           ) : null}
-          {section === "security" ? <SecuritySection /> : null}
+          {section === "security" ? (
+            <SecuritySection
+              user={user}
+              onUserUpdated={(updated) => {
+                setUser(updated);
+                updateStoredUser(updated);
+              }}
+            />
+          ) : null}
           {section === "notifications" ? <NotificationsSection /> : null}
           {section === "calendar" ? <CalendarSection /> : null}
           {section === "data" ? <DataSection /> : null}
@@ -326,24 +337,25 @@ function AccountSection({
   );
 }
 
-function SecuritySection() {
+function SecuritySection({
+  user,
+  onUserUpdated,
+}: {
+  user: PublicUser | null;
+  onUserUpdated: (user: PublicUser) => void;
+}) {
   return (
     <>
       <SettingsPanel
         eyebrow="Security"
-        title="Password"
-        description="Change the password used to sign in."
+        title={user?.hasPassword ? "Password" : "Add a password"}
+        description={
+          user?.hasPassword
+            ? "Change the password used to sign in."
+            : "Add email-and-password sign-in to your Google account."
+        }
       >
-        <button
-          type="button"
-          disabled
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-70"
-        >
-          <KeyRound className="size-4" /> Change password
-          <span className="rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] text-[#6B7280]">
-            Soon
-          </span>
-        </button>
+        <PasswordForm user={user} onUserUpdated={onUserUpdated} />
       </SettingsPanel>
       <SettingsPanel
         eyebrow="Security"
@@ -375,6 +387,151 @@ function SecuritySection() {
         </div>
       </SettingsPanel>
     </>
+  );
+}
+
+function PasswordForm({
+  user,
+  onUserUpdated,
+}: {
+  user: PublicUser | null;
+  onUserUpdated: (user: PublicUser) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
+  const hasPassword = Boolean(user?.hasPassword);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) return;
+
+    const form = new FormData(event.currentTarget);
+    const currentPassword = readText(form, "currentPassword");
+    const newPassword = readText(form, "newPassword");
+    const confirmPassword = readText(form, "confirmPassword");
+
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await authedApiRequest<PublicUser>(
+        "/auth/password/change",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            currentPassword: hasPassword ? currentPassword : undefined,
+            newPassword,
+          }),
+        },
+      );
+      onUserUpdated(updated);
+      event.currentTarget.reset();
+      toast.success(hasPassword ? "Password changed" : "Password added");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not update password",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!user) {
+    return <p className="text-sm text-[#6B7280]">Loading security settings...</p>;
+  }
+
+  return (
+    <form className="space-y-4" onSubmit={submit}>
+      {hasPassword ? (
+        <PasswordField
+          label="Current password"
+          name="currentPassword"
+          autoComplete="current-password"
+          show={showPasswords}
+        />
+      ) : (
+        <div className="flex items-start gap-3 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] p-4">
+          <ShieldCheck className="mt-0.5 size-5 text-[#2563EB]" />
+          <p className="text-[13px] leading-[1.6] text-[#1E3A8A]">
+            You currently sign in with Google. Add a password to also sign in
+            with your email address.
+          </p>
+        </div>
+      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        <PasswordField
+          label="New password"
+          name="newPassword"
+          autoComplete="new-password"
+          show={showPasswords}
+        />
+        <PasswordField
+          label="Confirm password"
+          name="confirmPassword"
+          autoComplete="new-password"
+          show={showPasswords}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setShowPasswords((value) => !value)}
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#374151] hover:bg-[#F9FAFB]"
+        >
+          {showPasswords ? (
+            <EyeOff className="size-4" />
+          ) : (
+            <Eye className="size-4" />
+          )}
+          {showPasswords ? "Hide passwords" : "Show passwords"}
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+          {saving
+            ? "Saving..."
+            : hasPassword
+              ? "Change password"
+              : "Add password"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PasswordField({
+  label,
+  name,
+  autoComplete,
+  show,
+}: {
+  label: string;
+  name: string;
+  autoComplete: string;
+  show: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold">{label}</span>
+      <input
+        name={name}
+        type={show ? "text" : "password"}
+        autoComplete={autoComplete}
+        minLength={8}
+        className="mt-2 h-12 w-full rounded-xl border border-[#E8DED7] bg-[#FFFBF7] px-4 outline-none placeholder:text-[#9CA3AF] focus:border-[#FF6267] focus:ring-4 focus:ring-[#FF6267]/10"
+      />
+    </label>
   );
 }
 
