@@ -195,6 +195,10 @@ function blockToWire(block: Block): AvailabilityOverrideBlock {
   return { startMinute: block.start, endMinute: block.end };
 }
 
+function formatDateShort(date: Date) {
+  return `${WEEK_LABELS[date.getDay()].slice(0, 3)} ${date.getDate()} ${MONTH_NAMES[date.getMonth()].slice(0, 3)}`;
+}
+
 function formatRangeLabel(start: Date, end: Date) {
   const sameMonth =
     start.getFullYear() === end.getFullYear() &&
@@ -313,6 +317,15 @@ export default function AvailabilityPage() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+
+  // Range selection: while `rangeMode` is on, calendar clicks set the start
+  // and end of a date range instead of picking a single day. Once both
+  // endpoints exist, the right-side editor switches to the range editor.
+  const [rangeMode, setRangeMode] = useState(false);
+  const [rangeStart, setRangeStart] = useState<Date | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
+  const [rangeDraft, setRangeDraft] = useState<ExceptionDraft | null>(null);
+  const [savingRange, setSavingRange] = useState(false);
 
   // Tabs.
   const [tab, setTab] = useState<"weekly" | "exceptions" | "rules">("weekly");
@@ -533,6 +546,12 @@ export default function AvailabilityPage() {
 
   function pickDate(date: Date) {
     if (date < today && !isSameDate(date, today)) return;
+
+    if (rangeMode) {
+      handleRangeClick(date);
+      return;
+    }
+
     if (isSameDate(date, selectedDate)) return;
     if (!confirmDiscardDayEdits()) return;
     if (date.getMonth() !== viewMonth || date.getFullYear() !== viewYear) {
@@ -541,6 +560,63 @@ export default function AvailabilityPage() {
     }
     setSelectedDate(date);
     setDayEdits(null);
+  }
+
+  function handleRangeClick(date: Date) {
+    // First endpoint, no endpoints yet, or a completed range exists → start over.
+    if (!rangeStart || (rangeStart && rangeEnd)) {
+      setRangeStart(date);
+      setRangeEnd(null);
+      setRangeDraft(null);
+      return;
+    }
+
+    // Second endpoint: normalize and open the range editor.
+    const [start, end] =
+      rangeStart <= date ? [rangeStart, date] : [date, rangeStart];
+    setRangeStart(start);
+    setRangeEnd(end);
+    setRangeDraft({
+      startDate: dateKey(start),
+      endDate: dateKey(end),
+      type: "BLOCKED",
+      note: "",
+      blocks: [{ start: 9 * 60, end: 17 * 60 }],
+    });
+    // Auto-exit range mode after the second click so accidental clicks don't
+    // reset the selection.
+    setRangeMode(false);
+  }
+
+  function toggleRangeMode() {
+    if (rangeMode) {
+      // Cancel range selection
+      setRangeMode(false);
+      setRangeStart(null);
+      setRangeEnd(null);
+      setRangeDraft(null);
+      return;
+    }
+    if (!confirmDiscardDayEdits()) return;
+    setRangeMode(true);
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeDraft(null);
+  }
+
+  function clearRangeSelection() {
+    setRangeMode(false);
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeDraft(null);
+  }
+
+  async function saveRangeDraft() {
+    if (!rangeDraft) return;
+    setSavingRange(true);
+    const ok = await saveExceptionDraft(rangeDraft);
+    setSavingRange(false);
+    if (ok) clearRangeSelection();
   }
 
   // ── handlers: day editor ────────────────────────────────────────────────
@@ -790,13 +866,13 @@ export default function AvailabilityPage() {
     }
   }
 
-  async function saveExceptionDraft(draft: ExceptionDraft) {
+  async function saveExceptionDraft(draft: ExceptionDraft): Promise<boolean> {
     const startStr = draft.startDate;
     const endStr = draft.endDate || draft.startDate;
 
     if (!startStr || !endStr) {
       toast.error("Pick a start date");
-      return;
+      return false;
     }
 
     // Validate blocks if EXTRA_OPENING
@@ -805,13 +881,13 @@ export default function AvailabilityPage() {
       for (const b of draft.blocks) {
         if (b.start >= b.end) {
           toast.error("Each time block must end after it starts");
-          return;
+          return false;
         }
         cleanBlocks.push(blockToWire(b));
       }
       if (cleanBlocks.length === 0) {
         toast.error("Add at least one time block for an extra opening");
-        return;
+        return false;
       }
     }
 
@@ -834,10 +910,12 @@ export default function AvailabilityPage() {
       toast.success(
         draft.type === "BLOCKED" ? "Dates blocked" : "Extra opening added",
       );
+      return true;
     } catch (caught) {
       toast.error(
         caught instanceof Error ? caught.message : "Could not save exception",
       );
+      return false;
     }
   }
 
@@ -1122,24 +1200,40 @@ export default function AvailabilityPage() {
               rules={previewRules}
               overridesByKey={overridesByKey}
               bookingsByDateKey={bookingsByDateKey}
+              rangeMode={rangeMode}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
               onShiftMonth={shiftMonth}
               onPickToday={pickToday}
               onPickDate={pickDate}
               onApplyRange={startRangeFromSelectedDate}
+              onToggleRangeMode={toggleRangeMode}
             />
 
-            <DayEditor
-              selectedDate={selectedDate}
-              today={today}
-              draft={dayDraft}
-              bookings={selectedDayBookings}
-              onStatus={setDayStatus}
-              onBlockChange={setDayBlock}
-              onRemoveBlock={removeDayBlock}
-              onAddBlock={addDayBlock}
-              onReset={resetDayToWeekly}
-              onNote={setDayNote}
-            />
+            {rangeDraft ? (
+              <RangeEditor
+                start={rangeStart}
+                end={rangeEnd}
+                draft={rangeDraft}
+                saving={savingRange}
+                onChange={setRangeDraft}
+                onCancel={clearRangeSelection}
+                onSave={saveRangeDraft}
+              />
+            ) : (
+              <DayEditor
+                selectedDate={selectedDate}
+                today={today}
+                draft={dayDraft}
+                bookings={selectedDayBookings}
+                onStatus={setDayStatus}
+                onBlockChange={setDayBlock}
+                onRemoveBlock={removeDayBlock}
+                onAddBlock={addDayBlock}
+                onReset={resetDayToWeekly}
+                onNote={setDayNote}
+              />
+            )}
           </section>
 
           {/* Tabs */}
@@ -1216,10 +1310,14 @@ function CalendarCard({
   rules,
   overridesByKey,
   bookingsByDateKey,
+  rangeMode,
+  rangeStart,
+  rangeEnd,
   onShiftMonth,
   onPickToday,
   onPickDate,
   onApplyRange,
+  onToggleRangeMode,
 }: {
   viewYear: number;
   viewMonth: number;
@@ -1229,11 +1327,23 @@ function CalendarCard({
   rules: WeeklyRuleLike[];
   overridesByKey: Map<string, AvailabilityOverride>;
   bookingsByDateKey: Map<string, HostBooking[]>;
+  rangeMode: boolean;
+  rangeStart: Date | null;
+  rangeEnd: Date | null;
   onShiftMonth: (delta: number) => void;
   onPickToday: () => void;
   onPickDate: (date: Date) => void;
   onApplyRange: () => void;
+  onToggleRangeMode: () => void;
 }) {
+  const rangeStartKey = rangeStart ? dateKey(rangeStart) : null;
+  const rangeEndKey = rangeEnd ? dateKey(rangeEnd) : null;
+  function isInRange(date: Date) {
+    if (!rangeStart) return false;
+    const end = rangeEnd ?? rangeStart;
+    const [lo, hi] = rangeStart <= end ? [rangeStart, end] : [end, rangeStart];
+    return date >= lo && date <= hi;
+  }
   return (
     <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
@@ -1258,14 +1368,44 @@ function CalendarCard({
             <ChevronRight className="size-4 text-[#6B7280]" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onPickToday}
-          className="text-[12px] font-bold text-[#FF5F63] hover:underline"
-        >
-          Today
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleRangeMode}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition ${
+              rangeMode
+                ? "border-[#FF5F63] bg-[#FFF0EF] text-[#FF5F63]"
+                : "border-[#E5E7EB] bg-white text-[#0B1220] hover:bg-[#FFFBF7]"
+            }`}
+            title={
+              rangeMode
+                ? "Cancel range selection"
+                : "Select a range of dates"
+            }
+          >
+            <CalendarRange className="size-3.5" />
+            {rangeMode ? "Selecting…" : "Select range"}
+          </button>
+          <button
+            type="button"
+            onClick={onPickToday}
+            className="text-[12px] font-bold text-[#FF5F63] hover:underline"
+          >
+            Today
+          </button>
+        </div>
       </div>
+
+      {rangeMode || rangeStart ? (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-[#FCC9C5] bg-[#FFF5F4] px-3 py-2 text-[11.5px] font-semibold text-[#7c2222]">
+          <CalendarRange className="size-3.5 text-[#FF5F63]" />
+          {rangeStart && !rangeEnd
+            ? `Start: ${formatDateShort(rangeStart)} — click another day to pick the end`
+            : rangeStart && rangeEnd
+              ? `Range selected: ${formatDateShort(rangeStart)} → ${formatDateShort(rangeEnd)}`
+              : "Click a day to start the range"}
+        </div>
+      ) : null}
 
       <div className="mt-4 grid grid-cols-7 gap-1 text-center">
         {SHORT_DAYS_MON_FIRST.map((d) => (
@@ -1309,6 +1449,11 @@ function CalendarCard({
           // would need the slot generator's output, which isn't on this page.
           if (state === "bookable" && used > 0) state = "fully";
 
+          const inRange = isInRange(date);
+          const isRangeEdge =
+            (rangeStartKey != null && k === rangeStartKey) ||
+            (rangeEndKey != null && k === rangeEndKey);
+
           return (
             <CalendarCell
               key={`${k}-${idx}`}
@@ -1318,6 +1463,8 @@ function CalendarCard({
               selected={isSelected}
               bookingsCount={used}
               note={override?.note ?? null}
+              inRange={inRange}
+              isRangeEdge={isRangeEdge}
               onClick={() => onPickDate(date)}
             />
           );
@@ -1359,6 +1506,8 @@ function CalendarCell({
   selected,
   bookingsCount,
   note,
+  inRange = false,
+  isRangeEdge = false,
   onClick,
 }: {
   date: Date;
@@ -1367,6 +1516,8 @@ function CalendarCell({
   selected: boolean;
   bookingsCount: number;
   note: string | null;
+  inRange?: boolean;
+  isRangeEdge?: boolean;
   onClick: () => void;
 }) {
   if (state === "outside") {
@@ -1392,11 +1543,15 @@ function CalendarCell({
     fully: "bg-[#F4EAFF]",
   };
 
-  const selectedClasses = selected
-    ? "!bg-gradient-to-br from-[#FF6267] to-[#FF8A4C] !border-transparent shadow-md text-white"
-    : "";
+  const selectedClasses =
+    selected || isRangeEdge
+      ? "!bg-gradient-to-br from-[#FF6267] to-[#FF8A4C] !border-transparent shadow-md text-white"
+      : inRange
+        ? "!bg-[#FFE7E1] !border-[#FCC9C5]"
+        : "";
 
-  const todayClasses = today && !selected ? "ring-2 ring-inset ring-[#FF5F63]" : "";
+  const todayClasses =
+    today && !selected && !isRangeEdge ? "ring-2 ring-inset ring-[#FF5F63]" : "";
 
   const dotColor =
     state === "blocked"
@@ -1416,7 +1571,7 @@ function CalendarCell({
           ? "Booked"
           : bookingsCount > 0
             ? `${bookingsCount} bk`
-            : "";
+            : "Open";
 
   return (
     <button
@@ -1430,7 +1585,7 @@ function CalendarCell({
     >
       <span
         className={`text-[14px] font-bold leading-none ${
-          selected
+          selected || isRangeEdge
             ? "text-white"
             : state === "blocked"
               ? "text-[#B91C1C]"
@@ -1631,6 +1786,188 @@ function DayEditor({
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RangeEditor({
+  start,
+  end,
+  draft,
+  saving,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  start: Date | null;
+  end: Date | null;
+  draft: ExceptionDraft;
+  saving: boolean;
+  onChange: (next: ExceptionDraft) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  if (!start || !end) return null;
+
+  const dayCount =
+    Math.round(
+      (startOfDay(end).getTime() - startOfDay(start).getTime()) /
+        (1000 * 60 * 60 * 24),
+    ) + 1;
+  const isBlocked = draft.type === "BLOCKED";
+
+  function setStatus(type: AvailabilityOverrideType) {
+    if (type === "CUSTOM_HOURS" && draft.blocks.length === 0) {
+      onChange({
+        ...draft,
+        type,
+        blocks: [{ start: 9 * 60, end: 17 * 60 }],
+      });
+      return;
+    }
+    onChange({ ...draft, type });
+  }
+
+  function setBlock(index: number, next: Block) {
+    onChange({
+      ...draft,
+      blocks: draft.blocks.map((b, i) => (i === index ? next : b)),
+    });
+  }
+
+  function removeBlock(index: number) {
+    onChange({
+      ...draft,
+      blocks: draft.blocks.filter((_, i) => i !== index),
+    });
+  }
+
+  function addBlock() {
+    const last = draft.blocks[draft.blocks.length - 1];
+    const nextStart = last ? Math.min(last.end + 30, 22 * 60) : 9 * 60;
+    onChange({
+      ...draft,
+      blocks: [...draft.blocks, { start: nextStart, end: Math.min(nextStart + 60, 23 * 60) }],
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-[#FCC9C5] bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#FF5F63]">
+          Selected range
+        </p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md p-1 text-[#9CA3AF] hover:bg-[#FFF6F0] hover:text-[#0B1220]"
+          aria-label="Cancel range selection"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <h2 className="text-[18px] font-bold tabular-nums">
+          {formatRangeLabel(start, end)}
+        </h2>
+        <span className="text-[12px] text-[#6B7280] tabular-nums">
+          {dayCount} day{dayCount === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          What should happen on these dates?
+        </p>
+        <div className="mt-1.5 inline-flex w-full rounded-[10px] border border-[#E5E7EB] bg-[#FFFBF7] p-[3px] gap-[2px]">
+          <SegButton
+            on={draft.type === "BLOCKED"}
+            onClick={() => setStatus("BLOCKED")}
+          >
+            Block off
+          </SegButton>
+          <SegButton
+            on={draft.type === "CUSTOM_HOURS"}
+            onClick={() => setStatus("CUSTOM_HOURS")}
+          >
+            Custom hours
+          </SegButton>
+        </div>
+        <p className="mt-2 text-[11.5px] text-[#6B7280]">
+          {isBlocked
+            ? "Guests can't book any of these dates."
+            : "Replace the weekly schedule with these time blocks on every day in the range."}
+        </p>
+      </div>
+
+      {!isBlocked ? (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+              Bookable hours
+            </p>
+            <button
+              type="button"
+              onClick={addBlock}
+              className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+            >
+              + Add block
+            </button>
+          </div>
+          <div className="mt-2 space-y-2">
+            {draft.blocks.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+                Add at least one time block.
+              </p>
+            ) : null}
+            {draft.blocks.map((block, idx) => (
+              <BlockRow
+                key={idx}
+                block={block}
+                onChange={(next) => setBlock(idx, next)}
+                onRemove={() => removeBlock(idx)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        <label className="block">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            Reason {isBlocked ? "(optional)" : "(optional, shown to you only)"}
+          </span>
+          <input
+            value={draft.note}
+            onChange={(event) => onChange({ ...draft, note: event.target.value })}
+            placeholder={isBlocked ? "Vacation, holiday, sick day…" : "Extended summer hours…"}
+            className="mt-1.5 h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+        >
+          {saving
+            ? "Saving…"
+            : isBlocked
+              ? `Block ${dayCount} day${dayCount === 1 ? "" : "s"}`
+              : `Apply hours to ${dayCount} day${dayCount === 1 ? "" : "s"}`}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#FFFBF7] disabled:opacity-60"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );

@@ -81,6 +81,7 @@ export type UpdateMeDto = {
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   isActive?: boolean;
+  isProfileHidden?: boolean;
 };
 
 export type GoogleAuthDto = {

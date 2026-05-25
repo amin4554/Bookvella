@@ -144,6 +144,10 @@ export class SchedulingService {
       throw new GoneException('Public profile is currently unavailable');
     }
 
+    if (host.isProfileHidden) {
+      throw new NotFoundException('Public host not found');
+    }
+
     // Review aggregates across ALL visible reviews for the host, plus a
     // breakdown by star count so the public profile can render a distribution
     // bar without loading every row.

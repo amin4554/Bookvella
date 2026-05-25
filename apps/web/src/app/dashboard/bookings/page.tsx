@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
   CalendarCheck2,
   CalendarPlus,
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -40,6 +41,9 @@ export default function BookingsPage() {
   const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Service filter: empty set = "All services"; otherwise show only bookings
+  // whose service id is in the set.
+  const [serviceFilter, setServiceFilter] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -92,6 +96,10 @@ export default function BookingsPage() {
         if (tab === "upcoming" ? start < now : start >= now) return false;
       }
 
+      if (serviceFilter.size > 0 && !serviceFilter.has(booking.eventTypeId)) {
+        return false;
+      }
+
       if (query) {
         const matchesName = booking.guestName.toLowerCase().includes(query);
         const matchesEmail = booking.guestEmail.toLowerCase().includes(query);
@@ -103,7 +111,21 @@ export default function BookingsPage() {
 
       return true;
     });
-  }, [bookings, loadedAt, tab, search]);
+  }, [bookings, loadedAt, tab, search, serviceFilter]);
+
+  // Unique services that appear in the booking list, sorted by title.
+  const availableServices = useMemo(() => {
+    const map = new Map<string, { id: string; title: string }>();
+    for (const booking of bookings) {
+      const id = booking.eventTypeId;
+      if (!map.has(id)) {
+        map.set(id, { id, title: booking.eventType.title });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.title.localeCompare(b.title),
+    );
+  }, [bookings]);
 
   async function cancelBooking(reason: string) {
     if (!selected) return;
@@ -237,13 +259,11 @@ export default function BookingsPage() {
                   className="h-10 w-[260px] rounded-xl border border-[#E5E7EB] bg-white pl-9 pr-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
                 />
               </div>
-              <button
-                type="button"
-                disabled
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
-              >
-                <Filter className="size-4" /> Filters
-              </button>
+              <ServiceFilterDropdown
+                services={availableServices}
+                selectedIds={serviceFilter}
+                onChange={setServiceFilter}
+              />
             </div>
           </div>
 
@@ -329,6 +349,129 @@ export default function BookingsPage() {
         />
       ) : null}
     </AppShell>
+  );
+}
+
+function ServiceFilterDropdown({
+  services,
+  selectedIds,
+  onChange,
+}: {
+  services: { id: string; title: string }[];
+  selectedIds: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  function toggleService(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(next);
+  }
+
+  const count = selectedIds.size;
+  const hasFilter = count > 0;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        disabled={services.length === 0}
+        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+          hasFilter
+            ? "border-[#FCC9C5] bg-[#FFF0EF] text-[#FF5F63] hover:bg-[#FFE2DF]"
+            : "border-[#E5E7EB] bg-white text-[#0B1220] hover:bg-[#F9FAFB]"
+        }`}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <Filter className="size-4" />
+        Filters
+        {hasFilter ? (
+          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF5F63] px-1.5 text-[10px] font-bold text-white">
+            {count}
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+6px)] z-20 w-[280px] rounded-xl border border-[#EEE7DF] bg-white p-2 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]"
+        >
+          <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+              Services
+            </p>
+            {hasFilter ? (
+              <button
+                type="button"
+                onClick={() => onChange(new Set())}
+                className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+          <div className="max-h-[320px] overflow-y-auto">
+            {services.length === 0 ? (
+              <p className="px-3 py-4 text-center text-[12px] text-[#9CA3AF]">
+                No services found in your bookings.
+              </p>
+            ) : (
+              services.map((service) => {
+                const checked = selectedIds.has(service.id);
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={checked}
+                    onClick={() => toggleService(service.id)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-[#0B1220] hover:bg-[#FFFBF7]"
+                  >
+                    <span
+                      className={`flex size-4 shrink-0 items-center justify-center rounded-[4px] border ${
+                        checked
+                          ? "border-[#FF5F63] bg-[#FF5F63] text-white"
+                          : "border-[#D1D5DB] bg-white"
+                      }`}
+                    >
+                      {checked ? <Check className="size-3" /> : null}
+                    </span>
+                    <span className="truncate">{service.title}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

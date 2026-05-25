@@ -595,6 +595,10 @@ export class AuthService {
       data.deactivatedAt = dto.isActive ? null : new Date();
     }
 
+    if (dto.isProfileHidden !== undefined) {
+      data.isProfileHidden = Boolean(dto.isProfileHidden);
+    }
+
     try {
       const user = await this.prisma.user.update({
         where: { id: payload.sub },
@@ -1806,6 +1810,7 @@ function toPublicUser(user: User): PublicUser {
     hasGoogleSignIn: Boolean(user.googleSub),
     hasTwoFactor: Boolean(user.totpEnabledAt),
     isActive: user.isActive,
+    isProfileHidden: user.isProfileHidden,
     name: user.name,
     businessDisplayName: user.businessDisplayName,
     slug: user.slug,

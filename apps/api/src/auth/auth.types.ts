@@ -20,6 +20,7 @@ export type PublicUser = {
   hasGoogleSignIn: boolean;
   hasTwoFactor: boolean;
   isActive: boolean;
+  isProfileHidden: boolean;
   name: string;
   businessDisplayName: string | null;
   slug: string;

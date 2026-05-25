@@ -215,7 +215,127 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
     priceCurrency,
   });
 
-  const summaryReady = title.trim().length > 0 && effectiveSlug.length > 0;
+  // Per-step validation errors. Cleared as the relevant field becomes valid.
+  const [step1Errors, setStep1Errors] = useState<{
+    title?: string;
+  }>({});
+  const [step3Errors, setStep3Errors] = useState<{
+    priceLower?: string;
+    priceUpper?: string;
+  }>({});
+  const [step4Errors, setStep4Errors] = useState<{
+    slug?: string;
+  }>({});
+
+  function validateStep1(): boolean {
+    const errors: typeof step1Errors = {};
+    if (!title.trim()) errors.title = "Add a service name so guests know what they're booking";
+    setStep1Errors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function validateStep3(): boolean {
+    const errors: typeof step3Errors = {};
+    if (priceType !== "FREE") {
+      const lower = parseFloat(priceLowerDollars);
+      if (!priceLowerDollars.trim() || Number.isNaN(lower) || lower < 0) {
+        errors.priceLower =
+          priceType === "RANGE"
+            ? "Enter the lower price"
+            : priceType === "FROM"
+              ? "Enter the starting price"
+              : "Enter a price";
+      }
+      if (priceType === "RANGE") {
+        const upper = parseFloat(priceUpperDollars);
+        if (!priceUpperDollars.trim() || Number.isNaN(upper) || upper < 0) {
+          errors.priceUpper = "Enter the upper price";
+        } else if (
+          !Number.isNaN(lower) &&
+          !Number.isNaN(upper) &&
+          upper < lower
+        ) {
+          errors.priceUpper = "Upper must be greater than the lower price";
+        }
+      }
+    }
+    setStep3Errors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function validateStep4(): boolean {
+    const errors: typeof step4Errors = {};
+    if (!effectiveSlug.trim()) {
+      errors.slug = "Add a public URL so guests can book this service";
+    }
+    setStep4Errors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function tryNext(from: 1 | 2 | 3) {
+    if (from === 1 && !validateStep1()) {
+      toast.error("Please complete the highlighted fields");
+      return;
+    }
+    if (from === 3 && !validateStep3()) {
+      toast.error("Please complete the highlighted fields");
+      return;
+    }
+    setStep(((from + 1) as 1 | 2 | 3 | 4));
+  }
+
+  // Step pill nav: jumping backward is always free, jumping forward must
+  // pass validation for every step between `step` and the target. Lets the
+  // user freely review earlier steps but blocks skipping past required
+  // fields.
+  function goToStep(target: 1 | 2 | 3 | 4) {
+    if (target <= step) {
+      setStep(target);
+      return;
+    }
+    if (step <= 1 && target > 1 && !validateStep1()) {
+      toast.error("Service name is required");
+      setStep(1);
+      return;
+    }
+    if (step <= 3 && target > 3 && !validateStep3()) {
+      toast.error("Add a price before continuing");
+      setStep(3);
+      return;
+    }
+    setStep(target);
+  }
+
+  async function publishWithValidation() {
+    const step1Ok = validateStep1();
+    const step3Ok = validateStep3();
+    const step4Ok = validateStep4();
+    if (!step1Ok) {
+      setStep(1);
+      toast.error("Service name is required");
+      return;
+    }
+    if (!step3Ok) {
+      setStep(3);
+      toast.error("Add a price before publishing");
+      return;
+    }
+    if (!step4Ok) {
+      setStep(4);
+      toast.error("Service URL is required");
+      return;
+    }
+    await save(true);
+  }
+
+  async function saveDraftWithValidation() {
+    if (!validateStep1()) {
+      setStep(1);
+      toast.error("Service name is required to save a draft");
+      return;
+    }
+    await save(false);
+  }
 
   async function save(publish: boolean) {
     setSaving(true);
@@ -351,16 +471,16 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
             </Link>
             <button
               type="button"
-              disabled={!summaryReady || saving}
-              onClick={() => save(false)}
+              disabled={saving}
+              onClick={saveDraftWithValidation}
               className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
             >
               <Save className="size-4" /> Save draft
             </button>
             <button
               type="button"
-              disabled={!summaryReady || saving}
-              onClick={() => save(true)}
+              disabled={saving}
+              onClick={publishWithValidation}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               <Check className="size-4" /> Publish service
@@ -370,10 +490,10 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
 
         {/* step indicator */}
         <ol className="mt-7 grid grid-cols-2 gap-2 rounded-2xl border border-[#EEE7DF] bg-white p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)] md:grid-cols-4">
-          <StepPill n={1} current={step} title="Basics" sub="Name, what & where" onClick={() => setStep(1)} />
-          <StepPill n={2} current={step} title="Guest experience" sub="Photo, what's included" onClick={() => setStep(2)} />
-          <StepPill n={3} current={step} title="Booking rules" sub="Buffer, notice, price" onClick={() => setStep(3)} />
-          <StepPill n={4} current={step} title="Visibility" sub="Link & publish" onClick={() => setStep(4)} />
+          <StepPill n={1} current={step} title="Basics" sub="Name, what & where" onClick={() => goToStep(1)} />
+          <StepPill n={2} current={step} title="Guest experience" sub="Photo, what's included" onClick={() => goToStep(2)} />
+          <StepPill n={3} current={step} title="Booking rules" sub="Buffer, notice, price" onClick={() => goToStep(3)} />
+          <StepPill n={4} current={step} title="Visibility" sub="Link & publish" onClick={() => goToStep(4)} />
         </ol>
 
         {error ? (
@@ -389,7 +509,13 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
             {step === 1 ? (
               <Step1
                 title={title}
-                onTitle={setTitle}
+                onTitle={(value) => {
+                  setTitle(value);
+                  if (step1Errors.title && value.trim()) {
+                    setStep1Errors({});
+                  }
+                }}
+                titleError={step1Errors.title}
                 category={category}
                 onCategory={setCategory}
                 description={description}
@@ -406,7 +532,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
                 onLocationType={setLocationType}
                 locationDetails={locationDetails}
                 onLocationDetails={setLocationDetails}
-                onNext={() => setStep(2)}
+                onNext={() => tryNext(1)}
               />
             ) : null}
 
@@ -427,22 +553,37 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
                 preparationNotes={preparationNotes}
                 onPreparationNotes={setPreparationNotes}
                 onBack={() => setStep(1)}
-                onNext={() => setStep(3)}
+                onNext={() => tryNext(2)}
               />
             ) : null}
 
             {step === 3 ? (
               <Step3
                 priceType={priceType}
-                onPriceType={setPriceType}
+                onPriceType={(value) => {
+                  setPriceType(value);
+                  setStep3Errors({});
+                }}
                 priceLowerDollars={priceLowerDollars}
-                onPriceLower={setPriceLowerDollars}
+                onPriceLower={(value) => {
+                  setPriceLowerDollars(value);
+                  if (step3Errors.priceLower && value.trim()) {
+                    setStep3Errors((prev) => ({ ...prev, priceLower: undefined }));
+                  }
+                }}
                 priceUpperDollars={priceUpperDollars}
-                onPriceUpper={setPriceUpperDollars}
+                onPriceUpper={(value) => {
+                  setPriceUpperDollars(value);
+                  if (step3Errors.priceUpper && value.trim()) {
+                    setStep3Errors((prev) => ({ ...prev, priceUpper: undefined }));
+                  }
+                }}
                 priceCurrency={priceCurrency}
                 onPriceCurrency={setPriceCurrency}
+                priceLowerError={step3Errors.priceLower}
+                priceUpperError={step3Errors.priceUpper}
                 onBack={() => setStep(2)}
-                onNext={() => setStep(4)}
+                onNext={() => tryNext(3)}
               />
             ) : null}
 
@@ -453,7 +594,11 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
                 onSlug={(value) => {
                   setSlug(value);
                   setSlugDirty(true);
+                  if (step4Errors.slug && value.trim()) {
+                    setStep4Errors({});
+                  }
                 }}
+                slugError={step4Errors.slug}
                 isEdit={isEdit}
                 isFeatured={isFeatured}
                 onIsFeatured={setIsFeatured}
@@ -473,7 +618,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
                       priceUpperDollars.length > 0),
                 }}
                 onBack={() => setStep(3)}
-                onPublish={() => save(true)}
+                onPublish={publishWithValidation}
                 saving={saving}
               />
             ) : null}
@@ -586,6 +731,7 @@ function StepPill({
 function Step1(props: {
   title: string;
   onTitle: (v: string) => void;
+  titleError?: string;
   category: string;
   onCategory: (v: string) => void;
   description: string;
@@ -610,10 +756,12 @@ function Step1(props: {
         <div className="space-y-5">
           <FieldText
             label="Service name"
+            required
             value={props.title}
             onChange={props.onTitle}
             placeholder="60-min massage, 1-on-1 coaching call…"
             help={`Use a name guests will immediately understand.`}
+            error={props.titleError}
           />
 
           <div>
@@ -984,6 +1132,8 @@ function Step3(props: {
   onPriceUpper: (v: string) => void;
   priceCurrency: string;
   onPriceCurrency: (v: string) => void;
+  priceLowerError?: string;
+  priceUpperError?: string;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -1014,17 +1164,20 @@ function Step3(props: {
           {props.priceType === "FIXED" ? (
             <CurrencyInput
               label="Price"
+              required
               symbol={symbol}
               value={props.priceLowerDollars}
               onChange={props.onPriceLower}
               currency={props.priceCurrency}
               onCurrency={props.onPriceCurrency}
+              error={props.priceLowerError}
             />
           ) : null}
 
           {props.priceType === "FROM" ? (
             <CurrencyInput
               label="Starts at"
+              required
               symbol={`${symbol}`}
               prefix={`From ${symbol}`}
               value={props.priceLowerDollars}
@@ -1032,6 +1185,7 @@ function Step3(props: {
               currency={props.priceCurrency}
               onCurrency={props.onPriceCurrency}
               help={`Guests see "from ${symbol}${props.priceLowerDollars || "—"}". Final amount is agreed with you.`}
+              error={props.priceLowerError}
             />
           ) : null}
 
@@ -1040,19 +1194,23 @@ function Step3(props: {
               <div className="grid gap-3 sm:grid-cols-2">
                 <CurrencyInput
                   label="From"
+                  required
                   symbol={symbol}
                   value={props.priceLowerDollars}
                   onChange={props.onPriceLower}
                   currency={props.priceCurrency}
                   onCurrency={props.onPriceCurrency}
+                  error={props.priceLowerError}
                 />
                 <CurrencyInput
                   label="To"
+                  required
                   symbol={symbol}
                   value={props.priceUpperDollars}
                   onChange={props.onPriceUpper}
                   currency={props.priceCurrency}
                   onCurrency={props.onPriceCurrency}
+                  error={props.priceUpperError}
                 />
               </div>
               <p className="mt-2 text-[11px] text-[#9CA3AF]">
@@ -1122,6 +1280,7 @@ function Step4(props: {
   hostSlug: string;
   slug: string;
   onSlug: (v: string) => void;
+  slugError?: string;
   isEdit: boolean;
   isFeatured: boolean;
   onIsFeatured: (v: boolean) => void;
@@ -1149,7 +1308,10 @@ function Step4(props: {
       <Card eyebrow="Public link" head="Where guests will book this service">
         <div className="space-y-5">
           <div>
-            <FieldEyebrow>Service URL</FieldEyebrow>
+            <FieldEyebrow>
+              Service URL
+              <span className="ml-1 text-[#FF5F63]">*</span>
+            </FieldEyebrow>
             <div className="mt-1.5 flex items-center gap-2">
               <span className="flex h-11 items-center whitespace-nowrap rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] px-3 text-[13px] tabular-nums text-[#9CA3AF]">
                 bookvella.com/{props.hostSlug}/
@@ -1159,7 +1321,11 @@ function Step4(props: {
                 onChange={(event) =>
                   props.onSlug(event.target.value.toLowerCase())
                 }
-                className="h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-medium tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+                className={`h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium tabular-nums outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+                  props.slugError
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-[#E5E7EB] focus:border-[#FF5F63]"
+                }`}
               />
               <button
                 type="button"
@@ -1179,6 +1345,11 @@ function Step4(props: {
                 <Copy className="size-4" />
               </button>
             </div>
+            {props.slugError ? (
+              <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">
+                {props.slugError}
+              </p>
+            ) : null}
           </div>
 
           {props.isEdit ? (
@@ -1289,7 +1460,7 @@ function Step4(props: {
           <p className="text-[11px] text-[#9CA3AF]">Step 4 of 4</p>
           <button
             type="button"
-            disabled={props.saving || !allReady}
+            disabled={props.saving}
             onClick={props.onPublish}
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
@@ -1438,23 +1609,39 @@ function FieldText({
   onChange,
   placeholder,
   help,
+  required,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   help?: string;
+  required?: boolean;
+  error?: string;
 }) {
   return (
     <label className="block">
-      <FieldEyebrow>{label}</FieldEyebrow>
+      <FieldEyebrow>
+        {label}
+        {required ? (
+          <span className="ml-1 text-[#FF5F63]">*</span>
+        ) : null}
+      </FieldEyebrow>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        aria-invalid={error ? true : undefined}
+        className={`mt-1.5 h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+          error
+            ? "border-red-400 focus:border-red-500"
+            : "border-[#E5E7EB] focus:border-[#FF5F63]"
+        }`}
       />
-      {help ? (
+      {error ? (
+        <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">{error}</p>
+      ) : help ? (
         <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
       ) : null}
     </label>
@@ -1635,6 +1822,8 @@ function CurrencyInput({
   currency,
   onCurrency,
   help,
+  required,
+  error,
 }: {
   label: string;
   symbol: string;
@@ -1644,12 +1833,20 @@ function CurrencyInput({
   currency: string;
   onCurrency: (v: string) => void;
   help?: string;
+  required?: boolean;
+  error?: string;
 }) {
+  const borderColor = error ? "border-red-400" : "border-[#E5E7EB]";
   return (
     <label className="block">
-      <FieldEyebrow>{label}</FieldEyebrow>
+      <FieldEyebrow>
+        {label}
+        {required ? <span className="ml-1 text-[#FF5F63]">*</span> : null}
+      </FieldEyebrow>
       <div className="mt-1.5 flex">
-        <span className="flex h-11 items-center rounded-l-xl border border-r-0 border-[#E5E7EB] bg-[#FFFBF7] px-3 text-[14px] font-bold text-[#6B7280]">
+        <span
+          className={`flex h-11 items-center rounded-l-xl border border-r-0 ${borderColor} bg-[#FFFBF7] px-3 text-[14px] font-bold text-[#6B7280]`}
+        >
           {prefix ?? symbol}
         </span>
         <input
@@ -1659,12 +1856,15 @@ function CurrencyInput({
           inputMode="decimal"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-11 min-w-0 flex-1 border-y border-[#E5E7EB] bg-white px-3.5 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+          aria-invalid={error ? true : undefined}
+          className={`h-11 min-w-0 flex-1 border-y ${borderColor} bg-white px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+            error ? "focus:border-red-500" : "focus:border-[#FF5F63]"
+          }`}
         />
         <select
           value={currency}
           onChange={(event) => onCurrency(event.target.value)}
-          className="h-11 rounded-r-xl border border-l-0 border-[#E5E7EB] bg-[#FFFBF7] px-3 text-sm font-medium outline-none"
+          className={`h-11 rounded-r-xl border border-l-0 ${borderColor} bg-[#FFFBF7] px-3 text-sm font-medium outline-none`}
         >
           {["USD", "EUR", "GBP", "CAD", "AUD"].map((c) => (
             <option key={c} value={c}>
@@ -1673,7 +1873,9 @@ function CurrencyInput({
           ))}
         </select>
       </div>
-      {help ? (
+      {error ? (
+        <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">{error}</p>
+      ) : help ? (
         <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
       ) : null}
     </label>

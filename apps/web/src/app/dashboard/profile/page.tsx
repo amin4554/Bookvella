@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  Eye,
   EyeOff,
   Globe,
   MapPin,
@@ -64,6 +65,7 @@ export default function ProfilePage() {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [togglingHidden, setTogglingHidden] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +171,37 @@ export default function ProfilePage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleProfileHidden() {
+    if (!user) return;
+    const next = !user.isProfileHidden;
+    const verb = next ? "hide" : "show";
+    const confirmed = window.confirm(
+      next
+        ? "Hide your profile from public? Guests visiting your booking page will see a 'not found' message. Existing bookings stay confirmed and direct service links keep working."
+        : "Make your profile public again? It will show up at your booking-link URL.",
+    );
+    if (!confirmed) return;
+
+    setTogglingHidden(true);
+    try {
+      const updated = await authedApiRequest<PublicUser>("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ isProfileHidden: next }),
+      });
+      setUser(updated);
+      updateStoredUser(updated);
+      toast.success(next ? "Profile hidden" : "Profile is public again");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : `Could not ${verb} profile`,
+      );
+    } finally {
+      setTogglingHidden(false);
     }
   }
 
@@ -463,27 +496,63 @@ export default function ProfilePage() {
               )}
             </Card>
 
-            {/* Danger zone */}
-            <section className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-5">
+            {/* Hide profile toggle */}
+            <section
+              className={`rounded-2xl border p-5 ${
+                user?.isProfileHidden
+                  ? "border-[#FCD34D] bg-[#FFFBEB]"
+                  : "border-[#FECACA] bg-[#FEF2F2]"
+              }`}
+            >
               <div className="flex items-start gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#B91C1C]">
-                  <EyeOff className="size-4" />
+                <span
+                  className={`flex size-9 items-center justify-center rounded-xl bg-white ${
+                    user?.isProfileHidden ? "text-[#92400E]" : "text-[#B91C1C]"
+                  }`}
+                >
+                  {user?.isProfileHidden ? (
+                    <Eye className="size-4" />
+                  ) : (
+                    <EyeOff className="size-4" />
+                  )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-bold text-[#7F1D1D]">
-                    Hide profile from public
+                  <p
+                    className={`text-[14px] font-bold ${
+                      user?.isProfileHidden ? "text-[#92400E]" : "text-[#7F1D1D]"
+                    }`}
+                  >
+                    {user?.isProfileHidden
+                      ? "Profile is hidden from public"
+                      : "Hide profile from public"}
                   </p>
-                  <p className="mt-1 text-[12px] leading-[1.55] text-[#7F1D1D]/80">
-                    Coming soon — pause your booking page while existing
-                    bookings stay confirmed.
+                  <p
+                    className={`mt-1 text-[12px] leading-[1.55] ${
+                      user?.isProfileHidden
+                        ? "text-[#92400E]/80"
+                        : "text-[#7F1D1D]/80"
+                    }`}
+                  >
+                    {user?.isProfileHidden
+                      ? "Your booking page returns a not-found response. Existing bookings stay confirmed and direct service links continue to work. Make it public again whenever you're ready."
+                      : "Pause your public booking page while existing bookings stay confirmed. Direct service links keep working for guests you've shared them with."}
                   </p>
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#FECACA] bg-white px-3 text-[12px] font-bold text-[#B91C1C] opacity-60"
+                  onClick={toggleProfileHidden}
+                  disabled={!user || togglingHidden}
+                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-bold disabled:opacity-60 ${
+                    user?.isProfileHidden
+                      ? "border-[#FCD34D] bg-white text-[#92400E] hover:bg-[#FFFBEB]"
+                      : "border-[#FECACA] bg-white text-[#B91C1C] hover:bg-[#FEF2F2]"
+                  }`}
                 >
-                  Hide profile
+                  {togglingHidden
+                    ? "Saving…"
+                    : user?.isProfileHidden
+                      ? "Show profile"
+                      : "Hide profile"}
                 </button>
               </div>
             </section>

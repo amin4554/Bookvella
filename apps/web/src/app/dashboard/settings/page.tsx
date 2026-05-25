@@ -445,16 +445,46 @@ function LeftRail({
   active: SectionId;
   onPick: (id: SectionId) => void;
 }) {
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // When the active section changes (via scrollspy or click), make sure the
+  // matching rail link is also visible inside the rail. Useful when the rail
+  // ever overflows (e.g. compact viewports / future extra sections).
+  useEffect(() => {
+    if (!navRef.current) return;
+    const link = navRef.current.querySelector<HTMLAnchorElement>(
+      `a[data-section="${active}"]`,
+    );
+    if (!link) return;
+    link.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [active]);
+
+  function handleClick(event: React.MouseEvent<HTMLAnchorElement>, id: SectionId) {
+    event.preventDefault();
+    onPick(id);
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${id}`);
+    }
+  }
+
   return (
-    <nav className="space-y-1 self-start lg:sticky lg:top-6">
+    <nav
+      ref={navRef}
+      className="space-y-1 self-start lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto"
+    >
       {SECTIONS.map((section) => {
         const Icon = section.icon;
         const on = active === section.id;
         return (
           <a
             key={section.id}
+            data-section={section.id}
             href={`#${section.id}`}
-            onClick={() => onPick(section.id)}
+            onClick={(event) => handleClick(event, section.id)}
             className={
               on
                 ? "flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-3.5 py-2.5 text-[13px] font-bold text-[#0B1220] shadow-[0_1px_0_rgba(17,24,39,0.04)]"

@@ -187,16 +187,13 @@ export function AppShell({
               <BrandLogo />
             </div>
             <h1 className="hidden text-lg font-semibold lg:block">{title}</h1>
-            <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
-              {userProfileImage ? (
-                <div
-                  className="size-full bg-cover bg-center"
-                  style={{ backgroundImage: `url(${userProfileImage})` }}
-                />
-              ) : (
-                userInitial
-              )}
-            </div>
+            <MobileUserMenuButton
+              userInitial={userInitial}
+              userProfileImage={userProfileImage}
+              userSlug={userSlug}
+              bookingLink={bookingLink}
+              onLogout={logout}
+            />
           </header>
 
           <MobileNav active={active} bookingCount={bookingCount} />
@@ -232,20 +229,6 @@ function DesktopSidebar({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  // Tailwind 4 themes via `:root.dark`, set via the `dark` class on <html>.
-  // The lazy initializer is SSR-safe (returns false on the server, reads
-  // localStorage on the first client render).
-  const [dark, setDark] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("bookvella.theme") === "dark";
-  });
-
-  // Keep the <html class="dark"> in sync with state.
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -267,34 +250,13 @@ function DesktopSidebar({
     };
   }, []);
 
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(bookingLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // ignored
-    }
-  }
-
-  function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    try {
-      window.localStorage.setItem("bookvella.theme", next ? "dark" : "light");
-    } catch {
-      // ignored
-    }
-  }
-
   return (
-    <aside className="hidden flex-col border-r border-[#EEE7DF] bg-white lg:flex">
-      <div className="flex h-16 items-center gap-2.5 border-b border-[#EEE7DF] px-5">
+    <aside className="sticky top-0 z-30 hidden h-screen flex-col self-start border-r border-[#EEE7DF] bg-white lg:flex">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-[#EEE7DF] px-5">
         <BrandLogo />
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {NAV_ITEMS.map((item) => {
           const selected = item.label === active;
           return (
@@ -360,115 +322,255 @@ function DesktopSidebar({
         </button>
 
         {menuOpen ? (
-          <div
-            role="menu"
-            className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]"
-          >
-            <MenuRow
-              as="a"
-              href={`/${userSlug}`}
-              target="_blank"
-              rel="noreferrer"
-              icon={
-                <ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              }
-            >
-              View public page
-            </MenuRow>
-            <MenuRow
-              as="button"
-              type="button"
-              onClick={copyLink}
-              icon={
-                copied ? (
-                  <Check className="size-4 shrink-0 text-[#16A34A]" />
-                ) : (
-                  <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-                )
-              }
-            >
-              {copied ? "Copied!" : "Copy booking link"}
-            </MenuRow>
-            <MenuRow
-              as={Link}
-              href="/dashboard/profile"
-              onClick={() => setMenuOpen(false)}
-              icon={
-                <UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              }
-            >
-              Edit profile
-            </MenuRow>
-            <MenuRow
-              as={Link}
-              href="/dashboard/settings"
-              onClick={() => setMenuOpen(false)}
-              icon={
-                <Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              }
-            >
-              Settings
-            </MenuRow>
-            <div className="my-1 h-px bg-[#EEE7DF]" />
-            <button
-              type="button"
-              role="menuitemcheckbox"
-              aria-checked={dark}
-              onClick={toggleTheme}
-              className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-[#374151] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
-            >
-              {dark ? (
-                <Sun className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              ) : (
-                <Moon className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              )}
-              <span className="flex-1">Dark mode</span>
-              <span
-                className={cn(
-                  "relative h-4 w-7 rounded-full transition",
-                  dark ? "bg-[#FF5F63]" : "bg-[#E5E7EB]",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-[2px] size-3 rounded-full bg-white shadow transition",
-                    dark ? "left-[14px]" : "left-[2px]",
-                  )}
-                />
-              </span>
-            </button>
-            <MenuRow
-              as={Link}
-              href="/legal/contact"
-              icon={
-                <LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              }
-            >
-              Help &amp; support
-            </MenuRow>
-            <MenuRow
-              as="a"
-              href="mailto:feedback@bookvella.com"
-              icon={
-                <MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-              }
-            >
-              Send feedback
-            </MenuRow>
-            <div className="my-1 h-px bg-[#EEE7DF]" />
-            <MenuRow
-              as="button"
-              type="button"
-              onClick={onLogout}
-              danger
-              icon={<LogOut className="size-4 shrink-0 text-[#DC2626]" />}
-            >
-              Sign out
-            </MenuRow>
-          </div>
+          <UserMenuItems
+            placement="above"
+            userSlug={userSlug}
+            bookingLink={bookingLink}
+            onClose={() => setMenuOpen(false)}
+            onLogout={onLogout}
+          />
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function MobileUserMenuButton({
+  userInitial,
+  userProfileImage,
+  userSlug,
+  bookingLink,
+  onLogout,
+}: {
+  userInitial: string;
+  userProfileImage: string | null;
+  userSlug: string;
+  bookingLink: string;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Open account menu"
+        className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white"
+      >
+        {userProfileImage ? (
+          <div
+            className="size-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${userProfileImage})` }}
+          />
+        ) : (
+          userInitial
+        )}
+      </button>
+
+      {open ? (
+        <UserMenuItems
+          placement="below"
+          userSlug={userSlug}
+          bookingLink={bookingLink}
+          onClose={() => setOpen(false)}
+          onLogout={onLogout}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function UserMenuItems({
+  placement,
+  userSlug,
+  bookingLink,
+  onClose,
+  onLogout,
+}: {
+  placement: "above" | "below";
+  userSlug: string;
+  bookingLink: string;
+  onClose: () => void;
+  onLogout: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  // Tailwind 4 themes via `:root.dark`, set via the `dark` class on <html>.
+  // The lazy initializer is SSR-safe (returns false on the server, reads
+  // localStorage on the first client render).
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("bookvella.theme") === "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(bookingLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // ignored
+    }
+  }
+
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      window.localStorage.setItem("bookvella.theme", next ? "dark" : "light");
+    } catch {
+      // ignored
+    }
+  }
+
+  const positionClass =
+    placement === "above"
+      ? "bottom-[calc(100%+8px)] left-0 right-0"
+      : "right-0 top-[calc(100%+8px)] w-[260px]";
+
+  return (
+    <div
+      role="menu"
+      className={cn(
+        "absolute z-40 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
+        positionClass,
+      )}
+    >
+      <MenuRow
+        as="a"
+        href={`/${userSlug}`}
+        target="_blank"
+        rel="noreferrer"
+        onClick={onClose}
+        icon={
+          <ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        }
+      >
+        View public page
+      </MenuRow>
+      <MenuRow
+        as="button"
+        type="button"
+        onClick={copyLink}
+        icon={
+          copied ? (
+            <Check className="size-4 shrink-0 text-[#16A34A]" />
+          ) : (
+            <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          )
+        }
+      >
+        {copied ? "Copied!" : "Copy booking link"}
+      </MenuRow>
+      <MenuRow
+        as={Link}
+        href="/dashboard/profile"
+        onClick={onClose}
+        icon={
+          <UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        }
+      >
+        Edit profile
+      </MenuRow>
+      <MenuRow
+        as={Link}
+        href="/dashboard/settings"
+        onClick={onClose}
+        icon={
+          <Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        }
+      >
+        Settings
+      </MenuRow>
+      <div className="my-1 h-px bg-[#EEE7DF]" />
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={dark}
+        onClick={toggleTheme}
+        className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-[#374151] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+      >
+        {dark ? (
+          <Sun className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        ) : (
+          <Moon className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        )}
+        <span className="flex-1">Dark mode</span>
+        <span
+          className={cn(
+            "relative h-4 w-7 rounded-full transition",
+            dark ? "bg-[#FF5F63]" : "bg-[#E5E7EB]",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-[2px] size-3 rounded-full bg-white shadow transition",
+              dark ? "left-[14px]" : "left-[2px]",
+            )}
+          />
+        </span>
+      </button>
+      <MenuRow
+        as={Link}
+        href="/legal/contact"
+        onClick={onClose}
+        icon={
+          <LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        }
+      >
+        Help &amp; support
+      </MenuRow>
+      <MenuRow
+        as="a"
+        href="mailto:feedback@bookvella.com"
+        onClick={onClose}
+        icon={
+          <MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+        }
+      >
+        Send feedback
+      </MenuRow>
+      <div className="my-1 h-px bg-[#EEE7DF]" />
+      <MenuRow
+        as="button"
+        type="button"
+        onClick={() => {
+          onClose();
+          onLogout();
+        }}
+        danger
+        icon={<LogOut className="size-4 shrink-0 text-[#DC2626]" />}
+      >
+        Sign out
+      </MenuRow>
+    </div>
   );
 }
 
