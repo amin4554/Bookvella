@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  FormEvent,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangle,
   Apple,
@@ -27,18 +36,31 @@ import {
   Smartphone,
   Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
+  type AccountDeletionResponse,
+  type ActiveUserSession,
+  apiRequest,
   authedApiRequest,
+  type BookingFeedResponse,
+  type CalendarAuthorizationResponse,
   checkSlugAvailability,
+  clearAuthSession,
+  type ConnectedCalendar,
+  downloadAuthedFile,
+  type EmailChangeConfirmResponse,
+  type EmailChangeRequestResponse,
   type HostBooking,
   type NotificationPreference,
   type NotificationPreferencesResponse,
   type PublicUser,
   publicBookingUrl,
+  type TotpEnrollmentResponse,
+  type TotpVerifyResponse,
   updateStoredUser,
 } from "@/lib/api";
 import {
@@ -114,7 +136,28 @@ function reminderValueFromMinutes(minutes: number | null) {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsPageFallback />}>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageFallback() {
+  return (
+    <AppShell active="Settings" title="Settings">
+      <div className="flex items-center gap-2 text-[13px] text-[#6B7280]">
+        <Loader2 className="size-4 animate-spin" /> Loading settings…
+      </div>
+    </AppShell>
+  );
+}
+
+function SettingsPageContent() {
   const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deleteToken = searchParams.get("deleteToken");
 
   const [user, setUser] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +167,7 @@ export default function SettingsPage() {
   // edited; `dirty` derives from a diff so the sticky footer knows when to
   // show the Save/Discard pair.
   const [draftName, setDraftName] = useState("");
+  const [draftBusinessDisplayName, setDraftBusinessDisplayName] = useState("");
   const [draftSlug, setDraftSlug] = useState("");
   const [draftTimezone, setDraftTimezone] = useState(detectedTimezone);
   const [draftLocation, setDraftLocation] = useState("");
@@ -137,17 +181,27 @@ export default function SettingsPage() {
 
   const [activeSection, setActiveSection] = useState<SectionId>("account");
 
+  const applyUser = useCallback(
+    (next: PublicUser) => {
+      setUser(next);
+      updateStoredUser(next);
+      setDraftName(next.name);
+      setDraftBusinessDisplayName(next.businessDisplayName ?? "");
+      setDraftSlug(next.slug);
+      setDraftTimezone(next.timezone || detectedTimezone);
+      setDraftLocation(next.location ?? "");
+      setSlugStatus({ kind: "idle" });
+    },
+    [detectedTimezone],
+  );
+
   useEffect(() => {
     let alive = true;
     async function load() {
       try {
         const me = await authedApiRequest<PublicUser>("/auth/me");
         if (!alive) return;
-        setUser(me);
-        setDraftName(me.name);
-        setDraftSlug(me.slug);
-        setDraftTimezone(me.timezone || detectedTimezone);
-        setDraftLocation(me.location ?? "");
+        applyUser(me);
       } catch (caught) {
         if (!alive) return;
         setError(
@@ -161,7 +215,7 @@ export default function SettingsPage() {
     return () => {
       alive = false;
     };
-  }, [detectedTimezone]);
+  }, [applyUser]);
 
   // Initial scroll to the section in the URL hash so the dashboard "Calendar
   // sync" link continues to land directly on the calendar section.
@@ -201,9 +255,7 @@ export default function SettingsPage() {
   }, []);
 
   // Debounced slug availability check whenever the host edits the booking
-  // link. We do all the work inside a setTimeout callback so React's
-  // "no setState in effect body" rule passes — the setState calls fire from
-  // the timer, which is asynchronous to the effect.
+  // link.
   useEffect(() => {
     if (!user) return;
     let alive = true;
@@ -247,19 +299,23 @@ export default function SettingsPage() {
     if (!user) return false;
     return (
       draftName.trim() !== user.name ||
+      draftBusinessDisplayName.trim() !== (user.businessDisplayName ?? "") ||
       draftSlug.trim() !== user.slug ||
       draftTimezone !== user.timezone ||
       (draftLocation || "") !== (user.location ?? "")
     );
-  }, [user, draftName, draftSlug, draftTimezone, draftLocation]);
+  }, [
+    user,
+    draftName,
+    draftBusinessDisplayName,
+    draftSlug,
+    draftTimezone,
+    draftLocation,
+  ]);
 
   function discardChanges() {
     if (!user) return;
-    setDraftName(user.name);
-    setDraftSlug(user.slug);
-    setDraftTimezone(user.timezone || detectedTimezone);
-    setDraftLocation(user.location ?? "");
-    setSlugStatus({ kind: "idle" });
+    applyUser(user);
   }
 
   async function saveProfile() {
@@ -270,22 +326,18 @@ export default function SettingsPage() {
     }
     setSavingProfile(true);
     try {
+      const trimmedBusiness = draftBusinessDisplayName.trim();
       const updated = await authedApiRequest<PublicUser>("/auth/me", {
         method: "PATCH",
         body: JSON.stringify({
           name: draftName.trim(),
+          businessDisplayName: trimmedBusiness ? trimmedBusiness : null,
           slug: draftSlug.trim(),
           timezone: draftTimezone,
           location: draftLocation.trim() || null,
         }),
       });
-      setUser(updated);
-      updateStoredUser(updated);
-      setDraftName(updated.name);
-      setDraftSlug(updated.slug);
-      setDraftTimezone(updated.timezone);
-      setDraftLocation(updated.location ?? "");
-      setSlugStatus({ kind: "idle" });
+      applyUser(updated);
       toast.success("Settings saved");
     } catch (caught) {
       toast.error(
@@ -342,12 +394,12 @@ export default function SettingsPage() {
             user={user}
             loading={loading}
             draftName={draftName}
+            draftBusinessDisplayName={draftBusinessDisplayName}
             onDraftName={setDraftName}
+            onDraftBusinessDisplayName={setDraftBusinessDisplayName}
+            onUserUpdated={applyUser}
           />
-          <SecuritySection user={user} onUserUpdated={(u) => {
-            setUser(u);
-            updateStoredUser(u);
-          }} />
+          <SecuritySection user={user} onUserUpdated={applyUser} />
           <NotificationsSection />
           <CalendarSection />
           <BusinessSection
@@ -363,7 +415,14 @@ export default function SettingsPage() {
             onLocation={setDraftLocation}
           />
           <DataSection />
-          <DangerSection />
+          <DangerSection
+            user={user}
+            onUserUpdated={applyUser}
+            deleteToken={deleteToken}
+            onDeleteTokenConsumed={() => {
+              router.replace("/dashboard/settings#danger");
+            }}
+          />
         </div>
       </div>
 
@@ -590,18 +649,21 @@ function Select({
   onChange,
   options,
   minWidth = "min-w-[200px]",
+  disabled,
 }: {
   value: string;
   onChange: (next: string) => void;
   options: { value: string; label: string }[];
   minWidth?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={`relative ${minWidth}`}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`h-10 ${minWidth} appearance-none rounded-xl border border-[#E5E7EB] bg-white pl-3.5 pr-9 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]`}
+        disabled={disabled}
+        className={`h-10 ${minWidth} appearance-none rounded-xl border border-[#E5E7EB] bg-white pl-3.5 pr-9 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:cursor-not-allowed disabled:bg-[#F9FAFB] disabled:text-[#9CA3AF]`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -639,20 +701,116 @@ function GoogleGlyph() {
   );
 }
 
+function ModalShell({
+  title,
+  onClose,
+  children,
+  maxWidth = "max-w-[480px]",
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  maxWidth?: string;
+}) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = original;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className={`w-full ${maxWidth} rounded-2xl border border-[#EEE7DF] bg-white shadow-xl`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-4">
+          <h3 className="text-[16px] font-bold text-[#0B1220]">{title}</h3>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F3F4F6]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="px-5 py-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── sections ───────────────────────────────────────────────────────────────────
 
 function AccountSection({
   user,
   loading,
   draftName,
+  draftBusinessDisplayName,
   onDraftName,
+  onDraftBusinessDisplayName,
+  onUserUpdated,
 }: {
   user: PublicUser | null;
   loading: boolean;
   draftName: string;
+  draftBusinessDisplayName: string;
   onDraftName: (next: string) => void;
+  onDraftBusinessDisplayName: (next: string) => void;
+  onUserUpdated: (user: PublicUser) => void;
 }) {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
+
+  async function disconnectGoogle() {
+    if (!user) return;
+    if (
+      !window.confirm(
+        "Disconnect Google sign-in? You'll still be able to sign in with email and password.",
+      )
+    ) {
+      return;
+    }
+    setDisconnectingGoogle(true);
+    try {
+      const updated = await authedApiRequest<PublicUser>("/auth/google", {
+        method: "DELETE",
+      });
+      onUserUpdated(updated);
+      toast.success("Google sign-in disconnected");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not disconnect Google sign-in",
+      );
+    } finally {
+      setDisconnectingGoogle(false);
+    }
+  }
+
+  const passwordSub = useMemo(() => {
+    if (!user) return "Loading…";
+    if (!user.hasPassword) {
+      return "You currently sign in with Google. Add a password to also sign in by email.";
+    }
+    if (user.passwordSetAt) {
+      return `Sign in with email and password. Last changed ${formatRelativeDate(user.passwordSetAt)}.`;
+    }
+    return "Sign in with email and password.";
+  }, [user]);
 
   return (
     <section id="account">
@@ -673,6 +831,20 @@ function AccountSection({
           )}
         </Row>
         <Row
+          title="Business display name"
+          sub="Shown on your public page and in booking emails when set. Leave empty to use your full name."
+        >
+          {loading || !user ? (
+            <span className="text-[12px] text-[#9CA3AF]">Loading…</span>
+          ) : (
+            <Input
+              value={draftBusinessDisplayName}
+              onChange={onDraftBusinessDisplayName}
+              placeholder="e.g. Marcus' Studio"
+            />
+          )}
+        </Row>
+        <Row
           title="Email address"
           sub={
             <>
@@ -684,23 +856,14 @@ function AccountSection({
           <Input value={user?.email ?? ""} disabled />
           <button
             type="button"
-            disabled
-            title="Coming soon"
-            className="text-[13px] font-bold text-[#9CA3AF]"
+            onClick={() => setEmailModalOpen(true)}
+            disabled={!user}
+            className="text-[13px] font-bold text-[#FF5F63] hover:underline disabled:text-[#9CA3AF] disabled:no-underline"
           >
             Change
           </button>
         </Row>
-        <Row
-          title="Password"
-          sub={
-            user
-              ? user.hasPassword
-                ? "Sign in with email and password."
-                : "You currently sign in with Google. Add a password to also sign in by email."
-              : "Loading…"
-          }
-        >
+        <Row title="Password" sub={passwordSub}>
           <button
             type="button"
             onClick={() => setShowPasswordForm((v) => !v)}
@@ -718,7 +881,7 @@ function AccountSection({
             <PasswordForm
               user={user}
               onUserUpdated={(updated) => {
-                updateStoredUser(updated);
+                onUserUpdated(updated);
                 setShowPasswordForm(false);
               }}
             />
@@ -740,11 +903,20 @@ function AccountSection({
           {user?.hasGoogleSignIn ? (
             <button
               type="button"
-              disabled
-              title="Coming soon"
-              className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
+              onClick={disconnectGoogle}
+              disabled={disconnectingGoogle || !user.hasPassword}
+              title={
+                user.hasPassword
+                  ? undefined
+                  : "Add a password first so you can still sign in"
+              }
+              className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#9CA3AF] disabled:hover:bg-white"
             >
-              Disconnect
+              {disconnectingGoogle ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Disconnect"
+              )}
             </button>
           ) : (
             <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-bold text-[#6B7280]">
@@ -753,7 +925,207 @@ function AccountSection({
           )}
         </Row>
       </Card>
+
+      {emailModalOpen && user ? (
+        <EmailChangeModal
+          currentEmail={user.email}
+          onClose={() => setEmailModalOpen(false)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function EmailChangeModal({
+  currentEmail,
+  onClose,
+}: {
+  currentEmail: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [step, setStep] = useState<"request" | "confirm" | "done">("request");
+  const [newEmail, setNewEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
+  async function requestChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSubmitting(true);
+    try {
+      const response =
+        await authedApiRequest<EmailChangeRequestResponse>(
+          "/auth/email/change",
+          {
+            method: "POST",
+            body: JSON.stringify({ newEmail: newEmail.trim() }),
+          },
+        );
+      setExpiresAt(response.expiresAt);
+      setStep("confirm");
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error
+          ? caught.message
+          : "Could not send confirmation code",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function confirmChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSubmitting(true);
+    try {
+      await authedApiRequest<EmailChangeConfirmResponse>(
+        "/auth/email/confirm",
+        {
+          method: "POST",
+          body: JSON.stringify({ token: code.trim() }),
+        },
+      );
+      setStep("done");
+      clearAuthSession();
+      toast.success("Email changed. Sign in again to continue.");
+      setTimeout(() => {
+        router.push(`/login?reason=session_expired`);
+      }, 1500);
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error
+          ? caught.message
+          : "Code is invalid or expired",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Change email address" onClose={onClose}>
+      {step === "request" ? (
+        <form className="space-y-4" onSubmit={requestChange}>
+          <p className="text-[13px] text-[#6B7280]">
+            We&apos;ll send a 6-digit confirmation code to the new email. Your
+            current email is{" "}
+            <span className="font-semibold text-[#0B1220]">{currentEmail}</span>
+            .
+          </p>
+          <label className="block">
+            <span className="text-[13px] font-bold text-[#0B1220]">
+              New email address
+            </span>
+            <input
+              type="email"
+              required
+              value={newEmail}
+              onChange={(event) => setNewEmail(event.target.value)}
+              placeholder="new@example.com"
+              className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[14px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            />
+          </label>
+          {errorMessage ? (
+            <p className="text-[13px] font-bold text-[#B91C1C]">
+              {errorMessage}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? "Sending…" : "Send code"}
+            </button>
+          </div>
+        </form>
+      ) : step === "confirm" ? (
+        <form className="space-y-4" onSubmit={confirmChange}>
+          <p className="text-[13px] text-[#6B7280]">
+            Enter the 6-digit code we sent to{" "}
+            <span className="font-semibold text-[#0B1220]">{newEmail}</span>.
+            {expiresAt ? (
+              <>
+                {" "}
+                Expires{" "}
+                <span className="font-semibold text-[#0B1220]">
+                  {formatRelativeDate(expiresAt)}
+                </span>
+                .
+              </>
+            ) : null}
+          </p>
+          <label className="block">
+            <span className="text-[13px] font-bold text-[#0B1220]">
+              Confirmation code
+            </span>
+            <input
+              required
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(event) =>
+                setCode(event.target.value.replace(/[^0-9]/g, ""))
+              }
+              placeholder="123456"
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            />
+          </label>
+          {errorMessage ? (
+            <p className="text-[13px] font-bold text-[#B91C1C]">
+              {errorMessage}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCode("");
+                setErrorMessage(null);
+                setStep("request");
+              }}
+              className="text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+            >
+              ← Use a different email
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || code.length !== 6}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? "Confirming…" : "Confirm change"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-3 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+            <Check className="size-6" />
+          </div>
+          <p className="text-[15px] font-bold text-[#0B1220]">
+            Email updated.
+          </p>
+          <p className="text-[13px] text-[#6B7280]">
+            We signed you out of every device. Redirecting you to sign in…
+          </p>
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -894,65 +1266,198 @@ function PasswordField({
 
 function SecuritySection({
   user,
+  onUserUpdated,
 }: {
   user: PublicUser | null;
   onUserUpdated: (user: PublicUser) => void;
 }) {
+  const router = useRouter();
+  const [sessions, setSessions] = useState<ActiveUserSession[] | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+
+  const [totpModal, setTotpModal] = useState<"enroll" | "disable" | null>(null);
+
+  const reloadSessions = useCallback(async () => {
+    try {
+      const list = await authedApiRequest<ActiveUserSession[]>("/auth/sessions");
+      setSessions(list);
+      setSessionsError(null);
+    } catch (caught) {
+      setSessionsError(
+        caught instanceof Error ? caught.message : "Could not load sessions",
+      );
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    async function load() {
+      try {
+        const list =
+          await authedApiRequest<ActiveUserSession[]>("/auth/sessions");
+        if (alive) {
+          setSessions(list);
+          setSessionsError(null);
+        }
+      } catch (caught) {
+        if (alive) {
+          setSessionsError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load sessions",
+          );
+        }
+      } finally {
+        if (alive) setSessionsLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  async function revokeSession(id: string) {
+    setRevokingId(id);
+    try {
+      const result = await authedApiRequest<{
+        success: boolean;
+        revokedCurrent: boolean;
+      }>(`/auth/sessions/${id}`, { method: "DELETE" });
+      if (result.revokedCurrent) {
+        clearAuthSession();
+        toast.success("Signed out of this device");
+        router.push("/login?reason=session_expired");
+        return;
+      }
+      toast.success("Session revoked");
+      await reloadSessions();
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not revoke session",
+      );
+    } finally {
+      setRevokingId(null);
+    }
+  }
+
+  async function revokeOthers() {
+    if (!window.confirm("Sign out of every other device?")) return;
+    setRevokingOthers(true);
+    try {
+      const result = await authedApiRequest<{
+        success: boolean;
+        revokedCount: number;
+      }>("/auth/sessions/others", { method: "DELETE" });
+      toast.success(
+        result.revokedCount === 1
+          ? "Signed out 1 other device"
+          : `Signed out ${result.revokedCount} other devices`,
+      );
+      await reloadSessions();
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not sign out other devices",
+      );
+    } finally {
+      setRevokingOthers(false);
+    }
+  }
+
+  const otherSessions = sessions?.filter((session) => !session.isCurrent) ?? [];
+  const twoFactorEnabled = Boolean(user?.hasTwoFactor);
+
   return (
     <section id="security">
       <SectionHeader
         eyebrow="Security"
         title="Sessions & sign-in"
-        description="2FA and per-device session control are on the roadmap."
+        description="Set up a second factor and keep an eye on where you're signed in."
       />
       <Card>
         <Row
           title="Two-factor authentication"
-          sub="Require a code from your authenticator app every time you sign in on a new device."
+          sub={
+            twoFactorEnabled
+              ? "Enabled. A 6-digit code is required when signing in."
+              : "Require a code from your authenticator app every time you sign in."
+          }
         >
-          <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-bold text-[#6B7280]">
-            Coming soon
-          </span>
-          <Toggle on={false} onChange={() => undefined} disabled />
+          {twoFactorEnabled ? (
+            <>
+              <Pill tone="green">Enabled</Pill>
+              <button
+                type="button"
+                onClick={() => setTotpModal("disable")}
+                className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              >
+                Disable
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTotpModal("enroll")}
+              disabled={!user?.hasPassword}
+              title={
+                user?.hasPassword
+                  ? undefined
+                  : "Add a password before enabling two-factor authentication"
+              }
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            >
+              Set up 2FA
+            </button>
+          )}
         </Row>
         <Row title="Active sessions" align="start">
           <div className="w-full space-y-2 lg:min-w-[420px]">
-            <div className="flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-white text-[#FF5F63]">
-                <Laptop className="size-4" />
+            {sessionsLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3 text-[13px] text-[#6B7280]">
+                <Loader2 className="size-4 animate-spin" /> Loading sessions…
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold">
-                  This device{" "}
-                  <span className="ml-1 inline-flex align-middle items-center gap-1 rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]">
-                    Active
-                  </span>
-                </p>
-                <p className="text-[12px] text-[#6B7280]">
-                  Signed in on this browser
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl border border-dashed border-[#EEE7DF] p-3">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-[#F4EAFF] text-[#7C3AED]">
-                <Smartphone className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#9CA3AF]">
-                  Other devices appear here when session listing ships
-                </p>
-                <p className="text-[12px] text-[#9CA3AF]">
-                  Until then, password reset signs everyone out at once.
-                </p>
-              </div>
-            </div>
+            ) : sessionsError ? (
+              <p className="text-[13px] text-[#B91C1C]">{sessionsError}</p>
+            ) : sessions && sessions.length > 0 ? (
+              sessions.map((session) => (
+                <SessionRow
+                  key={session.id}
+                  session={session}
+                  revoking={revokingId === session.id}
+                  onRevoke={() => revokeSession(session.id)}
+                />
+              ))
+            ) : (
+              <p className="text-[13px] text-[#6B7280]">
+                No active sessions found.
+              </p>
+            )}
             <button
               type="button"
-              disabled
-              className="text-[13px] font-bold text-[#9CA3AF]"
-              title="Coming soon — for now, reset your password to revoke every session."
+              onClick={revokeOthers}
+              disabled={revokingOthers || otherSessions.length === 0}
+              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-[#FF5F63] hover:underline disabled:cursor-not-allowed disabled:text-[#9CA3AF] disabled:no-underline"
             >
-              Sign out of all other devices
+              {revokingOthers ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LogOut className="size-4" />
+              )}
+              {revokingOthers
+                ? "Signing out…"
+                : otherSessions.length > 0
+                  ? `Sign out of ${otherSessions.length} other device${
+                      otherSessions.length === 1 ? "" : "s"
+                    }`
+                  : "Sign out of all other devices"}
             </button>
           </div>
         </Row>
@@ -962,11 +1467,384 @@ function SecuritySection({
           <ShieldCheck className="mt-0.5 size-4 text-amber-600" />
           <p className="text-[13px] leading-[1.6] text-[#92400E]">
             You sign in with Google only. Add a password from the Account
-            section to also sign in by email.
+            section to also sign in by email and to enable two-factor
+            authentication.
           </p>
         </div>
       ) : null}
+
+      {totpModal === "enroll" ? (
+        <TotpEnrollmentModal
+          onClose={() => setTotpModal(null)}
+          onEnabled={(updated) => {
+            onUserUpdated(updated);
+            setTotpModal(null);
+          }}
+        />
+      ) : null}
+      {totpModal === "disable" ? (
+        <TotpDisableModal
+          onClose={() => setTotpModal(null)}
+          onDisabled={(updated) => {
+            onUserUpdated(updated);
+            setTotpModal(null);
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function SessionRow({
+  session,
+  revoking,
+  onRevoke,
+}: {
+  session: ActiveUserSession;
+  revoking: boolean;
+  onRevoke: () => void;
+}) {
+  const isMobile = /iOS|Android/.test(session.os);
+  const Icon = isMobile ? Smartphone : Laptop;
+  const colorClass = session.isCurrent
+    ? "bg-white text-[#FF5F63]"
+    : "bg-[#F4EAFF] text-[#7C3AED]";
+
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border p-3 ${
+        session.isCurrent
+          ? "border-[#EEE7DF] bg-[#FFFBF7]"
+          : "border-[#EEE7DF] bg-white"
+      }`}
+    >
+      <div
+        className={`flex size-9 items-center justify-center rounded-xl ${colorClass}`}
+      >
+        <Icon className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-bold">
+          {session.deviceLabel}
+          {session.isCurrent ? (
+            <span className="ml-1 inline-flex align-middle items-center gap-1 rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]">
+              This device
+            </span>
+          ) : null}
+        </p>
+        <p className="text-[12px] text-[#6B7280]">
+          {session.ipRegion ?? session.ipAddress ?? "Unknown location"} ·{" "}
+          Active {formatRelativeDate(session.lastUsedAt)}
+        </p>
+      </div>
+      {session.isCurrent ? null : (
+        <button
+          type="button"
+          onClick={onRevoke}
+          disabled={revoking}
+          className="text-[12px] font-bold text-[#FF5F63] hover:underline disabled:text-[#9CA3AF]"
+        >
+          {revoking ? "Revoking…" : "Sign out"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TotpEnrollmentModal({
+  onClose,
+  onEnabled,
+}: {
+  onClose: () => void;
+  onEnabled: (user: PublicUser) => void;
+}) {
+  const [stage, setStage] = useState<
+    "loading" | "scan" | "verify" | "backup" | "error"
+  >("loading");
+  const [enrollment, setEnrollment] = useState<TotpEnrollmentResponse | null>(
+    null,
+  );
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function start() {
+      try {
+        const response = await authedApiRequest<TotpEnrollmentResponse>(
+          "/auth/totp/enroll",
+          { method: "POST" },
+        );
+        if (!alive) return;
+        setEnrollment(response);
+        setStage("scan");
+      } catch (caught) {
+        if (!alive) return;
+        setErrorMessage(
+          caught instanceof Error
+            ? caught.message
+            : "Could not start two-factor enrollment",
+        );
+        setStage("error");
+      }
+    }
+    void start();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function verify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSubmitting(true);
+    try {
+      const response = await authedApiRequest<TotpVerifyResponse>(
+        "/auth/totp/verify",
+        {
+          method: "POST",
+          body: JSON.stringify({ code: code.trim() }),
+        },
+      );
+      setBackupCodes(response.backupCodes);
+      setStage("backup");
+      // We'll bubble the updated user up when the modal closes from the backup
+      // step so the user sees the codes first.
+      updateStoredUser(response.user);
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error ? caught.message : "Invalid code",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function downloadBackupCodes() {
+    const text = backupCodes.join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bookvella-backup-codes.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function finish() {
+    try {
+      const me = await authedApiRequest<PublicUser>("/auth/me");
+      onEnabled(me);
+    } catch {
+      onClose();
+    }
+  }
+
+  return (
+    <ModalShell title="Set up two-factor authentication" onClose={onClose}>
+      {stage === "loading" ? (
+        <div className="flex items-center gap-2 py-6 text-[13px] text-[#6B7280]">
+          <Loader2 className="size-4 animate-spin" /> Generating secret…
+        </div>
+      ) : stage === "error" ? (
+        <div className="space-y-3">
+          <p className="text-[13px] text-[#B91C1C]">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            Close
+          </button>
+        </div>
+      ) : stage === "scan" && enrollment ? (
+        <div className="space-y-4">
+          <p className="text-[13px] text-[#6B7280]">
+            Scan this QR code in your authenticator app (Google Authenticator,
+            1Password, Authy…). Or enter the secret manually.
+          </p>
+          <div className="flex justify-center rounded-xl border border-[#EEE7DF] bg-white p-4">
+            <img
+              alt="Authenticator QR code"
+              width={196}
+              height={196}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=196x196&data=${encodeURIComponent(enrollment.otpauthUrl)}`}
+              className="rounded"
+            />
+          </div>
+          <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+              Secret
+            </p>
+            <p className="mt-1 break-all font-mono text-[13px] text-[#0B1220]">
+              {enrollment.secret}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStage("verify")}
+            className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+          >
+            Continue
+          </button>
+        </div>
+      ) : stage === "verify" ? (
+        <form className="space-y-4" onSubmit={verify}>
+          <p className="text-[13px] text-[#6B7280]">
+            Enter the 6-digit code from your authenticator app to confirm
+            setup.
+          </p>
+          <input
+            required
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(event) =>
+              setCode(event.target.value.replace(/[^0-9]/g, ""))
+            }
+            placeholder="123456"
+            className="h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+          />
+          {errorMessage ? (
+            <p className="text-[13px] font-bold text-[#B91C1C]">
+              {errorMessage}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setStage("scan")}
+              className="text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+            >
+              ← Back
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || code.length !== 6}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              Verify and enable
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 text-[12px] text-[#92400E]">
+            <p className="font-bold">Save these backup codes.</p>
+            <p className="mt-1">
+              Each code can be used once if you lose access to your
+              authenticator. Store them somewhere safe — we won&apos;t show them
+              again.
+            </p>
+          </div>
+          <ul className="grid grid-cols-2 gap-2 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
+            {backupCodes.map((codeValue) => (
+              <li
+                key={codeValue}
+                className="rounded-md bg-white px-2 py-1.5 text-center font-mono text-[13px] font-bold tracking-[0.1em] text-[#0B1220]"
+              >
+                {codeValue}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={downloadBackupCodes}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            >
+              <Download className="size-3.5" /> Download as .txt
+            </button>
+            <button
+              type="button"
+              onClick={finish}
+              className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+function TotpDisableModal({
+  onClose,
+  onDisabled,
+}: {
+  onClose: () => void;
+  onDisabled: (user: PublicUser) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function disable(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSubmitting(true);
+    try {
+      const response = await authedApiRequest<{
+        success: boolean;
+        user: PublicUser;
+      }>("/auth/totp/disable", {
+        method: "POST",
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      toast.success("Two-factor authentication disabled");
+      onDisabled(response.user);
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error ? caught.message : "Invalid code",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Disable two-factor authentication" onClose={onClose}>
+      <form className="space-y-4" onSubmit={disable}>
+        <p className="text-[13px] text-[#6B7280]">
+          Enter a current 6-digit code or one of your backup codes to confirm.
+        </p>
+        <input
+          required
+          inputMode="text"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          placeholder="123456 or backup code"
+          className="h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[15px] font-bold tracking-[0.2em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+        />
+        {errorMessage ? (
+          <p className="text-[13px] font-bold text-[#B91C1C]">{errorMessage}</p>
+        ) : null}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting || code.trim().length < 6}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#EF4444] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+          >
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+            Disable 2FA
+          </button>
+        </div>
+      </form>
+    </ModalShell>
   );
 }
 
@@ -1176,6 +2054,156 @@ function NotificationsSection() {
 }
 
 function CalendarSection() {
+  const [calendars, setCalendars] = useState<ConnectedCalendar[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState<"google" | "outlook" | null>(
+    null,
+  );
+  const [busyCalendarId, setBusyCalendarId] = useState<string | null>(null);
+  const [busyConflictId, setBusyConflictId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const list =
+          await authedApiRequest<ConnectedCalendar[]>("/auth/calendars");
+        if (alive) {
+          setCalendars(list);
+          setError(null);
+        }
+      } catch (caught) {
+        if (alive) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load connected calendars",
+          );
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function startConnect(provider: "google" | "outlook") {
+    setConnecting(provider);
+    try {
+      const response = await authedApiRequest<CalendarAuthorizationResponse>(
+        provider === "google"
+          ? "/auth/google/calendar"
+          : "/auth/outlook/calendar",
+      );
+      window.location.href = response.authorizationUrl;
+    } catch (caught) {
+      const message =
+        caught instanceof Error
+          ? caught.message
+          : `Could not start ${provider === "google" ? "Google" : "Outlook"} sign-in`;
+      toast.error(message);
+      setConnecting(null);
+    }
+  }
+
+  function replaceCalendar(updated: ConnectedCalendar) {
+    setCalendars((current) =>
+      current?.map((calendar) =>
+        calendar.id === updated.id ? updated : calendar,
+      ) ?? [updated],
+    );
+  }
+
+  async function updateCalendar(
+    calendar: ConnectedCalendar,
+    patch: {
+      enabled?: boolean;
+      conflictsOn?: boolean;
+      writeBackCalendarId?: string | null;
+      markBufferBusy?: boolean;
+      includeGuestDetails?: boolean;
+    },
+  ) {
+    setBusyCalendarId(calendar.id);
+    try {
+      const updated = await authedApiRequest<ConnectedCalendar>(
+        `/auth/calendars/${calendar.id}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      );
+      replaceCalendar(updated);
+      toast.success("Calendar settings saved");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not update calendar settings",
+      );
+    } finally {
+      setBusyCalendarId(null);
+    }
+  }
+
+  async function updateConflictCalendar(
+    calendar: ConnectedCalendar,
+    conflictId: string,
+    enabled: boolean,
+  ) {
+    setBusyConflictId(conflictId);
+    try {
+      const updated = await authedApiRequest<ConnectedCalendar>(
+        `/auth/calendars/${calendar.id}/conflicts/${conflictId}`,
+        { method: "PATCH", body: JSON.stringify({ enabled }) },
+      );
+      replaceCalendar(updated);
+      toast.success(enabled ? "Calendar blocks availability" : "Calendar ignored");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not update calendar",
+      );
+    } finally {
+      setBusyConflictId(null);
+    }
+  }
+
+  async function disconnectCalendar(calendar: ConnectedCalendar) {
+    if (
+      !window.confirm(
+        `Disconnect ${calendar.accountEmail}? Bookvella will stop checking it for conflicts and stop writing bookings to it.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyCalendarId(calendar.id);
+    try {
+      await authedApiRequest<{ success: boolean }>(
+        `/auth/calendars/${calendar.id}`,
+        { method: "DELETE" },
+      );
+      setCalendars((current) =>
+        current?.filter((item) => item.id !== calendar.id) ?? [],
+      );
+      toast.success("Calendar disconnected");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not disconnect calendar",
+      );
+    } finally {
+      setBusyCalendarId(null);
+    }
+  }
+
+  const googleCalendars =
+    calendars?.filter((c) => c.provider === "GOOGLE") ?? [];
+  const outlookCalendars =
+    calendars?.filter((c) => c.provider === "OUTLOOK") ?? [];
+
   return (
     <section id="calendar">
       <SectionHeader
@@ -1184,64 +2212,45 @@ function CalendarSection() {
         description="Bookvella will check your calendar for conflicts and write new bookings back to it. Guests never see private event details — only that a time isn't available."
       />
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-4 py-3">
-        <span className="flex size-8 items-center justify-center rounded-full bg-white text-[#FF5F63]">
-          <CalendarClock className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-bold text-[#0B1220]">
-            No calendar connected yet
-          </p>
-          <p className="text-[12px] text-[#6B7280]">
-            Your availability still works from the schedule you set in
-            Availability. Calendar sync ships next.
-          </p>
+      {error ? (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
-      </div>
+      ) : null}
 
       <Card>
-        <Row
-          title={
-            <div className="flex items-center gap-3">
-              <GoogleGlyph />
-              <span>
-                Google Calendar{" "}
-                <Pill tone="grey">Coming soon</Pill>
-              </span>
-            </div>
+        <CalendarProviderRow
+          label="Google Calendar"
+          glyph={<GoogleGlyph />}
+          description="Two-way sync: read busy times, write new bookings into the calendar of your choice."
+          calendars={googleCalendars}
+          loading={loading}
+          connecting={connecting === "google"}
+          onConnect={() => startConnect("google")}
+          busyCalendarId={busyCalendarId}
+          busyConflictId={busyConflictId}
+          onUpdateCalendar={updateCalendar}
+          onUpdateConflictCalendar={updateConflictCalendar}
+          onDisconnectCalendar={disconnectCalendar}
+        />
+        <CalendarProviderRow
+          label="Outlook / Microsoft 365"
+          glyph={
+            <span className="flex size-10 items-center justify-center rounded-xl bg-[#DBEAFE]">
+              <CalendarIcon className="size-5 text-[#1D4ED8]" />
+            </span>
           }
-          sub="Two-way sync: read busy times, write new bookings into the calendar of your choice."
-        >
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white opacity-60"
-          >
-            Connect
-          </button>
-        </Row>
-        <Row
-          title={
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-[#DBEAFE]">
-                <CalendarIcon className="size-5 text-[#1D4ED8]" />
-              </span>
-              <span>
-                Outlook / Microsoft 365{" "}
-                <Pill tone="grey">Coming soon</Pill>
-              </span>
-            </div>
-          }
-          sub="Pull busy times and write new bookings to Outlook."
-        >
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
-          >
-            Connect
-          </button>
-        </Row>
+          description="Pull busy times and write new bookings to Outlook."
+          calendars={outlookCalendars}
+          loading={loading}
+          connecting={connecting === "outlook"}
+          onConnect={() => startConnect("outlook")}
+          busyCalendarId={busyCalendarId}
+          busyConflictId={busyConflictId}
+          onUpdateCalendar={updateCalendar}
+          onUpdateConflictCalendar={updateConflictCalendar}
+          onDisconnectCalendar={disconnectCalendar}
+        />
         <Row
           title={
             <div className="flex items-center gap-3">
@@ -1274,14 +2283,381 @@ function CalendarSection() {
             Guests never see your private calendar
           </p>
           <p className="mt-1 text-[12px] leading-snug text-[#6B7280]">
-            When sync ships, conflicting times are hidden. Guests see &ldquo;no
-            longer available&rdquo; — never event titles, locations, or
-            attendees.
+            Conflicting times are hidden. Guests see &ldquo;no longer
+            available&rdquo; — never event titles, locations, or attendees.
           </p>
         </div>
       </div>
     </section>
   );
+}
+
+function CalendarProviderRow({
+  label,
+  glyph,
+  description,
+  calendars,
+  loading,
+  connecting,
+  onConnect,
+  busyCalendarId,
+  busyConflictId,
+  onUpdateCalendar,
+  onUpdateConflictCalendar,
+  onDisconnectCalendar,
+}: {
+  label: string;
+  glyph: React.ReactNode;
+  description: string;
+  calendars: ConnectedCalendar[];
+  loading: boolean;
+  connecting: boolean;
+  onConnect: () => void;
+  busyCalendarId: string | null;
+  busyConflictId: string | null;
+  onUpdateCalendar: (
+    calendar: ConnectedCalendar,
+    patch: {
+      enabled?: boolean;
+      conflictsOn?: boolean;
+      writeBackCalendarId?: string | null;
+      markBufferBusy?: boolean;
+      includeGuestDetails?: boolean;
+    },
+  ) => void;
+  onUpdateConflictCalendar: (
+    calendar: ConnectedCalendar,
+    conflictId: string,
+    enabled: boolean,
+  ) => void;
+  onDisconnectCalendar: (calendar: ConnectedCalendar) => void;
+}) {
+  const connected = calendars.length > 0;
+
+  return (
+    <div className="px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          {glyph}
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-bold text-[#0B1220]">
+              {label}
+              {connected ? (
+                <span className="ml-2 align-middle">
+                  <Pill tone="green">Connected</Pill>
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-0.5 text-[12px] leading-[1.5] text-[#6B7280]">
+              {description}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onConnect}
+          disabled={loading || connecting}
+          className={
+            connected
+              ? "inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+              : "inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+          }
+        >
+          {connecting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" /> Redirecting…
+            </>
+          ) : connected ? (
+            <>
+              <RefreshCw className="size-3.5" /> Reconnect
+            </>
+          ) : (
+            "Connect"
+          )}
+        </button>
+      </div>
+
+      {connected ? (
+        <div className="mt-3 space-y-3">
+          {calendars.map((calendar) => (
+            <div
+              key={calendar.id}
+              className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-[#0B1220]">
+                    {calendar.accountEmail}
+                  </p>
+                  <p className="text-[11px] text-[#6B7280]">
+                    Last synced{" "}
+                    {calendar.lastSyncedAt
+                      ? formatRelativeDate(calendar.lastSyncedAt)
+                      : "never"}{" "}
+                    · {calendar.conflictCalendars.length} calendar
+                    {calendar.conflictCalendars.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <CalendarStateChip state={calendar.state} />
+              </div>
+              {calendar.lastSyncError ? (
+                <p className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[11px] text-[#B91C1C]">
+                  {calendar.lastSyncError}
+                </p>
+              ) : null}
+              {calendar.conflictCalendars.length > 0 ? (
+                <ul className="hidden">
+                  {calendar.conflictCalendars.map((conflict) => (
+                    <li
+                      key={conflict.id}
+                      className="flex items-center gap-2 text-[12px] text-[#374151]"
+                    >
+                      <span
+                        className="size-2 rounded-full"
+                        style={{
+                          background: conflict.color ?? "#9CA3AF",
+                        }}
+                      />
+                      <span className="flex-1 truncate">{conflict.name}</span>
+                      <span
+                        className={
+                          conflict.enabled
+                            ? "rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]"
+                            : "rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-bold text-[#6B7280]"
+                        }
+                      >
+                        {conflict.enabled ? "Blocks" : "Ignored"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <CalendarAccountControls
+                calendar={calendar}
+                busy={busyCalendarId === calendar.id}
+                busyConflictId={busyConflictId}
+                onUpdate={onUpdateCalendar}
+                onUpdateConflict={onUpdateConflictCalendar}
+                onDisconnect={onDisconnectCalendar}
+              />
+            </div>
+          ))}
+          <p className="text-[11px] text-[#9CA3AF]">
+            Reconnect refreshes provider tokens and calendar lists.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CalendarAccountControls({
+  calendar,
+  busy,
+  busyConflictId,
+  onUpdate,
+  onUpdateConflict,
+  onDisconnect,
+}: {
+  calendar: ConnectedCalendar;
+  busy: boolean;
+  busyConflictId: string | null;
+  onUpdate: (
+    calendar: ConnectedCalendar,
+    patch: {
+      enabled?: boolean;
+      conflictsOn?: boolean;
+      writeBackCalendarId?: string | null;
+      markBufferBusy?: boolean;
+      includeGuestDetails?: boolean;
+    },
+  ) => void;
+  onUpdateConflict: (
+    calendar: ConnectedCalendar,
+    conflictId: string,
+    enabled: boolean,
+  ) => void;
+  onDisconnect: (calendar: ConnectedCalendar) => void;
+}) {
+  const providerUnavailable = calendar.state === "TOKEN_EXPIRED";
+  const controlDisabled = busy || providerUnavailable;
+  const conflictWriteBackOptions = calendar.conflictCalendars.map((conflict) => ({
+    value: conflict.providerCalendarId,
+    label: conflict.name,
+  }));
+  const hasCurrentWriteBack =
+    !calendar.writeBackCalendarId ||
+    conflictWriteBackOptions.some(
+      (option) => option.value === calendar.writeBackCalendarId,
+    );
+  const currentWriteBackOption =
+    !hasCurrentWriteBack && calendar.writeBackCalendarId
+      ? [
+          {
+            value: calendar.writeBackCalendarId,
+            label: "Current write-back calendar",
+          },
+        ]
+      : [];
+  const writeBackOptions = [
+    { value: "", label: "Default calendar" },
+    ...currentWriteBackOption,
+    ...conflictWriteBackOptions,
+  ];
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-[#EEE7DF] pt-3">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <CalendarToggleRow
+          label="Account sync"
+          note="Pause conflict checks and booking write-back."
+          checked={calendar.state !== "PAUSED"}
+          disabled={busy}
+          onChange={(next) => onUpdate(calendar, { enabled: next })}
+        />
+        <CalendarToggleRow
+          label="Block busy times"
+          note="Hide slots that overlap this account."
+          checked={calendar.conflictsOn}
+          disabled={controlDisabled}
+          onChange={(next) => onUpdate(calendar, { conflictsOn: next })}
+        />
+        <CalendarToggleRow
+          label="Reserve buffers"
+          note="Write service buffer time into calendar events."
+          checked={calendar.markBufferBusy}
+          disabled={controlDisabled}
+          onChange={(next) => onUpdate(calendar, { markBufferBusy: next })}
+        />
+        <CalendarToggleRow
+          label="Guest details"
+          note="Include guest name, contact info, and note."
+          checked={calendar.includeGuestDetails}
+          disabled={controlDisabled}
+          onChange={(next) => onUpdate(calendar, { includeGuestDetails: next })}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#EEE7DF] bg-white px-3 py-2.5">
+        <div>
+          <p className="text-[12px] font-bold text-[#0B1220]">
+            Write bookings to
+          </p>
+          <p className="text-[11px] text-[#6B7280]">
+            New confirmed bookings are added here.
+          </p>
+        </div>
+        <Select
+          value={calendar.writeBackCalendarId ?? ""}
+          onChange={(next) =>
+            onUpdate(calendar, { writeBackCalendarId: next || null })
+          }
+          options={writeBackOptions}
+          minWidth="min-w-[220px]"
+          disabled={controlDisabled}
+        />
+      </div>
+
+      {calendar.conflictCalendars.length > 0 ? (
+        <div className="rounded-lg border border-[#EEE7DF] bg-white p-3">
+          <p className="text-[12px] font-bold text-[#0B1220]">
+            Calendars that block availability
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {calendar.conflictCalendars.map((conflict) => (
+              <li
+                key={conflict.id}
+                className="flex items-center gap-2 rounded-md bg-[#FFFBF7] px-2.5 py-2 text-[12px] text-[#374151]"
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: conflict.color ?? "#9CA3AF" }}
+                />
+                <span className="min-w-0 flex-1 truncate">{conflict.name}</span>
+                {busyConflictId === conflict.id ? (
+                  <Loader2 className="size-3.5 animate-spin text-[#9CA3AF]" />
+                ) : null}
+                <Toggle
+                  on={conflict.enabled}
+                  disabled={controlDisabled || busyConflictId === conflict.id}
+                  onChange={(next) =>
+                    onUpdateConflict(calendar, conflict.id, next)
+                  }
+                />
+                <span
+                  className={
+                    conflict.enabled
+                      ? "w-12 text-right text-[10px] font-bold text-[#15803D]"
+                      : "w-12 text-right text-[10px] font-bold text-[#6B7280]"
+                  }
+                >
+                  {conflict.enabled ? "Blocks" : "Ignored"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-white px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+          Reconnect to refresh the calendar list.
+        </p>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => onDisconnect(calendar)}
+          disabled={busy}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-[12px] font-bold text-[#B91C1C] hover:bg-red-50 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          Disconnect
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CalendarToggleRow({
+  label,
+  note,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  note: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-[#EEE7DF] bg-white px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[12px] font-bold text-[#0B1220]">{label}</p>
+        <p className="text-[11px] leading-snug text-[#6B7280]">{note}</p>
+      </div>
+      <Toggle on={checked} disabled={disabled} onChange={onChange} />
+    </div>
+  );
+}
+
+function CalendarStateChip({
+  state,
+}: {
+  state: ConnectedCalendar["state"];
+}) {
+  switch (state) {
+    case "ACTIVE":
+      return <Pill tone="green">Active</Pill>;
+    case "PAUSED":
+      return <Pill tone="grey">Paused</Pill>;
+    case "TOKEN_EXPIRED":
+      return <Pill tone="amber">Reconnect</Pill>;
+    case "SYNC_ERROR":
+    default:
+      return <Pill tone="red">Sync error</Pill>;
+  }
 }
 
 function BusinessSection({
@@ -1427,6 +2803,29 @@ function BusinessSection({
 
 function DataSection() {
   const [exporting, setExporting] = useState(false);
+  const [exportingCustomers, setExportingCustomers] = useState(false);
+  const [feedUrl, setFeedUrl] = useState<string | null>(null);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedBusy, setFeedBusy] = useState<"copy" | "rotate" | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadFeed() {
+      try {
+        const response =
+          await authedApiRequest<BookingFeedResponse>("/bookings/feed");
+        if (alive) setFeedUrl(response.feedUrl);
+      } catch {
+        if (alive) setFeedUrl(null);
+      } finally {
+        if (alive) setFeedLoading(false);
+      }
+    }
+    void loadFeed();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function exportBookings() {
     setExporting(true);
@@ -1442,6 +2841,64 @@ function DataSection() {
       );
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function exportCustomers() {
+    setExportingCustomers(true);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      await downloadAuthedFile(
+        "/bookings/customers.csv",
+        `bookvella-customers-${stamp}.csv`,
+      );
+      toast.success("Customer list exported");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not export customer list",
+      );
+    } finally {
+      setExportingCustomers(false);
+    }
+  }
+
+  async function copyFeedUrl() {
+    if (!feedUrl) return;
+    setFeedBusy("copy");
+    try {
+      await navigator.clipboard.writeText(feedUrl);
+      toast.success("Feed URL copied");
+    } catch {
+      toast.error("Could not copy feed URL");
+    } finally {
+      setFeedBusy(null);
+    }
+  }
+
+  async function rotateFeedUrl() {
+    if (
+      !window.confirm(
+        "Rotating revokes the current feed URL. Any calendar app subscribed to the old URL will stop syncing.",
+      )
+    ) {
+      return;
+    }
+    setFeedBusy("rotate");
+    try {
+      const response = await authedApiRequest<BookingFeedResponse>(
+        "/bookings/feed/rotate",
+        { method: "PATCH" },
+      );
+      setFeedUrl(response.feedUrl);
+      toast.success("Feed URL rotated");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not rotate feed",
+      );
+    } finally {
+      setFeedBusy(null);
     }
   }
 
@@ -1472,68 +2929,215 @@ function DataSection() {
           </button>
         </Row>
         <Row
-          title={
-            <span className="flex items-center gap-2">
-              Customer list <Pill tone="amber">Soon</Pill>
-            </span>
-          }
-          sub="Email-based contact list of guests who've booked you. Coming after the bookings dashboard adds saved-customer state."
+          title="Customer list"
+          sub="Aggregated guests with most-recent name, contact info, booking count, last booking and total spend."
         >
           <button
             type="button"
-            disabled
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
+            onClick={exportCustomers}
+            disabled={exportingCustomers}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
           >
-            <Download className="size-4" /> Download CSV
+            {exportingCustomers ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            {exportingCustomers ? "Preparing…" : "Download CSV"}
           </button>
         </Row>
         <Row
-          title={
-            <span className="flex items-center gap-2">
-              Booking calendar feed (.ics){" "}
-              <Pill tone="amber">Soon</Pill>
-            </span>
+          title="Booking calendar feed (.ics)"
+          sub={
+            feedLoading
+              ? "Loading your feed URL…"
+              : feedUrl
+                ? "Subscribe to this URL in any calendar app for a live read-only feed of confirmed bookings."
+                : "Could not load feed URL. Try again."
           }
-          sub="A read-only feed of all confirmed bookings you can subscribe to from any calendar app. Individual .ics attachments already ship with each confirmation email."
+          align="start"
         >
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
-          >
-            <LinkIcon className="size-4" /> Copy feed URL
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={copyFeedUrl}
+              disabled={!feedUrl || feedBusy !== null}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            >
+              {feedBusy === "copy" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LinkIcon className="size-4" />
+              )}
+              Copy feed URL
+            </button>
+            <button
+              type="button"
+              onClick={rotateFeedUrl}
+              disabled={!feedUrl || feedBusy !== null}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#6B7280] hover:text-[#0B1220] disabled:opacity-60"
+            >
+              {feedBusy === "rotate" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              Rotate URL
+            </button>
+          </div>
         </Row>
       </Card>
     </section>
   );
 }
 
-function DangerSection() {
+function DangerSection({
+  user,
+  onUserUpdated,
+  deleteToken,
+  onDeleteTokenConsumed,
+}: {
+  user: PublicUser | null;
+  onUserUpdated: (user: PublicUser) => void;
+  deleteToken: string | null;
+  onDeleteTokenConsumed: () => void;
+}) {
+  const router = useRouter();
+  const [deactivating, setDeactivating] = useState(false);
+  const [requestingDelete, setRequestingDelete] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pendingDeleteExpiresAt, setPendingDeleteExpiresAt] = useState<
+    string | null
+  >(null);
+
+  const isActive = user?.isActive ?? true;
+
+  useEffect(() => {
+    if (!deleteToken) return;
+    let cancelled = false;
+    async function confirm() {
+      setConfirmingDelete(true);
+      try {
+        await apiRequest<{ success: boolean }>("/auth/me/delete/confirm", {
+          method: "POST",
+          body: JSON.stringify({ token: deleteToken }),
+        });
+        if (cancelled) return;
+        toast.success("Account deleted");
+        clearAuthSession();
+        router.push("/");
+      } catch (caught) {
+        if (cancelled) return;
+        toast.error(
+          caught instanceof Error
+            ? caught.message
+            : "Could not confirm deletion",
+        );
+        onDeleteTokenConsumed();
+      } finally {
+        if (!cancelled) setConfirmingDelete(false);
+      }
+    }
+    void confirm();
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteToken, onDeleteTokenConsumed, router]);
+
+  async function toggleActive(nextActive: boolean) {
+    if (!user) return;
+    if (!nextActive) {
+      if (
+        !window.confirm(
+          "Deactivate your account? Your public profile will show 'currently unavailable' and new bookings will be blocked. You can reactivate any time.",
+        )
+      ) {
+        return;
+      }
+    }
+    setDeactivating(true);
+    try {
+      const updated = await authedApiRequest<PublicUser>("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ isActive: nextActive }),
+      });
+      onUserUpdated(updated);
+      toast.success(nextActive ? "Account reactivated" : "Account deactivated");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not update account state",
+      );
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
+  async function requestDelete() {
+    if (
+      !window.confirm(
+        "Send a deletion confirmation email? You'll have 30 days to click the link before the request expires.",
+      )
+    ) {
+      return;
+    }
+    setRequestingDelete(true);
+    try {
+      const response = await authedApiRequest<AccountDeletionResponse>(
+        "/auth/me/delete",
+        { method: "POST" },
+      );
+      setPendingDeleteExpiresAt(response.expiresAt);
+      toast.success("Confirmation email sent");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not send confirmation email",
+      );
+    } finally {
+      setRequestingDelete(false);
+    }
+  }
+
   return (
     <section id="danger">
       <SectionHeader
         eyebrow="Danger zone"
         title="Irreversible actions"
-        description="Plumbed in the UI; the actual destructive endpoints land with billing/compliance review."
+        description="Deactivation is reversible; deletion anonymizes your account permanently."
         tone="danger"
       />
       <div className="mt-4 rounded-2xl border border-[#FCC9C5] bg-[#FFF5F4]">
         <div className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div className="max-w-[480px]">
-            <p className="text-[14px] font-bold">Deactivate account</p>
+            <p className="text-[14px] font-bold">
+              {isActive ? "Deactivate account" : "Account is deactivated"}
+            </p>
             <p className="mt-1 text-[12.5px] text-[#6B7280]">
-              Your public page will show a &ldquo;currently unavailable&rdquo;
-              notice. Existing bookings stay. You can reactivate any time.
+              {isActive
+                ? "Your public page will show a 'currently unavailable' notice. Existing bookings stay. You can reactivate any time."
+                : "Your public page is hidden and new bookings are blocked. Reactivate to make your services bookable again."}
             </p>
           </div>
           <button
             type="button"
-            disabled
-            title="Coming soon"
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
+            onClick={() => toggleActive(!isActive)}
+            disabled={deactivating || !user}
+            className={
+              isActive
+                ? "inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+                : "inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            }
           >
-            Deactivate
+            {deactivating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isActive ? (
+              "Deactivate"
+            ) : (
+              "Reactivate"
+            )}
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#FCC9C5] p-5">
@@ -1542,17 +3146,35 @@ function DangerSection() {
               Delete account permanently
             </p>
             <p className="mt-1 text-[12.5px] text-[#6B7280]">
-              All bookings, services, reviews, and your public page will be
-              removed. This cannot be undone.
+              We&apos;ll email a confirmation link. Clicking it anonymizes your
+              account, hides bookings, services, reviews, and your public page.
+              This cannot be undone.
             </p>
+            {pendingDeleteExpiresAt ? (
+              <p className="mt-1 text-[12px] font-bold text-amber-700">
+                Confirmation link sent. Expires{" "}
+                {formatRelativeDate(pendingDeleteExpiresAt)}.
+              </p>
+            ) : null}
+            {confirmingDelete ? (
+              <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-[#B91C1C]">
+                <Loader2 className="size-3.5 animate-spin" /> Confirming
+                deletion…
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
-            disabled
-            title="Coming soon"
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#EF4444] px-3.5 text-[13px] font-bold text-white opacity-60"
+            onClick={requestDelete}
+            disabled={requestingDelete || !user || confirmingDelete}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#EF4444] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
-            <Trash2 className="size-4" /> Delete account
+            {requestingDelete ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Trash2 className="size-4" />
+            )}
+            {requestingDelete ? "Sending…" : "Send delete email"}
           </button>
         </div>
       </div>
@@ -1667,8 +3289,28 @@ function downloadBlob(content: string, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-// Silence unused-warning for icons reserved for the next iteration (revoke
-// button, sync indicator). Keeps the import list aligned with the design's
-// vocabulary so it's a one-line edit to wire them up later.
-void LogOut;
-void RefreshCw;
+function formatRelativeDate(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+
+  const diffMs = date.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / 60_000);
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 60) {
+    return formatter.format(diffMinutes, "minute");
+  }
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return formatter.format(diffHours, "hour");
+  }
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 30) {
+    return formatter.format(diffDays, "day");
+  }
+  const diffMonths = Math.round(diffDays / 30);
+  if (Math.abs(diffMonths) < 12) {
+    return formatter.format(diffMonths, "month");
+  }
+  return formatter.format(Math.round(diffMonths / 12), "year");
+}

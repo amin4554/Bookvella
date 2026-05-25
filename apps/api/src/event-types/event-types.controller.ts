@@ -42,7 +42,7 @@ export class EventTypesController {
   }
 
   @Delete(':id')
-  deactivate(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
-    return this.eventTypesService.deactivate(request.user!.sub, id);
+  remove(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    return this.eventTypesService.remove(request.user!.sub, id);
   }
 }

@@ -32,6 +32,11 @@ enum AvailabilityOverrideType {
   CUSTOM_HOURS
 }
 
+enum EventTypeAvailabilityMode {
+  HOST_DEFAULT
+  CUSTOM
+}
+
 enum NotificationChannel {
   EMAIL
   SMS
@@ -229,12 +234,14 @@ model EventType {
   isFeatured          Boolean      @default(false) @map("is_featured")
   directLinkOnly      Boolean      @default(false) @map("direct_link_only")
   isActive            Boolean      @default(true) @map("is_active")
+  deletedAt           DateTime?    @map("deleted_at")
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
   reviews  Review[]
+  availability EventTypeAvailability?
 
   @@unique([userId, slug])
   @@map("event_types")
@@ -251,6 +258,32 @@ model AvailabilityRule {
 
   @@index([userId])
   @@map("availability_rules")
+}
+
+model EventTypeAvailability {
+  id          String                    @id @default(uuid())
+  eventTypeId String                    @unique @map("event_type_id")
+  mode        EventTypeAvailabilityMode @default(HOST_DEFAULT)
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
+
+  eventType EventType                   @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+  rules     EventTypeAvailabilityRule[]
+
+  @@map("event_type_availability")
+}
+
+model EventTypeAvailabilityRule {
+  id             String @id @default(uuid())
+  availabilityId String @map("availability_id")
+  dayOfWeek      Int    @map("day_of_week")
+  startMinute    Int    @map("start_minute")
+  endMinute      Int    @map("end_minute")
+
+  availability EventTypeAvailability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+
+  @@index([availabilityId])
+  @@map("event_type_availability_rules")
 }
 
 model AvailabilityOverride {

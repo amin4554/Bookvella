@@ -944,6 +944,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       where: {
         slug: eventSlug,
         isActive: true,
+        deletedAt: null,
         user: {
           slug: hostSlug,
           isActive: true,

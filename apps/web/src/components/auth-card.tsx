@@ -18,6 +18,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { LegalInlineLinks } from "@/components/legal-footer";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
+  type ApiError,
   apiRequest,
   AuthResponse,
   authedApiRequest,
@@ -59,6 +60,13 @@ export function AuthCard({
   const [sessionExpired, setSessionExpired] = useState(
     Boolean(message?.toLowerCase().includes("session")),
   );
+  const [pendingTotp, setPendingTotp] = useState<
+    | null
+    | {
+        email: string;
+        password: string;
+      }
+  >(null);
   const isRegister = mode === "register";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   void state;
@@ -161,6 +169,16 @@ export function AuthCard({
       onTogglePassword={() => setShowPassword((value) => !value)}
       onSubmit={handleSubmit}
       error={error}
+    />
+  ) : pendingTotp ? (
+    <TotpStep
+      submitting={submitting}
+      error={error}
+      onSubmit={handleTotpSubmit}
+      onCancel={() => {
+        setPendingTotp(null);
+        setError(null);
+      }}
     />
   ) : (
     <LoginForm
@@ -335,13 +353,124 @@ export function AuthCard({
       saveAuthSession(session);
       router.push(safeRedirect(redirectTo));
     } catch (caught) {
+      if (!isRegister && isTotpRequired(caught)) {
+        setPendingTotp({
+          email: readFormText(form, "email"),
+          password: readFormText(form, "password"),
+        });
+        setError(null);
+      } else {
+        setError(
+          caught instanceof Error ? caught.message : "Something went wrong",
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleTotpSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pendingTotp) return;
+    setError(null);
+    setSubmitting(true);
+
+    const form = new FormData(event.currentTarget);
+    const totpCode = readFormText(form, "totpCode");
+
+    try {
+      const session = await apiRequest<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: pendingTotp.email,
+          password: pendingTotp.password,
+          totpCode,
+        }),
+      });
+
+      saveAuthSession(session);
+      router.push(safeRedirect(redirectTo));
+    } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Something went wrong",
+        caught instanceof Error
+          ? caught.message
+          : "Invalid two-factor authentication code",
       );
     } finally {
       setSubmitting(false);
     }
   }
+}
+
+function isTotpRequired(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const apiError = error as ApiError;
+  const body = apiError.body;
+  if (!body || typeof body !== "object") return false;
+  const record = body as Record<string, unknown>;
+  return (
+    record.errorCode === "TOTP_REQUIRED" || record.requiresTwoFactor === true
+  );
+}
+
+function TotpStep({
+  submitting,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  submitting: boolean;
+  error: string | null;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <form className="space-y-5" onSubmit={onSubmit}>
+      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-[13px] text-[#374151]">
+        <p className="font-bold text-[#0B1220]">
+          Two-factor authentication
+        </p>
+        <p className="mt-1">
+          Enter the 6-digit code from your authenticator app, or a backup code
+          if you&apos;ve lost access.
+        </p>
+      </div>
+      <label className="block">
+        <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+          Code
+        </span>
+        <input
+          name="totpCode"
+          required
+          inputMode="text"
+          autoComplete="one-time-code"
+          autoFocus
+          placeholder="123456"
+          className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        />
+      </label>
+      {error ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
+          <p>{error}</p>
+        </div>
+      ) : null}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="h-14 w-full rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
+      >
+        {submitting ? "Verifying..." : "Verify and sign in →"}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="block w-full text-center text-[13px] font-semibold text-[#6B7280] hover:text-[#0B1220]"
+      >
+        ← Use a different account
+      </button>
+    </form>
+  );
 }
 
 function LoginForm({

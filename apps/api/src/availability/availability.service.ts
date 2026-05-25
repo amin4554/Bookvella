@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AvailabilityOverrideType, Prisma } from '@prisma/client';
+import {
+  AvailabilityOverrideType,
+  EventTypeAvailabilityMode,
+  Prisma,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -11,6 +15,7 @@ import type {
   AvailabilitySettingsDto,
   CreateAvailabilityOverrideDto,
   CreateAvailabilityRuleDto,
+  ReplaceEventTypeAvailabilityDto,
   ReplaceAvailabilityRulesDto,
   UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
@@ -19,6 +24,12 @@ import type {
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_RANGE_DAYS = 366;
 const MAX_BLOCKS_PER_OVERRIDE = 6;
+
+type NormalizedRule = {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+};
 
 @Injectable()
 export class AvailabilityService {
@@ -96,37 +107,7 @@ export class AvailabilityService {
   // Replace the entire weekly schedule in a single transaction. Lets the UI
   // submit a fully edited set of weekly rules without sequencing many calls.
   async replaceRules(userId: string, dto: ReplaceAvailabilityRulesDto) {
-    const incoming = dto.rules ?? [];
-    const normalized = incoming.map((rule) => {
-      const next = normalizeRule(rule, { requireAll: true });
-      return {
-        dayOfWeek: next.dayOfWeek!,
-        startMinute: next.startMinute!,
-        endMinute: next.endMinute!,
-      };
-    });
-
-    // Reject overlapping windows within the same day so generated slots can
-    // never come from two competing rules.
-    const byDay = new Map<
-      number,
-      Array<{ startMinute: number; endMinute: number }>
-    >();
-    for (const rule of normalized) {
-      const list = byDay.get(rule.dayOfWeek) ?? [];
-      list.push(rule);
-      byDay.set(rule.dayOfWeek, list);
-    }
-    for (const list of byDay.values()) {
-      list.sort((a, b) => a.startMinute - b.startMinute);
-      for (let i = 1; i < list.length; i++) {
-        if (list[i].startMinute < list[i - 1].endMinute) {
-          throw new BadRequestException(
-            'Time ranges on the same day cannot overlap',
-          );
-        }
-      }
-    }
+    const normalized = normalizeRuleList(dto.rules ?? []);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.availabilityRule.deleteMany({ where: { userId } });
@@ -140,6 +121,53 @@ export class AvailabilityService {
         where: { userId },
         orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
       });
+    });
+  }
+
+  async getEventTypeAvailability(userId: string, eventTypeId: string) {
+    await this.assertOwnedEventType(userId, eventTypeId);
+    return this.readEventTypeAvailability(eventTypeId);
+  }
+
+  async replaceEventTypeAvailability(
+    userId: string,
+    eventTypeId: string,
+    dto: ReplaceEventTypeAvailabilityDto,
+  ) {
+    await this.assertOwnedEventType(userId, eventTypeId);
+
+    const mode = normalizeEventTypeAvailabilityMode(dto.mode);
+    const normalized =
+      mode === EventTypeAvailabilityMode.CUSTOM
+        ? normalizeRuleList(dto.rules ?? [])
+        : [];
+
+    return this.prisma.$transaction(async (tx) => {
+      const availability = await tx.eventTypeAvailability.upsert({
+        where: { eventTypeId },
+        create: {
+          eventTypeId,
+          mode,
+        },
+        update: {
+          mode,
+        },
+      });
+
+      await tx.eventTypeAvailabilityRule.deleteMany({
+        where: { availabilityId: availability.id },
+      });
+
+      if (normalized.length > 0) {
+        await tx.eventTypeAvailabilityRule.createMany({
+          data: normalized.map((rule) => ({
+            availabilityId: availability.id,
+            ...rule,
+          })),
+        });
+      }
+
+      return this.readEventTypeAvailability(eventTypeId, tx);
     });
   }
 
@@ -348,6 +376,45 @@ export class AvailabilityService {
 
     return this.getSettings(userId);
   }
+
+  private async assertOwnedEventType(userId: string, eventTypeId: string) {
+    const eventType = await this.prisma.eventType.findFirst({
+      where: { id: eventTypeId, userId, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!eventType) {
+      throw new NotFoundException('Service not found');
+    }
+  }
+
+  private async readEventTypeAvailability(
+    eventTypeId: string,
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const availability = await prisma.eventTypeAvailability.findUnique({
+      where: { eventTypeId },
+      include: {
+        rules: {
+          orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+        },
+      },
+    });
+
+    if (!availability) {
+      return {
+        eventTypeId,
+        mode: EventTypeAvailabilityMode.HOST_DEFAULT,
+        rules: [],
+      };
+    }
+
+    return {
+      eventTypeId,
+      mode: availability.mode,
+      rules: availability.rules,
+    };
+  }
 }
 
 function normalizeRule(
@@ -375,6 +442,60 @@ function normalizeRule(
   }
 
   return { dayOfWeek, startMinute, endMinute };
+}
+
+function normalizeRuleList(
+  rules: Array<{
+    dayOfWeek?: number;
+    startMinute?: number;
+    endMinute?: number;
+  }>,
+) {
+  const normalized: NormalizedRule[] = rules.map((rule) => {
+    const next = normalizeRule(rule, { requireAll: true });
+    return {
+      dayOfWeek: next.dayOfWeek!,
+      startMinute: next.startMinute!,
+      endMinute: next.endMinute!,
+    };
+  });
+
+  const byDay = new Map<number, NormalizedRule[]>();
+  for (const rule of normalized) {
+    const list = byDay.get(rule.dayOfWeek) ?? [];
+    list.push(rule);
+    byDay.set(rule.dayOfWeek, list);
+  }
+
+  for (const list of byDay.values()) {
+    list.sort((a, b) => a.startMinute - b.startMinute);
+    for (let i = 1; i < list.length; i++) {
+      if (list[i].startMinute < list[i - 1].endMinute) {
+        throw new BadRequestException(
+          'Time ranges on the same day cannot overlap',
+        );
+      }
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeEventTypeAvailabilityMode(
+  value: string | undefined,
+): EventTypeAvailabilityMode {
+  if (value === undefined) {
+    return EventTypeAvailabilityMode.CUSTOM;
+  }
+
+  if (
+    value !== EventTypeAvailabilityMode.HOST_DEFAULT &&
+    value !== EventTypeAvailabilityMode.CUSTOM
+  ) {
+    throw new BadRequestException('Invalid service availability mode');
+  }
+
+  return value;
 }
 
 function normalizeDayOfWeek(value: number | undefined, required: boolean) {

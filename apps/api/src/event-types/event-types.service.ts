@@ -26,7 +26,7 @@ export class EventTypesService {
 
   list(userId: string) {
     return this.prisma.eventType.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: [
         { isFeatured: 'desc' },
         { isActive: 'desc' },
@@ -234,9 +234,20 @@ export class EventTypesService {
     });
   }
 
+  async remove(userId: string, id: string) {
+    await this.assertOwned(userId, id);
+
+    await this.prisma.eventType.update({
+      where: { id },
+      data: { isActive: false, deletedAt: new Date() },
+    });
+
+    return { success: true };
+  }
+
   private async assertOwned(userId: string, id: string) {
     const eventType = await this.prisma.eventType.findFirst({
-      where: { id, userId },
+      where: { id, userId, deletedAt: null },
     });
 
     if (!eventType) {

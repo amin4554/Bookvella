@@ -56,6 +56,7 @@ export type EventType = {
   isFeatured: boolean;
   directLinkOnly: boolean;
   isActive: boolean;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -66,6 +67,22 @@ export type AvailabilityRule = {
   dayOfWeek: number;
   startMinute: number;
   endMinute: number;
+};
+
+export type EventTypeAvailabilityMode = "HOST_DEFAULT" | "CUSTOM";
+
+export type EventTypeAvailabilityRule = {
+  id: string;
+  availabilityId: string;
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+};
+
+export type EventTypeAvailability = {
+  eventTypeId: string;
+  mode: EventTypeAvailabilityMode;
+  rules: EventTypeAvailabilityRule[];
 };
 
 export type AvailabilityOverrideType = "BLOCKED" | "CUSTOM_HOURS";
@@ -260,6 +277,7 @@ export type BookingCodeResponse = {
 
 export type ApiError = Error & {
   status?: number;
+  body?: unknown;
 };
 
 export type SlugAvailability = {
@@ -287,6 +305,87 @@ export type NotificationPreferencesResponse = {
   preferences: NotificationPreference[];
 };
 
+export type ActiveUserSession = {
+  id: string;
+  isCurrent: boolean;
+  userAgent: string | null;
+  browser: string;
+  os: string;
+  deviceLabel: string;
+  ipAddress: string | null;
+  ipRegion: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+};
+
+export type TotpEnrollmentResponse = {
+  secret: string;
+  otpauthUrl: string;
+};
+
+export type TotpVerifyResponse = {
+  success: boolean;
+  backupCodes: string[];
+  user: PublicUser;
+};
+
+export type EmailChangeRequestResponse = {
+  success: boolean;
+  expiresAt: string;
+};
+
+export type EmailChangeConfirmResponse = {
+  success: boolean;
+  user: PublicUser;
+};
+
+export type BookingFeedResponse = {
+  feedUrl: string;
+};
+
+export type AccountDeletionResponse = {
+  success: boolean;
+  expiresAt: string;
+};
+
+export type CalendarProvider = "GOOGLE" | "OUTLOOK";
+
+export type ConnectedCalendarState =
+  | "ACTIVE"
+  | "PAUSED"
+  | "SYNC_ERROR"
+  | "TOKEN_EXPIRED";
+
+export type ConflictCalendar = {
+  id: string;
+  providerCalendarId: string;
+  name: string;
+  color: string | null;
+  enabled: boolean;
+};
+
+export type ConnectedCalendar = {
+  id: string;
+  provider: CalendarProvider;
+  accountEmail: string;
+  scopes: string[];
+  conflictsOn: boolean;
+  writeBackCalendarId: string | null;
+  markBufferBusy: boolean;
+  includeGuestDetails: boolean;
+  state: ConnectedCalendarState;
+  lastSyncedAt: string | null;
+  lastSyncError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  conflictCalendars: ConflictCalendar[];
+};
+
+export type CalendarAuthorizationResponse = {
+  authorizationUrl: string;
+};
+
 export async function checkSlugAvailability(
   slug: string,
 ): Promise<SlugAvailability> {
@@ -311,8 +410,10 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = new Error(await readErrorMessage(response)) as ApiError;
+    const parsed = await readErrorBody(response);
+    const error = new Error(parsed.message) as ApiError;
     error.status = response.status;
+    error.body = parsed.body;
     throw error;
   }
 
@@ -358,6 +459,41 @@ export async function authedApiRequest<T>(
 
     return apiRequest<T>(path, options);
   }
+}
+
+export async function downloadAuthedFile(path: string, filename: string) {
+  const session = getAuthSession();
+
+  if (!session?.user) {
+    const error = new Error("Please sign in again") as ApiError;
+    error.status = 401;
+    throw error;
+  }
+
+  let response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+
+  if (response.status === 401) {
+    await apiRequest<AuthResponse>("/auth/refresh", { method: "POST" });
+    response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  }
+
+  if (!response.ok) {
+    const parsed = await readErrorBody(response);
+    const error = new Error(parsed.message) as ApiError;
+    error.status = response.status;
+    error.body = parsed.body;
+    throw error;
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export async function uploadImage(file: File) {
@@ -413,20 +549,29 @@ export function publicBookingUrl(hostSlug: string, eventSlug: string) {
   return `${appUrl.replace(/\/$/, "")}/${hostSlug}/${eventSlug}`;
 }
 
-async function readErrorMessage(response: Response) {
+async function readErrorBody(
+  response: Response,
+): Promise<{ message: string; body: unknown }> {
   try {
     const body = (await response.json()) as { message?: unknown };
-    if (typeof body.message === "string") {
-      return body.message;
-    }
-    if (Array.isArray(body.message)) {
-      return body.message.join(", ");
-    }
-  } catch {
-    // Fall through to status text.
-  }
+    let message: string | null = null;
 
-  return response.statusText || "Something went wrong";
+    if (typeof body.message === "string") {
+      message = body.message;
+    } else if (Array.isArray(body.message)) {
+      message = body.message.join(", ");
+    }
+
+    return {
+      message: message ?? response.statusText ?? "Something went wrong",
+      body,
+    };
+  } catch {
+    return {
+      message: response.statusText || "Something went wrong",
+      body: null,
+    };
+  }
 }
 
 async function clearServerSession() {

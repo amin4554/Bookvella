@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,10 @@ import {
   timingSafeEqual,
 } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import type {
+  UpdateConnectedCalendarDto,
+  UpdateConflictCalendarDto,
+} from './dto';
 
 const GOOGLE_SCOPES = [
   'openid',
@@ -90,6 +95,32 @@ type CalendarEventInput = {
   endTimeUtc: Date;
   includeGuestDetails: boolean;
 };
+
+const connectedCalendarSelect = {
+  id: true,
+  provider: true,
+  accountEmail: true,
+  scopes: true,
+  conflictsOn: true,
+  writeBackCalendarId: true,
+  markBufferBusy: true,
+  includeGuestDetails: true,
+  state: true,
+  lastSyncedAt: true,
+  lastSyncError: true,
+  createdAt: true,
+  updatedAt: true,
+  conflictCalendars: {
+    select: {
+      id: true,
+      providerCalendarId: true,
+      name: true,
+      color: true,
+      enabled: true,
+    },
+    orderBy: [{ enabled: 'desc' }, { name: 'asc' }],
+  },
+} satisfies Prisma.ConnectedCalendarSelect;
 
 @Injectable()
 export class CalendarService {
@@ -259,33 +290,119 @@ export class CalendarService {
   listConnectedCalendars(userId: string) {
     return this.prisma.connectedCalendar.findMany({
       where: { userId },
-      select: {
-        id: true,
-        provider: true,
-        accountEmail: true,
-        scopes: true,
-        conflictsOn: true,
-        writeBackCalendarId: true,
-        markBufferBusy: true,
-        includeGuestDetails: true,
-        state: true,
-        lastSyncedAt: true,
-        lastSyncError: true,
-        createdAt: true,
-        updatedAt: true,
-        conflictCalendars: {
-          select: {
-            id: true,
-            providerCalendarId: true,
-            name: true,
-            color: true,
-            enabled: true,
-          },
-          orderBy: [{ enabled: 'desc' }, { name: 'asc' }],
-        },
-      },
+      select: connectedCalendarSelect,
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async updateConnectedCalendar(
+    userId: string,
+    id: string,
+    dto: UpdateConnectedCalendarDto,
+  ) {
+    const existing = await this.prisma.connectedCalendar.findFirst({
+      where: { id, userId },
+      include: { conflictCalendars: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    const data: Prisma.ConnectedCalendarUpdateInput = {};
+
+    if (dto.enabled !== undefined) {
+      data.state = requireBoolean(dto.enabled, 'enabled')
+        ? ConnectedCalendarState.ACTIVE
+        : ConnectedCalendarState.PAUSED;
+    }
+
+    if (dto.conflictsOn !== undefined) {
+      data.conflictsOn = requireBoolean(dto.conflictsOn, 'conflictsOn');
+    }
+
+    if (dto.markBufferBusy !== undefined) {
+      data.markBufferBusy = requireBoolean(
+        dto.markBufferBusy,
+        'markBufferBusy',
+      );
+    }
+
+    if (dto.includeGuestDetails !== undefined) {
+      data.includeGuestDetails = requireBoolean(
+        dto.includeGuestDetails,
+        'includeGuestDetails',
+      );
+    }
+
+    if (dto.writeBackCalendarId !== undefined) {
+      data.writeBackCalendarId = normalizeWriteBackCalendarId(
+        dto.writeBackCalendarId,
+        [
+          ...existing.conflictCalendars.map(
+            (calendar) => calendar.providerCalendarId,
+          ),
+          ...(existing.writeBackCalendarId ? [existing.writeBackCalendarId] : []),
+        ],
+      );
+    }
+
+    return this.prisma.connectedCalendar.update({
+      where: { id },
+      data,
+      select: connectedCalendarSelect,
+    });
+  }
+
+  async updateConflictCalendar(
+    userId: string,
+    connectedCalendarId: string,
+    conflictCalendarId: string,
+    dto: UpdateConflictCalendarDto,
+  ) {
+    const conflict = await this.prisma.conflictCalendar.findFirst({
+      where: {
+        id: conflictCalendarId,
+        connectedCalendar: { id: connectedCalendarId, userId },
+      },
+      select: { id: true },
+    });
+
+    if (!conflict) {
+      throw new NotFoundException('Conflict calendar not found');
+    }
+
+    await this.prisma.conflictCalendar.update({
+      where: { id: conflict.id },
+      data: { enabled: requireBoolean(dto.enabled, 'enabled') },
+    });
+
+    return this.getConnectedCalendar(userId, connectedCalendarId);
+  }
+
+  async disconnectCalendar(userId: string, id: string) {
+    const result = await this.prisma.connectedCalendar.deleteMany({
+      where: { id, userId },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    return { success: true };
+  }
+
+  private async getConnectedCalendar(userId: string, id: string) {
+    const calendar = await this.prisma.connectedCalendar.findFirst({
+      where: { id, userId },
+      select: connectedCalendarSelect,
+    });
+
+    if (!calendar) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    return calendar;
   }
 
   async getBusyIntervals(userId: string, start: Date, end: Date) {
@@ -366,6 +483,18 @@ export class CalendarService {
         (calendar.provider === CalendarProvider.OUTLOOK
           ? 'calendar'
           : 'primary');
+      const writeStartTimeUtc = calendar.markBufferBusy
+        ? new Date(
+            booking.startTimeUtc.getTime() -
+              booking.eventType.bufferBeforeMinutes * 60_000,
+          )
+        : booking.startTimeUtc;
+      const writeEndTimeUtc = calendar.markBufferBusy
+        ? new Date(
+            booking.endTimeUtc.getTime() +
+              booking.eventType.bufferAfterMinutes * 60_000,
+          )
+        : booking.endTimeUtc;
 
       try {
         const event =
@@ -376,8 +505,8 @@ export class CalendarService {
                 guestEmail: booking.guestEmail,
                 guestPhone: booking.guestPhone,
                 guestNote: booking.guestNote,
-                startTimeUtc: booking.startTimeUtc,
-                endTimeUtc: booking.endTimeUtc,
+                startTimeUtc: writeStartTimeUtc,
+                endTimeUtc: writeEndTimeUtc,
                 includeGuestDetails: calendar.includeGuestDetails,
               })
             : await this.createGoogleEvent(calendar.id, calendarId, {
@@ -386,8 +515,8 @@ export class CalendarService {
                 guestEmail: booking.guestEmail,
                 guestPhone: booking.guestPhone,
                 guestNote: booking.guestNote,
-                startTimeUtc: booking.startTimeUtc,
-                endTimeUtc: booking.endTimeUtc,
+                startTimeUtc: writeStartTimeUtc,
+                endTimeUtc: writeEndTimeUtc,
                 includeGuestDetails: calendar.includeGuestDetails,
               });
 
@@ -1049,6 +1178,40 @@ function requireText(value: string | undefined, field: string) {
 
   if (!text) {
     throw new BadRequestException(`${field} is required`);
+  }
+
+  return text;
+}
+
+function requireBoolean(value: unknown, field: string) {
+  if (typeof value !== 'boolean') {
+    throw new BadRequestException(`${field} must be a boolean`);
+  }
+
+  return value;
+}
+
+function normalizeWriteBackCalendarId(
+  value: unknown,
+  allowedProviderCalendarIds: string[],
+) {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new BadRequestException('writeBackCalendarId must be a string');
+  }
+
+  const text = value.trim();
+  if (!text) {
+    return null;
+  }
+
+  if (!allowedProviderCalendarIds.includes(text)) {
+    throw new BadRequestException(
+      'writeBackCalendarId must match a connected calendar',
+    );
   }
 
   return text;

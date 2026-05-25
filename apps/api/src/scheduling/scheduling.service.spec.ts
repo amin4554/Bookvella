@@ -134,4 +134,70 @@ describe('SchedulingService', () => {
 
     expect(slots).toHaveLength(0);
   });
+
+  it('uses custom service availability instead of the host default', async () => {
+    const prisma = {
+      eventType: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'event-3',
+          userId: 'user-1',
+          slug: 'consult',
+          title: 'Consultation',
+          description: null,
+          durationMinutes: 60,
+          bufferBeforeMinutes: 0,
+          bufferAfterMinutes: 0,
+          locationType: 'VIDEO',
+          isActive: true,
+          availability: {
+            id: 'event-availability-1',
+            eventTypeId: 'event-3',
+            mode: 'CUSTOM',
+            rules: [
+              {
+                id: 'event-rule-1',
+                availabilityId: 'event-availability-1',
+                dayOfWeek: 2, // Tuesday
+                startMinute: 13 * 60,
+                endMinute: 15 * 60,
+              },
+            ],
+          },
+          user: {
+            id: 'user-1',
+            name: 'Host',
+            slug: 'host',
+            timezone: 'UTC',
+            availabilityRules: [
+              {
+                id: 'host-rule-1',
+                userId: 'user-1',
+                dayOfWeek: 1, // Monday
+                startMinute: 9 * 60,
+                endMinute: 17 * 60,
+              },
+            ],
+            availabilityOverrides: [],
+          },
+        }),
+      },
+      booking: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = new SchedulingService(prisma as unknown as PrismaService);
+
+    const slots = await service.getAvailableSlots({
+      hostSlug: 'host',
+      eventSlug: 'consult',
+      start: '2026-06-01T00:00:00.000Z',
+      end: '2026-06-03T00:00:00.000Z',
+      guestTimezone: 'UTC',
+    });
+
+    expect(slots.map((slot) => slot.startTimeUtc)).toEqual([
+      '2026-06-02T13:00:00.000Z',
+      '2026-06-02T14:00:00.000Z',
+    ]);
+  });
 });

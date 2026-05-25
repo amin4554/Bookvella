@@ -51,3 +51,14 @@ export type AvailabilitySettingsDto = {
   dailyBookingLimit?: number | null;
   showBufferTime?: boolean;
 };
+
+export type EventTypeAvailabilityModeDto = 'HOST_DEFAULT' | 'CUSTOM';
+
+export type ReplaceEventTypeAvailabilityDto = {
+  mode?: EventTypeAvailabilityModeDto;
+  rules?: Array<{
+    dayOfWeek?: number;
+    startMinute?: number;
+    endMinute?: number;
+  }>;
+};

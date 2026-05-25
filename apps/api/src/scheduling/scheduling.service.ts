@@ -35,6 +35,7 @@ export class SchedulingService {
       where: {
         slug: eventSlug,
         isActive: true,
+        deletedAt: null,
         user: {
           slug: hostSlug,
           isActive: true,
@@ -129,7 +130,7 @@ export class SchedulingService {
       where: { slug: hostSlug },
       include: {
         eventTypes: {
-          where: { isActive: true, directLinkOnly: false },
+          where: { isActive: true, directLinkOnly: false, deletedAt: null },
           orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
         },
       },
@@ -256,12 +257,18 @@ export class SchedulingService {
       where: {
         slug: input.eventSlug,
         isActive: true,
+        deletedAt: null,
         user: {
           slug: input.hostSlug,
           isActive: true,
         },
       },
       include: {
+        availability: {
+          include: {
+            rules: true,
+          },
+        },
         user: {
           include: {
             availabilityRules: true,
@@ -308,10 +315,13 @@ export class SchedulingService {
       return [];
     }
 
-    if (
-      host.availabilityRules.length === 0 &&
-      host.availabilityOverrides.length === 0
-    ) {
+    const serviceAvailability = eventType.availability;
+    const weeklyRules =
+      serviceAvailability?.mode === 'CUSTOM'
+        ? serviceAvailability.rules
+        : host.availabilityRules;
+
+    if (weeklyRules.length === 0 && host.availabilityOverrides.length === 0) {
       return [];
     }
 
@@ -380,7 +390,7 @@ export class SchedulingService {
     const rulesByDay = new Map(
       Array.from({ length: 7 }, (_, day) => [
         day,
-        host.availabilityRules.filter((rule) => rule.dayOfWeek === day),
+        weeklyRules.filter((rule) => rule.dayOfWeek === day),
       ]),
     );
     const slots: AvailableSlot[] = [];

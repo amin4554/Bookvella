@@ -107,9 +107,7 @@ export default function ServicesPage() {
     try {
       const updated = await authedApiRequest<EventType>(
         `/event-types/${event.id}`,
-        target
-          ? { method: "PATCH", body: JSON.stringify({ isActive: true }) }
-          : { method: "DELETE" },
+        { method: "PATCH", body: JSON.stringify({ isActive: target }) },
       );
       setEvents((current) =>
         current.map((e) => (e.id === updated.id ? updated : e)),
@@ -118,6 +116,23 @@ export default function ServicesPage() {
     } catch (caught) {
       toast.error(
         caught instanceof Error ? caught.message : "Could not update service",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteService(event: EventType) {
+    setBusyId(event.id);
+    try {
+      await authedApiRequest<{ success: boolean }>(`/event-types/${event.id}`, {
+        method: "DELETE",
+      });
+      setEvents((current) => current.filter((e) => e.id !== event.id));
+      toast.success("Service deleted");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not delete service",
       );
     } finally {
       setBusyId(null);
@@ -239,6 +254,7 @@ export default function ServicesPage() {
                       user={user}
                       busy={busyId === event.id}
                       onDeactivate={() => toggleActive(event, false)}
+                      onDelete={() => setDeleting(event)}
                     />
                   ))}
                 </div>
@@ -274,7 +290,7 @@ export default function ServicesPage() {
           event={deleting}
           onClose={() => setDeleting(null)}
           onConfirm={async () => {
-            await toggleActive(deleting, false);
+            await deleteService(deleting);
             setDeleting(null);
           }}
         />
@@ -492,8 +508,7 @@ function ServiceCard({
                     }}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-[#B91C1C] hover:bg-[#FEF2F2]"
                   >
-                    <Trash2 className="size-4 text-[#DC2626]" /> Deactivate &amp;
-                    hide
+                    <Trash2 className="size-4 text-[#DC2626]" /> Delete service
                   </button>
                 </div>
               ) : null}
@@ -510,11 +525,13 @@ function CompactRow({
   user,
   busy,
   onDeactivate,
+  onDelete,
 }: {
   event: EventType;
   user: PublicUser | null;
   busy: boolean;
   onDeactivate: () => void;
+  onDelete: () => void;
 }) {
   const fullLink = user ? publicBookingUrl(user.slug, event.slug) : "";
   return (
@@ -551,6 +568,15 @@ function CompactRow({
           className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#6B7280] disabled:opacity-50"
         >
           <EyeOff className="size-3.5" /> Deactivate
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={busy}
+          aria-label="Delete service"
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-[#B91C1C] hover:bg-red-50 disabled:opacity-50"
+        >
+          <Trash2 className="size-4" />
         </button>
       </div>
     </article>
@@ -728,10 +754,11 @@ function DeleteConfirm({
             <Trash2 className="size-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-bold">Deactivate {event.title}?</h3>
+            <h3 className="text-lg font-bold">Delete {event.title}?</h3>
             <p className="mt-1 text-[13px] text-[#6B7280]">
-              This hides the service from your public page so no new bookings
-              can be made. Existing bookings stay. You can reactivate it later.
+              This removes the service from your dashboard and public booking
+              pages. Existing booking history stays attached for records, but
+              the service cannot be restored from this page.
             </p>
           </div>
           <button
@@ -749,7 +776,7 @@ function DeleteConfirm({
             onClick={onClose}
             className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
           >
-            Keep active
+            Keep service
           </button>
           <button
             type="button"
@@ -764,8 +791,7 @@ function DeleteConfirm({
             }}
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#DC2626] px-4 text-[13px] font-bold text-white hover:bg-[#B91C1C] disabled:opacity-60"
           >
-            <EyeOff className="size-4" />{" "}
-            {saving ? "Deactivating..." : "Deactivate"}
+            <Trash2 className="size-4" /> {saving ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>

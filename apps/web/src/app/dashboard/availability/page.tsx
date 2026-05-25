@@ -10,6 +10,7 @@ import {
   Globe,
   Lock,
   Plus,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +22,10 @@ import {
   type AvailabilityOverrideType,
   type AvailabilityRule,
   type AvailabilitySettings,
+  type ConnectedCalendar,
+  type EventTypeAvailability,
+  type EventTypeAvailabilityMode,
+  type EventType,
   type HostBooking,
   type PublicUser,
 } from "@/lib/api";
@@ -38,6 +43,12 @@ type WeeklyDay = {
 };
 
 type Block = { start: number; end: number };
+
+type WeeklyRuleLike = {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+};
 
 type DayDraft = {
   // Identity of the date this draft refers to (YYYY-MM-DD in host-local tz).
@@ -148,7 +159,7 @@ function parseISODateOnly(isoOrYmd: string): Date {
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
 
-function rulesForDay(rules: AvailabilityRule[], dayIndex: number): Block[] {
+function rulesForDay(rules: WeeklyRuleLike[], dayIndex: number): Block[] {
   return rules
     .filter((r) => r.dayOfWeek === dayIndex)
     .map((r) => ({ start: r.startMinute, end: r.endMinute }))
@@ -196,6 +207,17 @@ function formatRangeLabel(start: Date, end: Date) {
     return `${start.getDate()}–${end.getDate()} ${MONTH_NAMES[start.getMonth()].slice(0, 3)} ${end.getFullYear()}`;
   }
   return `${startStr} – ${end.getDate()} ${MONTH_NAMES[end.getMonth()].slice(0, 3)} ${end.getFullYear()}`;
+}
+
+function formatRelativeCalendarTime(date: Date) {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) return "just now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // Build a list of exception "groups" for the Exceptions tab. Multi-day ranges
@@ -274,6 +296,15 @@ export default function AvailabilityPage() {
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [serviceAvailabilityById, setServiceAvailabilityById] = useState<
+    Record<string, EventTypeAvailability>
+  >({});
+  const [calendars, setCalendars] = useState<ConnectedCalendar[]>([]);
+  // null = "All services". Otherwise the EventType.id we want to filter by.
+  const [activeServiceId, setActiveServiceId] = useState<string | null>(null);
+  const [serviceModeDraft, setServiceModeDraft] =
+    useState<EventTypeAvailabilityMode>("HOST_DEFAULT");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -305,14 +336,33 @@ export default function AvailabilityPage() {
 
     async function load() {
       try {
-        const [me, ruleList, overrideList, settingsData, hostBookings] =
+        const [
+          me,
+          ruleList,
+          overrideList,
+          settingsData,
+          hostBookings,
+          services,
+          connectedCalendars,
+        ] =
           await Promise.all([
             authedApiRequest<PublicUser>("/auth/me"),
             authedApiRequest<AvailabilityRule[]>("/availability/rules"),
             authedApiRequest<AvailabilityOverride[]>("/availability/overrides"),
             authedApiRequest<AvailabilitySettings>("/availability/settings"),
             authedApiRequest<HostBooking[]>("/bookings"),
+            authedApiRequest<EventType[]>("/event-types"),
+            authedApiRequest<ConnectedCalendar[]>("/auth/calendars"),
           ]);
+        const serviceAvailabilityEntries = await Promise.all(
+          services
+            .filter((service) => service.isActive)
+            .map((service) =>
+              authedApiRequest<EventTypeAvailability>(
+                `/availability/event-types/${service.id}`,
+              ),
+            ),
+        );
 
         if (!alive) return;
         setUser(me);
@@ -320,6 +370,16 @@ export default function AvailabilityPage() {
         setOverrides(overrideList);
         setSettingsDraft(settingsData);
         setBookings(hostBookings);
+        setEventTypes(services);
+        setServiceAvailabilityById(
+          Object.fromEntries(
+            serviceAvailabilityEntries.map((entry) => [
+              entry.eventTypeId,
+              entry,
+            ]),
+          ),
+        );
+        setCalendars(connectedCalendars);
         setWeekDraft(buildWeekDraft(ruleList));
       } catch (caught) {
         if (!alive) return;
@@ -337,11 +397,42 @@ export default function AvailabilityPage() {
     };
   }, []);
 
+  const activeService = useMemo(
+    () =>
+      activeServiceId
+        ? eventTypes.find((service) => service.id === activeServiceId) ?? null
+        : null,
+    [activeServiceId, eventTypes],
+  );
+
+  const savedActiveServiceAvailability = activeServiceId
+    ? serviceAvailabilityById[activeServiceId] ?? null
+    : null;
+
+  const savedActiveRules = useMemo<WeeklyRuleLike[]>(() => {
+    if (
+      activeServiceId &&
+      savedActiveServiceAvailability?.mode === "CUSTOM"
+    ) {
+      return savedActiveServiceAvailability.rules;
+    }
+
+    return rules;
+  }, [activeServiceId, savedActiveServiceAvailability, rules]);
+
+  const previewRules = useMemo<WeeklyRuleLike[]>(() => {
+    if (weekDirty) {
+      return rulesFromWeekDraft(weekDraft);
+    }
+
+    return savedActiveRules;
+  }, [savedActiveRules, weekDirty, weekDraft]);
+
   // Base draft is derived from the selected date plus saved rules/overrides.
   // User edits sit in `dayEdits` and overlay this base.
   const baseDayDraft = useMemo<DayDraft>(
-    () => buildBaseDayDraft(selectedDate, rules, overrides),
-    [selectedDate, rules, overrides],
+    () => buildBaseDayDraft(selectedDate, previewRules, overrides),
+    [selectedDate, previewRules, overrides],
   );
   const dayDraft: DayDraft = useMemo(() => {
     if (!dayEdits) return baseDayDraft;
@@ -361,9 +452,14 @@ export default function AvailabilityPage() {
     return m;
   }, [overrides]);
 
+  const filteredBookings = useMemo(() => {
+    if (!activeServiceId) return bookings;
+    return bookings.filter((b) => b.eventTypeId === activeServiceId);
+  }, [bookings, activeServiceId]);
+
   const bookingsByDateKey = useMemo(() => {
     const m = new Map<string, HostBooking[]>();
-    for (const b of bookings) {
+    for (const b of filteredBookings) {
       if (b.status !== "CONFIRMED") continue;
       const k = dateKey(new Date(b.startTimeUtc));
       const list = m.get(k) ?? [];
@@ -377,7 +473,7 @@ export default function AvailabilityPage() {
       );
     }
     return m;
-  }, [bookings]);
+  }, [filteredBookings]);
 
   const monthGrid = useMemo(
     () => buildMonthGrid(viewYear, viewMonth),
@@ -396,7 +492,39 @@ export default function AvailabilityPage() {
     setViewMonth(d.getMonth());
   }
 
+  function confirmDiscardDayEdits() {
+    if (!dayEdits) return true;
+    return window.confirm(
+      "You have unsaved changes on the current day. Discard them?",
+    );
+  }
+
+  function pickAvailabilityScope(nextId: string | null) {
+    if (nextId === activeServiceId) return;
+    if (weekDirty || dayDraft.dirty) {
+      const shouldDiscard = window.confirm(
+        "You have unsaved availability changes. Discard them?",
+      );
+      if (!shouldDiscard) return;
+    }
+
+    const nextAvailability = nextId ? serviceAvailabilityById[nextId] ?? null : null;
+    const nextMode = nextAvailability?.mode ?? "HOST_DEFAULT";
+    const nextRules =
+      nextId && nextMode === "CUSTOM" && nextAvailability
+        ? nextAvailability.rules
+        : rules;
+
+    setActiveServiceId(nextId);
+    setServiceModeDraft(nextMode);
+    setWeekDraft(buildWeekDraft(nextRules));
+    setWeekDirty(false);
+    setDayEdits(null);
+  }
+
   function pickToday() {
+    if (isSameDate(today, selectedDate)) return;
+    if (!confirmDiscardDayEdits()) return;
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
     setSelectedDate(today);
@@ -404,7 +532,9 @@ export default function AvailabilityPage() {
   }
 
   function pickDate(date: Date) {
-    if (date < today) return;
+    if (date < today && !isSameDate(date, today)) return;
+    if (isSameDate(date, selectedDate)) return;
+    if (!confirmDiscardDayEdits()) return;
     if (date.getMonth() !== viewMonth || date.getFullYear() !== viewYear) {
       setViewYear(date.getFullYear());
       setViewMonth(date.getMonth());
@@ -425,7 +555,7 @@ export default function AvailabilityPage() {
 
   function setDayStatus(status: DayStatus) {
     if (status === "available" && dayDraft.blocks.length === 0) {
-      const weeklyBlocks = rulesForDay(rules, selectedDate.getDay());
+      const weeklyBlocks = rulesForDay(previewRules, selectedDate.getDay());
       patchDayEdits({
         status,
         blocks: weeklyBlocks.length ? weeklyBlocks : [{ start: 9 * 60, end: 17 * 60 }],
@@ -459,7 +589,7 @@ export default function AvailabilityPage() {
   }
 
   function resetDayToWeekly() {
-    const weeklyBlocks = rulesForDay(rules, selectedDate.getDay());
+    const weeklyBlocks = rulesForDay(previewRules, selectedDate.getDay());
     patchDayEdits({
       status: weeklyBlocks.length > 0 ? "available" : "dayoff",
       blocks: weeklyBlocks,
@@ -498,7 +628,7 @@ export default function AvailabilityPage() {
       // Available: if blocks match the weekly default for this weekday, we
       // delete any existing override to keep the data tidy. Otherwise we
       // create/update a CUSTOM_HOURS override.
-      const weeklyBlocks = rulesForDay(rules, selectedDate.getDay());
+      const weeklyBlocks = rulesForDay(previewRules, selectedDate.getDay());
       const matchesWeekly = blocksEqual(draft.blocks, weeklyBlocks);
 
       if (matchesWeekly) {
@@ -532,6 +662,27 @@ export default function AvailabilityPage() {
 
   // ── handlers: weekly tab ────────────────────────────────────────────────
 
+  function markWeekDirty() {
+    if (activeServiceId && serviceModeDraft === "HOST_DEFAULT") {
+      setServiceModeDraft("CUSTOM");
+    }
+    setWeekDirty(true);
+  }
+
+  function changeServiceAvailabilityMode(mode: EventTypeAvailabilityMode) {
+    if (!activeServiceId || serviceModeDraft === mode) return;
+
+    const nextRules =
+      mode === "CUSTOM" && savedActiveServiceAvailability?.mode === "CUSTOM"
+        ? savedActiveServiceAvailability.rules
+        : rules;
+
+    setServiceModeDraft(mode);
+    setWeekDraft(buildWeekDraft(nextRules));
+    setWeekDirty(true);
+    setDayEdits(null);
+  }
+
   function toggleWeekDay(idx: number) {
     setWeekDraft((current) =>
       current.map((day) => {
@@ -544,7 +695,7 @@ export default function AvailabilityPage() {
         };
       }),
     );
-    setWeekDirty(true);
+    markWeekDirty();
   }
 
   function updateWeekBlock(idx: number, blockIndex: number, next: Block) {
@@ -558,7 +709,7 @@ export default function AvailabilityPage() {
             },
       ),
     );
-    setWeekDirty(true);
+    markWeekDirty();
   }
 
   function addWeekBlock(idx: number) {
@@ -575,7 +726,7 @@ export default function AvailabilityPage() {
         };
       }),
     );
-    setWeekDirty(true);
+    markWeekDirty();
   }
 
   function removeWeekBlock(idx: number, blockIndex: number) {
@@ -586,7 +737,7 @@ export default function AvailabilityPage() {
           : { ...day, blocks: day.blocks.filter((_, i) => i !== blockIndex) },
       ),
     );
-    setWeekDirty(true);
+    markWeekDirty();
   }
 
   function copyMondayToWeekdays() {
@@ -603,7 +754,7 @@ export default function AvailabilityPage() {
           : day,
       );
     });
-    setWeekDirty(true);
+    markWeekDirty();
   }
 
   // ── handlers: settings tab ──────────────────────────────────────────────
@@ -692,27 +843,60 @@ export default function AvailabilityPage() {
 
   // ── global save ─────────────────────────────────────────────────────────
 
+  function startRangeFromSelectedDate() {
+    const fallbackBlocks =
+      dayDraft.blocks.length > 0
+        ? dayDraft.blocks.map((block) => ({ ...block }))
+        : [{ start: 9 * 60, end: 17 * 60 }];
+
+    setTab("exceptions");
+    setExceptionEditor({
+      startDate: selectedKey,
+      endDate: "",
+      type: dayDraft.status === "available" ? "CUSTOM_HOURS" : "BLOCKED",
+      note: dayDraft.note,
+      blocks: fallbackBlocks,
+    });
+  }
+
   async function saveAll() {
     if (!dirty) return;
     setSaving(true);
     try {
       if (weekDirty) {
+        const wireRules = rulesFromWeekDraft(weekDraft);
         const wirePayload = {
-          rules: weekDraft
-            .filter((d) => d.enabled)
-            .flatMap((d) =>
-              d.blocks.map((b) => ({
-                dayOfWeek: d.dayIndex,
-                startMinute: b.start,
-                endMinute: b.end,
-              })),
-            ),
+          rules: wireRules,
         };
-        const next = await authedApiRequest<AvailabilityRule[]>(
-          "/availability/rules",
-          { method: "PUT", body: JSON.stringify(wirePayload) },
-        );
-        setRules(next);
+
+        if (activeServiceId) {
+          const next = await authedApiRequest<EventTypeAvailability>(
+            `/availability/event-types/${activeServiceId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({
+                mode: serviceModeDraft,
+                rules: serviceModeDraft === "CUSTOM" ? wireRules : [],
+              }),
+            },
+          );
+          setServiceAvailabilityById((current) => ({
+            ...current,
+            [next.eventTypeId]: next,
+          }));
+          setServiceModeDraft(next.mode);
+          setWeekDraft(
+            buildWeekDraft(next.mode === "CUSTOM" ? next.rules : rules),
+          );
+        } else {
+          const next = await authedApiRequest<AvailabilityRule[]>(
+            "/availability/rules",
+            { method: "PUT", body: JSON.stringify(wirePayload) },
+          );
+          setRules(next);
+          setWeekDraft(buildWeekDraft(next));
+        }
+
         setWeekDirty(false);
       }
 
@@ -775,6 +959,53 @@ export default function AvailabilityPage() {
     }
   }, [user]);
 
+  const calendarSyncPill = useMemo(() => {
+    if (calendars.length === 0) {
+      return {
+        text: "Calendar sync not connected",
+        className: "border-[#EEE7DF] bg-white text-[#6B7280]",
+        dotClassName: "bg-[#D1D5DB]",
+      };
+    }
+
+    const hasError = calendars.some(
+      (calendar) =>
+        calendar.state === "SYNC_ERROR" || calendar.state === "TOKEN_EXPIRED",
+    );
+    const activeCount = calendars.filter(
+      (calendar) => calendar.state === "ACTIVE",
+    ).length;
+    const latestSync = calendars
+      .map((calendar) =>
+        calendar.lastSyncedAt ? new Date(calendar.lastSyncedAt).getTime() : 0,
+      )
+      .reduce((latest, value) => Math.max(latest, value), 0);
+
+    if (hasError) {
+      return {
+        text: "Calendar sync needs attention",
+        className: "border-amber-200 bg-amber-50 text-amber-800",
+        dotClassName: "bg-amber-500",
+      };
+    }
+
+    if (activeCount === 0) {
+      return {
+        text: "Calendar sync paused",
+        className: "border-[#EEE7DF] bg-white text-[#6B7280]",
+        dotClassName: "bg-[#9CA3AF]",
+      };
+    }
+
+    return {
+      text: latestSync
+        ? `Calendar synced ${formatRelativeCalendarTime(new Date(latestSync))}`
+        : `Calendar connected (${activeCount})`,
+      className: "border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46]",
+      dotClassName: "bg-[#10B981]",
+    };
+  }, [calendars]);
+
   // ── render ──────────────────────────────────────────────────────────────
 
   return (
@@ -826,6 +1057,12 @@ export default function AvailabilityPage() {
 
       {/* Compact toolbar */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
+        <ServiceFilterSegmented
+          eventTypes={eventTypes}
+          activeServiceId={activeServiceId}
+          onPick={pickAvailabilityScope}
+        />
+        <span className="text-[12px] text-[#D1D5DB]">·</span>
         <p className="inline-flex items-center gap-1.5 text-[12px] text-[#6B7280]">
           <Globe className="size-3.5 text-[#9CA3AF]" />
           {tzLabel}
@@ -836,6 +1073,13 @@ export default function AvailabilityPage() {
             {totalWeekHours.toFixed(0)}h
           </span>{" "}
           bookable per week
+        </span>
+        <span
+          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold ${calendarSyncPill.className}`}
+        >
+          <RefreshCw className="size-3.5" />
+          <span className={`size-1.5 rounded-full ${calendarSyncPill.dotClassName}`} />
+          {calendarSyncPill.text}
         </span>
       </div>
 
@@ -875,16 +1119,13 @@ export default function AvailabilityPage() {
               today={today}
               selectedDate={selectedDate}
               monthGrid={monthGrid}
-              rules={rules}
+              rules={previewRules}
               overridesByKey={overridesByKey}
               bookingsByDateKey={bookingsByDateKey}
               onShiftMonth={shiftMonth}
               onPickToday={pickToday}
               onPickDate={pickDate}
-              onApplyRange={() => {
-                setTab("exceptions");
-                setExceptionEditor(emptyExceptionDraft());
-              }}
+              onApplyRange={startRangeFromSelectedDate}
             />
 
             <DayEditor
@@ -905,7 +1146,7 @@ export default function AvailabilityPage() {
           <section className="mt-8 rounded-2xl border border-[#EEE7DF] bg-white shadow-sm">
             <div className="flex flex-wrap items-center gap-5 border-b border-[#EEE7DF] px-5">
               <TabButton on={tab === "weekly"} onClick={() => setTab("weekly")}>
-                Default weekly hours
+                {activeService ? "Service weekly hours" : "Default weekly hours"}
               </TabButton>
               <TabButton
                 on={tab === "exceptions"}
@@ -922,6 +1163,9 @@ export default function AvailabilityPage() {
               <WeeklyTab
                 days={weekDraft}
                 totalHours={totalWeekHours}
+                serviceTitle={activeService?.title ?? null}
+                serviceMode={activeServiceId ? serviceModeDraft : null}
+                onServiceModeChange={changeServiceAvailabilityMode}
                 onToggle={toggleWeekDay}
                 onUpdateBlock={updateWeekBlock}
                 onAddBlock={addWeekBlock}
@@ -982,7 +1226,7 @@ function CalendarCard({
   today: Date;
   selectedDate: Date;
   monthGrid: { date: Date; outside: boolean }[];
-  rules: AvailabilityRule[];
+  rules: WeeklyRuleLike[];
   overridesByKey: Map<string, AvailabilityOverride>;
   bookingsByDateKey: Map<string, HostBooking[]>;
   onShiftMonth: (delta: number) => void;
@@ -1060,15 +1304,10 @@ function CalendarCard({
             state = "bookable";
           }
 
-          // Compute open vs booked indicator for bookable days.
-          const effectiveBlocks: Block[] = override?.type === "CUSTOM_HOURS"
-            ? blocksFromOverride(override)
-            : dayRules;
-          const totalCapacity = effectiveBlocks.length;
           const used = bookingsHere.length;
-          const fullyBooked =
-            state === "bookable" && totalCapacity > 0 && used > 0 && used >= totalCapacity * 4;
-          if (fullyBooked) state = "fully";
+          // "Has bookings" lights the purple dot — actual fully-booked status
+          // would need the slot generator's output, which isn't on this page.
+          if (state === "bookable" && used > 0) state = "fully";
 
           return (
             <CalendarCell
@@ -1486,6 +1725,74 @@ function BookingRow({ booking }: { booking: HostBooking }) {
   );
 }
 
+function ServiceFilterSegmented({
+  eventTypes,
+  activeServiceId,
+  onPick,
+}: {
+  eventTypes: EventType[];
+  activeServiceId: string | null;
+  onPick: (id: string | null) => void;
+}) {
+  // No services yet — show a quiet placeholder instead of an empty seg control.
+  if (eventTypes.length === 0) {
+    return (
+      <span className="inline-flex h-9 items-center rounded-[10px] border border-dashed border-[#EEE7DF] bg-white px-3 text-[12px] font-bold text-[#9CA3AF]">
+        No services yet
+      </span>
+    );
+  }
+
+  // Visible services come from the host's active list. Inactive services are
+  // dropped to keep the toolbar focused on what the host is actually selling.
+  const visibleServices = eventTypes.filter((service) => service.isActive);
+
+  return (
+    <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-[#FFFBF7] p-[3px] gap-[2px]">
+      <ServiceSegmentedButton
+        on={activeServiceId === null}
+        onClick={() => onPick(null)}
+      >
+        All services
+      </ServiceSegmentedButton>
+      {visibleServices.map((service) => (
+        <ServiceSegmentedButton
+          key={service.id}
+          on={activeServiceId === service.id}
+          onClick={() => onPick(service.id)}
+        >
+          {service.title}
+        </ServiceSegmentedButton>
+      ))}
+    </div>
+  );
+}
+
+function ServiceSegmentedButton({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
+        on
+          ? "bg-white text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+          : "text-[#6B7280] hover:text-[#0B1220]",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SegButton({
   on,
   onClick,
@@ -1541,6 +1848,9 @@ function TabButton({
 function WeeklyTab({
   days,
   totalHours: weekTotal,
+  serviceTitle,
+  serviceMode,
+  onServiceModeChange,
   onToggle,
   onUpdateBlock,
   onAddBlock,
@@ -1549,6 +1859,9 @@ function WeeklyTab({
 }: {
   days: WeeklyDay[];
   totalHours: number;
+  serviceTitle: string | null;
+  serviceMode: EventTypeAvailabilityMode | null;
+  onServiceModeChange: (mode: EventTypeAvailabilityMode) => void;
   onToggle: (idx: number) => void;
   onUpdateBlock: (idx: number, blockIndex: number, next: Block) => void;
   onAddBlock: (idx: number) => void;
@@ -1562,10 +1875,51 @@ function WeeklyTab({
 
   return (
     <div className="p-5">
-      <p className="text-[12px] text-[#6B7280]">
-        Used as the starting point for every new date. Changes don&apos;t affect
-        dates you&apos;ve already edited.
-      </p>
+      {serviceTitle && serviceMode ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3.5">
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-bold text-[#0B1220]">
+              {serviceTitle}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[#6B7280]">
+              {serviceMode === "HOST_DEFAULT"
+                ? "Inherits your default weekly hours."
+                : "Uses custom weekly hours for this service."}
+            </p>
+          </div>
+          <div className="inline-flex rounded-[10px] border border-[#E5E7EB] bg-white p-[3px] gap-[2px]">
+            <button
+              type="button"
+              onClick={() => onServiceModeChange("HOST_DEFAULT")}
+              className={[
+                "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
+                serviceMode === "HOST_DEFAULT"
+                  ? "bg-[#FFFBF7] text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+                  : "text-[#6B7280] hover:text-[#0B1220]",
+              ].join(" ")}
+            >
+              Use default
+            </button>
+            <button
+              type="button"
+              onClick={() => onServiceModeChange("CUSTOM")}
+              className={[
+                "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
+                serviceMode === "CUSTOM"
+                  ? "bg-[#FFFBF7] text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+                  : "text-[#6B7280] hover:text-[#0B1220]",
+              ].join(" ")}
+            >
+              Custom hours
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[12px] text-[#6B7280]">
+          Used as the starting point for every new date. Changes don&apos;t affect
+          dates you&apos;ve already edited.
+        </p>
+      )}
       <div className="mt-4 divide-y divide-[#EEE7DF] rounded-xl border border-[#EEE7DF]">
         {ordered.map((day) => (
           <WeeklyDayRow
@@ -2145,7 +2499,7 @@ function SelectField({
 
 function buildBaseDayDraft(
   selectedDate: Date,
-  rules: AvailabilityRule[],
+  rules: WeeklyRuleLike[],
   overrides: AvailabilityOverride[],
 ): DayDraft {
   const key = dateKey(selectedDate);
@@ -2181,7 +2535,19 @@ function buildBaseDayDraft(
   };
 }
 
-function buildWeekDraft(rules: AvailabilityRule[]): WeeklyDay[] {
+function rulesFromWeekDraft(days: WeeklyDay[]): WeeklyRuleLike[] {
+  return days
+    .filter((day) => day.enabled)
+    .flatMap((day) =>
+      day.blocks.map((block) => ({
+        dayOfWeek: day.dayIndex,
+        startMinute: block.start,
+        endMinute: block.end,
+      })),
+    );
+}
+
+function buildWeekDraft(rules: WeeklyRuleLike[]): WeeklyDay[] {
   return WEEK_LABELS.map((label, idx) => {
     const blocks = rulesForDay(rules, idx);
     return {
@@ -2202,4 +2568,3 @@ function blocksEqual(a: Block[], b: Block[]) {
   }
   return true;
 }
-

@@ -17,6 +17,7 @@ import type {
   AvailabilitySettingsDto,
   CreateAvailabilityOverrideDto,
   CreateAvailabilityRuleDto,
+  ReplaceEventTypeAvailabilityDto,
   ReplaceAvailabilityRulesDto,
   UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
@@ -63,6 +64,30 @@ export class AvailabilityController {
   }
 
   // ── Date overrides ────────────────────────────────────────────────────────
+
+  @Get('event-types/:eventTypeId')
+  getEventTypeAvailability(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventTypeId') eventTypeId: string,
+  ) {
+    return this.availabilityService.getEventTypeAvailability(
+      request.user!.sub,
+      eventTypeId,
+    );
+  }
+
+  @Put('event-types/:eventTypeId')
+  replaceEventTypeAvailability(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventTypeId') eventTypeId: string,
+    @Body() dto: ReplaceEventTypeAvailabilityDto,
+  ) {
+    return this.availabilityService.replaceEventTypeAvailability(
+      request.user!.sub,
+      eventTypeId,
+      dto,
+    );
+  }
 
   @Get('overrides')
   listOverrides(@Req() request: AuthenticatedRequest) {
