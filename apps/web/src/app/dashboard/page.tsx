@@ -117,7 +117,8 @@ export default function DashboardPage() {
     isThisWeek(booking.startTimeUtc, data.loadedAt),
   ).length;
   const firstActiveEvent = activeEvents[0];
-  const firstPublicLink = firstActiveEvent
+  const publicProfileLink = publicProfileUrl(data.user.slug);
+  const firstServiceBookingLink = firstActiveEvent
     ? publicBookingUrl(data.user.slug, firstActiveEvent.slug)
     : null;
   const hostFirstName = data.user.name.split(" ")[0] || "there";
@@ -138,7 +139,8 @@ export default function DashboardPage() {
           upcoming={upcoming}
           thisWeekCount={thisWeekCount}
           activeEventsCount={activeEvents.length}
-          firstPublicLink={firstPublicLink}
+          publicProfileLink={publicProfileLink}
+          firstServiceBookingLink={firstServiceBookingLink}
           timezone={data.user.timezone}
         />
       ) : (
@@ -146,7 +148,7 @@ export default function DashboardPage() {
           hostFirstName={hostFirstName}
           hasServices={activeEvents.length > 0}
           hasSchedule={data.availability.length > 0}
-          firstPublicLink={firstPublicLink}
+          publicProfileLink={publicProfileLink}
         />
       )}
     </AppShell>
@@ -160,7 +162,8 @@ function ActiveDashboard({
   upcoming,
   thisWeekCount,
   activeEventsCount,
-  firstPublicLink,
+  publicProfileLink,
+  firstServiceBookingLink,
   timezone,
 }: {
   hostFirstName: string;
@@ -169,7 +172,8 @@ function ActiveDashboard({
   upcoming: HostBooking[];
   thisWeekCount: number;
   activeEventsCount: number;
-  firstPublicLink: string | null;
+  publicProfileLink: string;
+  firstServiceBookingLink: string | null;
   timezone: string;
 }) {
   const firstToday = todayBookings[0] ?? upcoming[0];
@@ -188,16 +192,14 @@ function ActiveDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {firstPublicLink ? (
-            <a
-              href={firstPublicLink}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
-            >
-              <ExternalLink className="size-4" /> View public page
-            </a>
-          ) : null}
+          <a
+            href={publicProfileLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            <ExternalLink className="size-4" /> View public page
+          </a>
           <Link
             href="/dashboard/services"
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
@@ -251,7 +253,10 @@ function ActiveDashboard({
         <div className="space-y-5">
           <TodaySchedule bookings={todayBookings} timezone={timezone} />
           <CalendarSyncCard />
-          <QuickActions firstPublicLink={firstPublicLink} />
+          <QuickActions
+            publicProfileLink={publicProfileLink}
+            firstServiceBookingLink={firstServiceBookingLink}
+          />
         </div>
       </div>
     </>
@@ -589,14 +594,20 @@ function CalendarSyncCard() {
   );
 }
 
-function QuickActions({ firstPublicLink }: { firstPublicLink: string | null }) {
+function QuickActions({
+  publicProfileLink,
+  firstServiceBookingLink,
+}: {
+  publicProfileLink: string;
+  firstServiceBookingLink: string | null;
+}) {
   async function copyLink() {
-    if (!firstPublicLink) {
+    if (!firstServiceBookingLink) {
       toast.error("Create an active service first");
       return;
     }
     try {
-      await navigator.clipboard.writeText(firstPublicLink);
+      await navigator.clipboard.writeText(firstServiceBookingLink);
       toast.success("Booking link copied");
     } catch {
       toast.error("Copy failed");
@@ -636,7 +647,7 @@ function QuickActions({ firstPublicLink }: { firstPublicLink: string | null }) {
           <span className="text-[13px] font-bold">Edit availability</span>
         </Link>
         <a
-          href={firstPublicLink ?? "#"}
+          href={publicProfileLink}
           target="_blank"
           rel="noreferrer"
           className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
@@ -655,12 +666,12 @@ function SetupDashboard({
   hostFirstName,
   hasServices,
   hasSchedule,
-  firstPublicLink,
+  publicProfileLink,
 }: {
   hostFirstName: string;
   hasServices: boolean;
   hasSchedule: boolean;
-  firstPublicLink: string | null;
+  publicProfileLink: string;
 }) {
   const completed = [true, hasServices, hasSchedule, false].filter(Boolean)
     .length;
@@ -681,16 +692,14 @@ function SetupDashboard({
             world.
           </p>
         </div>
-        {firstPublicLink ? (
-          <a
-            href={firstPublicLink}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
-          >
-            <ExternalLink className="size-4" /> Preview public page
-          </a>
-        ) : null}
+        <a
+          href={publicProfileLink}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+        >
+          <ExternalLink className="size-4" /> Preview public page
+        </a>
       </div>
 
       <div
@@ -782,16 +791,14 @@ function SetupDashboard({
           >
             Continue setup <ArrowRight className="size-4" />
           </Link>
-          {firstPublicLink ? (
-            <a
-              href={firstPublicLink}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
-            >
-              <ExternalLink className="size-4" /> Preview public page
-            </a>
-          ) : null}
+          <a
+            href={publicProfileLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            <ExternalLink className="size-4" /> Preview public page
+          </a>
         </div>
       </div>
 
@@ -938,6 +945,11 @@ function formatTime(value: string, timeZone: string) {
     minute: "2-digit",
     timeZone,
   }).format(new Date(value));
+}
+
+function publicProfileUrl(hostSlug: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+  return `${appUrl.replace(/\/$/, "")}/${hostSlug}`;
 }
 
 function isThisWeek(value: string, referenceMs: number) {

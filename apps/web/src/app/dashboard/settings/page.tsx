@@ -233,25 +233,49 @@ function SettingsPageContent() {
     });
   }, []);
 
-  // Scrollspy: highlight the rail link whose section is closest to the top.
+  // Scrollspy: keep the rail matched to the section currently passing through
+  // the upper part of the viewport while the user scrolls manually.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible[0]) {
-          setActiveSection(visible[0].target.id as SectionId);
+
+    let frame = 0;
+
+    function syncActiveSection() {
+      frame = 0;
+      const anchorY = Math.min(window.innerHeight * 0.28, 220);
+      let next: SectionId = SECTIONS[0].id;
+
+      for (const section of SECTIONS) {
+        const element = document.getElementById(section.id);
+        if (!element) continue;
+        if (element.getBoundingClientRect().top <= anchorY) {
+          next = section.id;
         }
-      },
-      { rootMargin: "-30% 0px -55% 0px", threshold: [0, 0.25, 0.5, 1] },
-    );
-    for (const section of SECTIONS) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
+      }
+
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageBottom = document.documentElement.scrollHeight;
+      if (pageBottom - scrollBottom < 8) {
+        next = SECTIONS[SECTIONS.length - 1].id;
+      }
+
+      setActiveSection((current) => (current === next ? current : next));
     }
-    return () => observer.disconnect();
+
+    function scheduleSync() {
+      if (frame) return;
+      frame = requestAnimationFrame(syncActiveSection);
+    }
+
+    scheduleSync();
+    window.addEventListener("scroll", scheduleSync, { passive: true });
+    window.addEventListener("resize", scheduleSync);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleSync);
+      window.removeEventListener("resize", scheduleSync);
+    };
   }, []);
 
   // Debounced slug availability check whenever the host edits the booking

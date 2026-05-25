@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   CalendarRange,
   ChevronLeft,
@@ -120,6 +120,14 @@ const LIMIT_OPTIONS = [
   { value: 10, label: "10 per day" },
 ];
 
+const HOUR_OPTIONS = Array.from({ length: 25 }, (_, hour) =>
+  String(hour).padStart(2, "0"),
+);
+
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) =>
+  String(minute).padStart(2, "0"),
+);
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function fmtMin(m: number) {
@@ -128,18 +136,25 @@ function fmtMin(m: number) {
   return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-function parseMin(s: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const mm = Number(m[2]);
-  if (h < 0 || h > 24 || mm < 0 || mm > 59) return null;
-  if (h === 24 && mm !== 0) return null;
-  return h * 60 + mm;
-}
-
 function pad2(n: number) {
   return String(n).padStart(2, "0");
+}
+
+function timeParts(minutes: number) {
+  return {
+    hour: pad2(Math.floor(minutes / 60)),
+    minute: pad2(minutes % 60),
+  };
+}
+
+function parseTimeParts(hourText: string, minuteText: string): number | null {
+  if (hourText.trim() === "") return null;
+  const hour = Number(hourText.trim());
+  const minute = Number(minuteText.trim() || "0");
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour < 0 || hour > 24 || minute < 0 || minute > 59) return null;
+  if (hour === 24 && minute !== 0) return null;
+  return hour * 60 + minute;
 }
 
 // Stable YYYY-MM-DD key for a local Date.
@@ -2175,6 +2190,127 @@ function RangeEditor({
   );
 }
 
+function TimePartsInput({
+  value,
+  ariaLabel,
+  compact = false,
+  onCommit,
+}: {
+  value: number;
+  ariaLabel: string;
+  compact?: boolean;
+  onCommit: (next: number) => boolean;
+}) {
+  const listIdBase = useId().replace(/:/g, "");
+  const hourListId = `${listIdBase}-hours`;
+  const minuteListId = `${listIdBase}-minutes`;
+  const [hourText, setHourText] = useState(() => timeParts(value).hour);
+  const [minuteText, setMinuteText] = useState(() => timeParts(value).minute);
+
+  function reset(nextValue = value) {
+    const parts = timeParts(nextValue);
+    setHourText(parts.hour);
+    setMinuteText(parts.minute);
+  }
+
+  function commit() {
+    const next = parseTimeParts(hourText, minuteText);
+    if (next === null) {
+      toast.error("Enter a valid time");
+      reset();
+      return;
+    }
+    if (onCommit(next)) {
+      reset(next);
+      return;
+    }
+    reset();
+  }
+
+  function handleBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    commit();
+  }
+
+  function cleanPart(value: string) {
+    return value.replace(/\D/g, "").slice(0, 2);
+  }
+
+  const wrapperClass = compact
+    ? "inline-flex h-7 items-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-1"
+    : "inline-flex h-9 items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-white px-1.5";
+  const inputClass = compact
+    ? "h-5 w-[28px] rounded border border-transparent bg-[#FFFBF7] px-0.5 text-center text-[11px] font-bold tabular-nums outline-none focus:border-[#FF5F63] focus:bg-white"
+    : "h-7 w-[36px] rounded border border-transparent bg-[#FFFBF7] px-1 text-center text-[12px] font-semibold tabular-nums outline-none focus:border-[#FF5F63] focus:bg-white";
+  const unitClass = compact
+    ? "text-[10px] font-bold text-[#9CA3AF]"
+    : "text-[11px] font-bold text-[#9CA3AF]";
+
+  return (
+    <div className={wrapperClass} onBlur={handleBlur}>
+      <input
+        aria-label={`${ariaLabel} hour`}
+        inputMode="numeric"
+        list={hourListId}
+        maxLength={2}
+        onChange={(event) => setHourText(cleanPart(event.target.value))}
+        onFocus={(event) => event.currentTarget.select()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            reset();
+          }
+        }}
+        placeholder="HH"
+        value={hourText}
+        className={inputClass}
+      />
+      <span className={unitClass}>h</span>
+      <input
+        aria-label={`${ariaLabel} minute`}
+        inputMode="numeric"
+        list={minuteListId}
+        maxLength={2}
+        onChange={(event) => setMinuteText(cleanPart(event.target.value))}
+        onFocus={(event) => event.currentTarget.select()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            reset();
+          }
+        }}
+        placeholder="MM"
+        value={minuteText}
+        className={inputClass}
+      />
+      <span className={unitClass}>m</span>
+      <datalist id={hourListId}>
+        {HOUR_OPTIONS.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+      <datalist id={minuteListId}>
+        {MINUTE_OPTIONS.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
 function BlockRow({
   block,
   onChange,
@@ -2184,48 +2320,39 @@ function BlockRow({
   onChange: (next: Block) => void;
   onRemove: () => void;
 }) {
-  // Uncontrolled inputs keyed on the block value so they reset cleanly when the
-  // parent replaces the block (e.g. reset-to-default), but don't fight the user
-  // mid-typing. Validation runs on blur — invalid input simply doesn't fire
-  // onChange, leaving the parent value (and the next render's defaultValue)
-  // unchanged.
-  const startKey = `s-${block.start}-${block.end}`;
-  const endKey = `e-${block.start}-${block.end}`;
-
-  function commitStart(value: string) {
-    const next = parseMin(value);
-    if (next === null || next >= block.end) {
-      if (next !== null) toast.error("Start must be before end");
-      onChange({ ...block });
-      return;
+  // Validate the split hour/minute controls against the surrounding range.
+  function commitStart(next: number) {
+    if (next >= block.end) {
+      toast.error("Start must be before end");
+      return false;
     }
     onChange({ start: next, end: block.end });
+    return true;
   }
 
-  function commitEnd(value: string) {
-    const next = parseMin(value);
-    if (next === null || next <= block.start) {
-      if (next !== null) toast.error("End must be after start");
-      onChange({ ...block });
-      return;
+  function commitEnd(next: number) {
+    if (next <= block.start) {
+      toast.error("End must be after start");
+      return false;
     }
     onChange({ start: block.start, end: next });
+    return true;
   }
 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-2.5 py-2">
-      <input
-        key={startKey}
-        defaultValue={fmtMin(block.start)}
-        onBlur={(e) => commitStart(e.target.value)}
-        className="h-9 w-[88px] rounded-md border border-[#E5E7EB] bg-white px-2 text-center text-[13px] font-semibold tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+      <TimePartsInput
+        key={`start-${block.start}`}
+        value={block.start}
+        ariaLabel="Start time"
+        onCommit={commitStart}
       />
       <span className="text-[#9CA3AF]">—</span>
-      <input
-        key={endKey}
-        defaultValue={fmtMin(block.end)}
-        onBlur={(e) => commitEnd(e.target.value)}
-        className="h-9 w-[88px] rounded-md border border-[#E5E7EB] bg-white px-2 text-center text-[13px] font-semibold tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+      <TimePartsInput
+        key={`end-${block.end}`}
+        value={block.end}
+        ariaLabel="End time"
+        onCommit={commitEnd}
       />
       <button
         type="button"
@@ -2549,43 +2676,40 @@ function WeeklyBlockChip({
   onChange: (next: Block) => void;
   onRemove: () => void;
 }) {
-  const startKey = `s-${block.start}-${block.end}`;
-  const endKey = `e-${block.start}-${block.end}`;
-
-  function commitStart(value: string) {
-    const next = parseMin(value);
-    if (next === null || next >= block.end) {
-      if (next !== null) toast.error("Start must be before end");
-      onChange({ ...block });
-      return;
+  function commitStart(next: number) {
+    if (next >= block.end) {
+      toast.error("Start must be before end");
+      return false;
     }
     onChange({ start: next, end: block.end });
+    return true;
   }
 
-  function commitEnd(value: string) {
-    const next = parseMin(value);
-    if (next === null || next <= block.start) {
-      if (next !== null) toast.error("End must be after start");
-      onChange({ ...block });
-      return;
+  function commitEnd(next: number) {
+    if (next <= block.start) {
+      toast.error("End must be after start");
+      return false;
     }
     onChange({ start: block.start, end: next });
+    return true;
   }
 
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-2 py-1">
-      <input
-        key={startKey}
-        defaultValue={fmtMin(block.start)}
-        onBlur={(e) => commitStart(e.target.value)}
-        className="h-6 w-[58px] rounded border border-transparent bg-transparent px-1 text-center text-[12px] font-bold tabular-nums outline-none focus:border-[#FF5F63]"
+      <TimePartsInput
+        key={`start-${block.start}`}
+        value={block.start}
+        ariaLabel="Start time"
+        compact
+        onCommit={commitStart}
       />
       <span className="text-[#9CA3AF]">–</span>
-      <input
-        key={endKey}
-        defaultValue={fmtMin(block.end)}
-        onBlur={(e) => commitEnd(e.target.value)}
-        className="h-6 w-[58px] rounded border border-transparent bg-transparent px-1 text-center text-[12px] font-bold tabular-nums outline-none focus:border-[#FF5F63]"
+      <TimePartsInput
+        key={`end-${block.end}`}
+        value={block.end}
+        ariaLabel="End time"
+        compact
+        onCommit={commitEnd}
       />
       <button
         type="button"

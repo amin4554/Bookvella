@@ -66,7 +66,6 @@ export function AuthCard({
   // Mirror into a ref so the Google sign-in callback — which is bound once on
   // mount — always reads the latest value without forcing a button re-render.
   const rememberMeRef = useRef(rememberMe);
-  rememberMeRef.current = rememberMe;
   const [pendingTotp, setPendingTotp] = useState<
     | null
     | {
@@ -77,6 +76,10 @@ export function AuthCard({
   const isRegister = mode === "register";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   void state;
+
+  useEffect(() => {
+    rememberMeRef.current = rememberMe;
+  }, [rememberMe]);
 
   useEffect(() => {
     let active = true;
@@ -147,10 +150,10 @@ export function AuthCard({
           }
         },
       });
-      // GIS button caps at 400 px; we clamp to whatever the wrapper measures
-      // so the rendered button always fills our centered slot consistently.
+      // Match the full form width so the Google row aligns with the divider,
+      // inputs, and primary actions below it.
       const measured = googleButtonRef.current.offsetWidth;
-      const buttonWidth = Math.max(280, Math.min(400, measured || 360));
+      const buttonWidth = Math.max(280, Math.round(measured || 440));
       google.accounts.id.renderButton(googleButtonRef.current, {
         theme: "outline",
         size: "large",
@@ -237,16 +240,28 @@ export function AuthCard({
       </h1>
       <p className="mt-4 text-sm text-[#6B7280]">
         Sign in to your Bookvella account
-        <span className="mx-1 text-[#D1D5DB]">·</span>
-        <Link
-          href="/register"
-          className="font-semibold text-[#FF5F63] hover:underline"
-        >
-          create one free
-        </Link>
       </p>
     </>
   );
+
+  const loginSignupCta =
+    !isRegister && !pendingTotp ? (
+      <div className="mt-8">
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-[#EEE7DF]" />
+          <span className="text-xs font-semibold text-[#9CA3AF]">
+            New to Bookvella?
+          </span>
+          <span className="h-px flex-1 bg-[#EEE7DF]" />
+        </div>
+        <Link
+          href="/register"
+          className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+        >
+          Create your free booking page &rarr;
+        </Link>
+      </div>
+    ) : null;
 
   const formColumn = (
     <div className="relative flex flex-col bg-white px-6 py-10 sm:px-10 lg:px-16 lg:py-14">
@@ -269,7 +284,7 @@ export function AuthCard({
                 googleLoading ? "pointer-events-none opacity-60" : ""
               }`}
             >
-              <div ref={googleButtonRef} className="w-full max-w-[400px]" />
+              <div ref={googleButtonRef} className="w-full" />
             </div>
           ) : (
             <button
@@ -296,6 +311,7 @@ export function AuthCard({
         </div>
 
         {formNode}
+        {loginSignupCta}
       </div>
 
       <p className="mt-14 text-center text-[11px] text-[#9CA3AF] lg:mt-auto lg:pt-14 lg:text-left">
@@ -1024,9 +1040,12 @@ function RegisterGradientPanel() {
 
       <div className="relative z-10 flex w-full flex-col px-12 py-12">
         <div className="flex items-center justify-end">
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/20 bg-white/15 px-3 py-2 backdrop-blur">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-2xl border border-white/20 bg-white/15 px-3 py-2 backdrop-blur"
+          >
             <BrandLogo inverse />
-          </div>
+          </Link>
         </div>
 
         <div className="mt-24">
