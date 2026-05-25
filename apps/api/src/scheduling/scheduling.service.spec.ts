@@ -2,6 +2,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SchedulingService } from './scheduling.service';
 
 describe('SchedulingService', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-05-24T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('steps slots by session duration and removes buffered booking conflicts', async () => {
     // Session is 30 min with a 15-min buffer after.
     // Window: Mon 09:00–11:00 Berlin (07:00–09:00 UTC, Berlin = UTC+2 in May).
