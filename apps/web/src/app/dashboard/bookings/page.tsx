@@ -12,6 +12,8 @@ import {
   Copy,
   Download,
   Filter,
+  List,
+  Loader2,
   Mail,
   MessageCircle,
   Plus,
@@ -25,22 +27,32 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import {
   authedApiRequest,
+  downloadAuthedFile,
+  apiRequest,
+  type AvailableSlot,
   type HostBooking,
   type PublicUser,
 } from "@/lib/api";
 
 type Tab = "upcoming" | "past" | "cancelled";
+type ViewMode = "list" | "calendar";
 
 export default function BookingsPage() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
   const [selected, setSelected] = useState<HostBooking | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<HostBooking | null>(
+    null,
+  );
   const [tab, setTab] = useState<Tab>("upcoming");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [exporting, setExporting] = useState(false);
   // Service filter: empty set = "All services"; otherwise show only bookings
   // whose service id is in the set.
   const [serviceFilter, setServiceFilter] = useState<Set<string>>(new Set());
@@ -146,6 +158,57 @@ export default function BookingsPage() {
     }
   }
 
+  async function exportBookings() {
+    setExporting(true);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      await downloadAuthedFile(
+        "/bookings/export.csv",
+        `bookvella-bookings-${stamp}.csv`,
+      );
+      toast.success("Bookings exported");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not export bookings",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function downloadBookingIcs(booking: HostBooking) {
+    try {
+      await downloadAuthedFile(
+        `/bookings/${booking.id}.ics`,
+        `bookvella-${booking.eventType.slug}-${booking.id}.ics`,
+      );
+      toast.success("Calendar file downloaded");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not download calendar file",
+      );
+    }
+  }
+
+  async function rescheduleBooking(booking: HostBooking, startTimeUtc: string) {
+    const updated = await authedApiRequest<HostBooking>(
+      `/bookings/${booking.id}/reschedule`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          startTimeUtc,
+          guestTimezone: booking.guestTimezone,
+        }),
+      },
+    );
+    setBookings((current) =>
+      current.map((item) => (item.id === updated.id ? updated : item)),
+    );
+    toast.success("Booking rescheduled");
+  }
+
   const totalBookings = bookings.length;
   const thisMonth = bookings.filter((b) =>
     isThisMonth(b.startTimeUtc, loadedAt),
@@ -173,17 +236,32 @@ export default function BookingsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled
+            onClick={exportBookings}
+            disabled={exporting || bookings.length === 0}
             className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
           >
-            <Download className="size-4" /> Export
+            {exporting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}{" "}
+            {exporting ? "Exporting..." : "Export"}
           </button>
           <button
             type="button"
-            disabled
+            onClick={() =>
+              setViewMode((current) =>
+                current === "calendar" ? "list" : "calendar",
+              )
+            }
             className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
           >
-            <Calendar className="size-4" /> Calendar view
+            {viewMode === "calendar" ? (
+              <List className="size-4" />
+            ) : (
+              <Calendar className="size-4" />
+            )}
+            {viewMode === "calendar" ? "List view" : "Calendar view"}
           </button>
         </div>
       </div>
@@ -267,7 +345,18 @@ export default function BookingsPage() {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {viewMode === "calendar" ? (
+            <BookingsCalendarView
+              bookings={filtered}
+              month={calendarMonth}
+              timeZone={user?.timezone ?? "UTC"}
+              onMonthChange={setCalendarMonth}
+              onOpenBooking={(booking) => {
+                setExpanded(booking.id);
+                setViewMode("list");
+              }}
+            />
+          ) : filtered.length === 0 ? (
             <EmptyState tab={tab} search={search} user={user} />
           ) : (
             <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
@@ -306,6 +395,8 @@ export default function BookingsPage() {
                         )
                       }
                       onCancel={() => setSelected(booking)}
+                      onDownloadIcs={() => downloadBookingIcs(booking)}
+                      onReschedule={() => setRescheduleTarget(booking)}
                     />
                   ))}
                 </tbody>
@@ -346,6 +437,18 @@ export default function BookingsPage() {
           timeZone={user?.timezone ?? "UTC"}
           onClose={() => setSelected(null)}
           onConfirm={cancelBooking}
+        />
+      ) : null}
+      {rescheduleTarget && user ? (
+        <RescheduleModal
+          booking={rescheduleTarget}
+          hostSlug={user.slug}
+          timeZone={user.timezone}
+          onClose={() => setRescheduleTarget(null)}
+          onConfirm={async (startTimeUtc) => {
+            await rescheduleBooking(rescheduleTarget, startTimeUtc);
+            setRescheduleTarget(null);
+          }}
         />
       ) : null}
     </AppShell>
@@ -534,18 +637,165 @@ function TabButton({
   );
 }
 
+function BookingsCalendarView({
+  bookings,
+  month,
+  timeZone,
+  onMonthChange,
+  onOpenBooking,
+}: {
+  bookings: HostBooking[];
+  month: Date;
+  timeZone: string;
+  onMonthChange: (next: Date) => void;
+  onOpenBooking: (booking: HostBooking) => void;
+}) {
+  const days = useMemo(() => calendarGridDays(month), [month]);
+  const bookingsByDay = useMemo(() => {
+    const map = new Map<string, HostBooking[]>();
+    for (const booking of bookings) {
+      const key = dateKeyInTimeZone(booking.startTimeUtc, timeZone);
+      const list = map.get(key) ?? [];
+      list.push(booking);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort(
+        (a, b) =>
+          new Date(a.startTimeUtc).getTime() -
+          new Date(b.startTimeUtc).getTime(),
+      );
+    }
+    return map;
+  }, [bookings, timeZone]);
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-4">
+        <div>
+          <p className="text-[13px] font-bold">Calendar view</p>
+          <p className="text-[11px] text-[#6B7280]">
+            {bookings.length} booking{bookings.length === 1 ? "" : "s"} in the
+            current filters
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onMonthChange(addMonths(month, -1))}
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMonthChange(new Date())}
+            className="inline-flex h-9 items-center rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => onMonthChange(addMonths(month, 1))}
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+            aria-label="Next month"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="border-b border-[#EEE7DF] bg-[#FFFBF7] px-5 py-4">
+        <h2 className="text-xl font-bold">{monthLabel(month)}</h2>
+      </div>
+
+      <div className="grid grid-cols-7 border-b border-[#EEE7DF] bg-[#F9FAFB] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <div key={day} className="py-2">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-7">
+        {days.map((day) => {
+          const key = dateKey(day);
+          const dayBookings = bookingsByDay.get(key) ?? [];
+          const muted = day.getMonth() !== month.getMonth();
+          return (
+            <div
+              key={key}
+              className={`min-h-[132px] border-b border-r border-[#EEE7DF] p-2.5 ${
+                muted ? "bg-[#F9FAFB] text-[#9CA3AF]" : "bg-white"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-bold tabular-nums">
+                  {day.getDate()}
+                </span>
+                {dayBookings.length > 0 ? (
+                  <span className="rounded-full bg-[#FFF0EF] px-1.5 py-0.5 text-[10px] font-bold text-[#FF5F63]">
+                    {dayBookings.length}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {dayBookings.slice(0, 3).map((booking) => (
+                  <button
+                    key={booking.id}
+                    type="button"
+                    onClick={() => onOpenBooking(booking)}
+                    className={`w-full rounded-lg border px-2 py-1.5 text-left text-[11px] leading-tight ${
+                      booking.status === "CANCELLED"
+                        ? "border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]"
+                        : "border-[#FFD2CE] bg-[#FFF7F5] text-[#0B1220] hover:bg-[#FFF0EF]"
+                    }`}
+                  >
+                    <span className="block font-bold tabular-nums">
+                      {formatTime(booking.startTimeUtc, timeZone)}
+                    </span>
+                    <span className="block truncate text-[#6B7280]">
+                      {booking.guestName}
+                    </span>
+                  </button>
+                ))}
+                {dayBookings.length > 3 ? (
+                  <p className="px-1 text-[10px] font-bold text-[#9CA3AF]">
+                    +{dayBookings.length - 3} more
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {bookings.length === 0 ? (
+        <div className="px-5 py-10 text-center text-sm text-[#6B7280]">
+          No bookings match the current filters.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BookingRow({
   booking,
   timeZone,
   expanded,
   onToggle,
   onCancel,
+  onDownloadIcs,
+  onReschedule,
 }: {
   booking: HostBooking;
   timeZone: string;
   expanded: boolean;
   onToggle: () => void;
   onCancel: () => void;
+  onDownloadIcs: () => void;
+  onReschedule: () => void;
 }) {
   const cancelled = booking.status === "CANCELLED";
   const location =
@@ -690,14 +940,13 @@ function BookingRow({
                 <ActionButton
                   icon={CalendarPlus}
                   label="Add to my calendar"
-                  disabled
-                  hint="Soon"
+                  onClick={onDownloadIcs}
                 />
                 <ActionButton
                   icon={Repeat}
                   label="Reschedule"
-                  disabled
-                  hint="Soon"
+                  disabled={cancelled}
+                  onClick={onReschedule}
                 />
                 {!cancelled ? (
                   <button
@@ -882,6 +1131,165 @@ function CancelModal({
   );
 }
 
+function RescheduleModal({
+  booking,
+  hostSlug,
+  timeZone,
+  onClose,
+  onConfirm,
+}: {
+  booking: HostBooking;
+  hostSlug: string;
+  timeZone: string;
+  onClose: () => void;
+  onConfirm: (startTimeUtc: string) => Promise<void>;
+}) {
+  const [slots, setSlots] = useState<AvailableSlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const start = new Date();
+    const end = new Date(start.getTime() + 21 * 24 * 60 * 60 * 1000);
+    apiRequest<AvailableSlot[]>(
+      `/public/${hostSlug}/${booking.eventType.slug}/slots?start=${encodeURIComponent(
+        start.toISOString(),
+      )}&end=${encodeURIComponent(end.toISOString())}&timezone=${encodeURIComponent(
+        booking.guestTimezone,
+      )}`,
+    )
+      .then((items) => {
+        if (!alive) return;
+        const next = items.filter(
+          (slot) => slot.startTimeUtc !== booking.startTimeUtc,
+        );
+        setSlots(next);
+        setSelectedSlot(next[0]?.startTimeUtc ?? "");
+      })
+      .catch((caught) => {
+        if (!alive) return;
+        setError(
+          caught instanceof Error ? caught.message : "Could not load slots",
+        );
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [booking, hostSlug]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1220]/45 p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-[500px] rounded-2xl bg-white shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
+        <div className="flex items-start gap-4 p-6">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+            <Repeat className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold">Reschedule booking</h3>
+            <p className="mt-1 text-[13px] text-[#6B7280]">
+              Choose a new available slot. The guest will receive an updated
+              confirmation email and calendar file.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-[#F9FAFB]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mx-6 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+          <p className="text-sm font-bold">{booking.eventType.title}</p>
+          <p className="mt-0.5 text-xs text-[#6B7280] tabular-nums">
+            {booking.guestName} - {formatDateTime(booking.startTimeUtc, timeZone)}
+          </p>
+        </div>
+
+        <div className="px-6 py-5">
+          <label className="block">
+            <span className="text-xs font-bold text-[#374151]">
+              New time
+            </span>
+            <select
+              value={selectedSlot}
+              onChange={(event) => setSelectedSlot(event.target.value)}
+              disabled={loading || busy || slots.length === 0}
+              className="mt-1.5 h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:bg-[#F9FAFB] disabled:text-[#9CA3AF]"
+            >
+              {loading ? (
+                <option>Loading available times...</option>
+              ) : slots.length === 0 ? (
+                <option>No alternate slots available</option>
+              ) : (
+                slots.map((slot) => (
+                  <option key={slot.startTimeUtc} value={slot.startTimeUtc}>
+                    {new Intl.DateTimeFormat("en-US", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                      timeZone: booking.guestTimezone,
+                    }).format(new Date(slot.startTimeUtc))}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          {error ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-[#EEE7DF] p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          >
+            Keep current time
+          </button>
+          <button
+            type="button"
+            disabled={!selectedSlot || busy || loading}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConfirm(selectedSlot);
+              } catch (caught) {
+                setError(
+                  caught instanceof Error
+                    ? caught.message
+                    : "Could not reschedule booking",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white hover:brightness-105 disabled:opacity-60"
+          >
+            <Repeat className="size-4" />{" "}
+            {busy ? "Rescheduling..." : "Reschedule"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({
   tab,
   search,
@@ -1017,6 +1425,56 @@ function formatDateTime(value: string, timeZone: string) {
     minute: "2-digit",
     timeZone,
   }).format(new Date(value));
+}
+
+function formatTime(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(value));
+}
+
+function monthLabel(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
+
+function addMonths(value: Date, amount: number) {
+  return new Date(value.getFullYear(), value.getMonth() + amount, 1);
+}
+
+function calendarGridDays(month: Date) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
+  });
+}
+
+function dateKey(value: Date) {
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function dateKeyInTimeZone(value: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone,
+  }).formatToParts(new Date(value));
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function formatLocation(locationType: string) {

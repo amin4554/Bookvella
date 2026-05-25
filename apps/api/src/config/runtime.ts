@@ -79,7 +79,9 @@ export function securityHeaders(
 export function createRateLimitMiddleware(options: {
   windowMs: number;
   max: number;
-  paths: string[];
+  paths?: string[];
+  pathPatterns?: RegExp[];
+  methods?: string[];
 }) {
   const buckets = new Map<string, RateLimitBucket>();
 
@@ -97,7 +99,17 @@ export function createRateLimitMiddleware(options: {
   cleanup.unref();
 
   return (request: Request, response: Response, next: NextFunction) => {
-    if (!options.paths.some((path) => request.path.endsWith(path))) {
+    const methodAllowed =
+      !options.methods || options.methods.includes(request.method);
+    const pathAllowed =
+      !options.paths?.length && !options.pathPatterns?.length
+        ? true
+        : Boolean(options.paths?.some((path) => request.path.endsWith(path))) ||
+          Boolean(
+            options.pathPatterns?.some((pattern) => pattern.test(request.path)),
+          );
+
+    if (!methodAllowed || !pathAllowed) {
       next();
       return;
     }
@@ -122,6 +134,7 @@ export function createRateLimitMiddleware(options: {
       response.status(429).json({
         statusCode: 429,
         message: 'Too many requests. Please try again shortly.',
+        code: 'RATE_LIMITED',
         error: 'Too Many Requests',
       });
       return;
@@ -129,6 +142,53 @@ export function createRateLimitMiddleware(options: {
 
     next();
   };
+}
+
+export function csrfOriginGuard(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    next();
+    return;
+  }
+
+  const hasCookie = Boolean(request.headers.cookie);
+  const hasBearer = request.headers.authorization?.startsWith('Bearer ');
+
+  if (!hasCookie && hasBearer) {
+    next();
+    return;
+  }
+
+  const sourceOrigin = request.headers.origin ?? originFromReferer(request);
+
+  if (!sourceOrigin) {
+    if (isProduction() && hasCookie) {
+      response.status(403).json({
+        statusCode: 403,
+        message: 'Missing request origin',
+        code: 'CSRF_ORIGIN_MISSING',
+        error: 'Forbidden',
+      });
+      return;
+    }
+    next();
+    return;
+  }
+
+  if (!getCorsOrigins().includes(sourceOrigin)) {
+    response.status(403).json({
+      statusCode: 403,
+      message: 'Request origin is not allowed',
+      code: 'CSRF_ORIGIN_DENIED',
+      error: 'Forbidden',
+    });
+    return;
+  }
+
+  next();
 }
 
 function requiredVariables() {
@@ -153,4 +213,15 @@ function requiredVariables() {
 
 function isProduction() {
   return process.env.NODE_ENV === 'production';
+}
+
+function originFromReferer(request: Request) {
+  const referer = request.headers.referer;
+  if (!referer) return null;
+
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
 }

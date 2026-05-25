@@ -104,8 +104,13 @@ export class EventTypesService {
       data.title = requireText(dto.title, 'title');
     }
 
+    let previousSlug: string | null = null;
     if (dto.slug !== undefined) {
-      data.slug = slugify(dto.slug);
+      const nextSlug = slugify(dto.slug);
+      data.slug = nextSlug;
+      if (existing.slug !== nextSlug) {
+        previousSlug = existing.slug;
+      }
     }
 
     if (dto.description !== undefined) {
@@ -210,10 +215,38 @@ export class EventTypesService {
     }
 
     try {
-      return await this.prisma.eventType.update({
+      const updated = await this.prisma.eventType.update({
         where: { id },
         data,
+        include: { user: { select: { slug: true } } },
       });
+
+      if (previousSlug && previousSlug !== updated.slug) {
+        // Record a redirect for /{currentHostSlug}/{oldEventSlug} → updated.
+        try {
+          await this.prisma.publicLinkRedirect.create({
+            data: {
+              hostUserId: updated.userId,
+              oldHostSlug: updated.user.slug,
+              oldEventSlug: previousSlug,
+              eventTypeId: updated.id,
+            },
+          });
+        } catch (error) {
+          if (
+            !(
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === 'P2002'
+            )
+          ) {
+            throw error;
+          }
+        }
+      }
+
+      const { user: _ignored, ...rest } = updated;
+      void _ignored;
+      return rest;
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ConflictException(

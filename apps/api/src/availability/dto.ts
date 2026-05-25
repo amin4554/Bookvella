@@ -34,6 +34,9 @@ export type CreateAvailabilityOverrideDto = {
   type?: AvailabilityOverrideType;
   note?: string;
   blocks?: AvailabilityBlockDto[];
+  // When set, the override applies only to that service. Otherwise it applies
+  // host-wide as before.
+  eventTypeId?: string | null;
 };
 
 export type UpdateAvailabilityOverrideDto = {

@@ -65,6 +65,9 @@ describe('SchedulingService', () => {
           },
         ]),
       },
+      availabilityOverride: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     const service = new SchedulingService(prisma as unknown as PrismaService);
 
@@ -115,20 +118,25 @@ describe('SchedulingService', () => {
                 endMinute: 660,
               },
             ],
-            // 2026-05-25 is a Monday; block it entirely
-            availabilityOverrides: [
-              {
-                id: 'override-1',
-                userId: 'user-1',
-                date: new Date('2026-05-25T00:00:00.000Z'),
-                isBlocked: true,
-              },
-            ],
           },
         }),
       },
       booking: {
         findMany: jest.fn().mockResolvedValue([]),
+      },
+      // 2026-05-25 is a Monday; block it entirely
+      availabilityOverride: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'override-1',
+            userId: 'user-1',
+            eventTypeId: null,
+            date: new Date('2026-05-25T00:00:00.000Z'),
+            type: 'BLOCKED',
+            isBlocked: true,
+            blocks: null,
+          },
+        ]),
       },
     };
     const service = new SchedulingService(prisma as unknown as PrismaService);
@@ -191,6 +199,9 @@ describe('SchedulingService', () => {
         }),
       },
       booking: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      availabilityOverride: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };

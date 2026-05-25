@@ -20,6 +20,11 @@ import type {
   UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
 } from './dto';
+import type {
+  ApplyAvailabilityScheduleDto,
+  CreateAvailabilityScheduleDto,
+  UpdateAvailabilityScheduleDto,
+} from './schedules.dto';
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_RANGE_DAYS = 366;
@@ -173,9 +178,22 @@ export class AvailabilityService {
 
   // ── Date overrides ─────────────────────────────────────────────────────────
 
-  listOverrides(userId: string) {
+  // When `eventTypeId` is omitted we return every override the host owns so
+  // the dashboard can render both host-wide and per-service exceptions in one
+  // pass. The "host-only" view passes `host` and the "service" view passes the
+  // service id.
+  listOverrides(
+    userId: string,
+    scope?: { eventTypeId?: string | null | 'host' },
+  ) {
+    const where: Prisma.AvailabilityOverrideWhereInput = { userId };
+    if (scope?.eventTypeId === 'host') {
+      where.eventTypeId = null;
+    } else if (scope?.eventTypeId) {
+      where.eventTypeId = scope.eventTypeId;
+    }
     return this.prisma.availabilityOverride.findMany({
-      where: { userId },
+      where,
       orderBy: { date: 'asc' },
     });
   }
@@ -189,6 +207,11 @@ export class AvailabilityService {
     const type: AvailabilityOverrideType = dto.type ?? 'BLOCKED';
     const note = dto.note?.trim() || null;
     const blocks = type === 'CUSTOM_HOURS' ? normalizeBlocks(dto.blocks) : null;
+    const eventTypeId = dto.eventTypeId ?? null;
+
+    if (eventTypeId) {
+      await this.assertOwnedEventType(userId, eventTypeId);
+    }
 
     if (endDate < startDate) {
       throw new BadRequestException('endDate must be on or after date');
@@ -219,15 +242,17 @@ export class AvailabilityService {
         cursor <= endDate;
         cursor = new Date(cursor.getTime() + 86_400_000)
       ) {
-        // Replace any existing override for this date with the new one. Hosts
-        // expect "block this day" to override an earlier override on the same
-        // date rather than silently fail.
+        // Replace any existing override for this exact scope+date with the new
+        // one. Host-level (eventTypeId=null) and per-service (eventTypeId=...)
+        // exceptions are tracked separately so blocking a service does not
+        // wipe a host-wide block on the same day.
         await tx.availabilityOverride.deleteMany({
-          where: { userId, date: cursor },
+          where: { userId, eventTypeId, date: cursor },
         });
         const row = await tx.availabilityOverride.create({
           data: {
             userId,
+            eventTypeId,
             date: cursor,
             type,
             isBlocked: type === 'BLOCKED',
@@ -375,6 +400,164 @@ export class AvailabilityService {
     await this.prisma.user.update({ where: { id: userId }, data });
 
     return this.getSettings(userId);
+  }
+
+  // ── Named availability schedules (templates) ──────────────────────────────
+
+  async listSchedules(userId: string) {
+    const schedules = await this.prisma.availabilitySchedule.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        rules: {
+          orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+        },
+      },
+    });
+
+    return schedules.map(serializeSchedule);
+  }
+
+  async createSchedule(userId: string, dto: CreateAvailabilityScheduleDto) {
+    const name = normalizeScheduleName(dto.name);
+    const rules = normalizeRuleList(dto.rules ?? []);
+
+    try {
+      const schedule = await this.prisma.availabilitySchedule.create({
+        data: {
+          userId,
+          name,
+          rules: {
+            createMany: {
+              data: rules,
+            },
+          },
+        },
+        include: {
+          rules: {
+            orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+          },
+        },
+      });
+      return serializeSchedule(schedule);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'You already have a schedule with that name',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async updateSchedule(
+    userId: string,
+    id: string,
+    dto: UpdateAvailabilityScheduleDto,
+  ) {
+    const existing = await this.prisma.availabilitySchedule.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    const data: Prisma.AvailabilityScheduleUpdateInput = {};
+    if (dto.name !== undefined) {
+      data.name = normalizeScheduleName(dto.name);
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (Object.keys(data).length > 0) {
+          await tx.availabilitySchedule.update({
+            where: { id },
+            data,
+          });
+        }
+
+        if (dto.rules !== undefined) {
+          const normalized = normalizeRuleList(dto.rules);
+          await tx.availabilityScheduleRule.deleteMany({
+            where: { scheduleId: id },
+          });
+          if (normalized.length > 0) {
+            await tx.availabilityScheduleRule.createMany({
+              data: normalized.map((rule) => ({ scheduleId: id, ...rule })),
+            });
+          }
+        }
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'You already have a schedule with that name',
+        );
+      }
+      throw error;
+    }
+
+    const updated = await this.prisma.availabilitySchedule.findUnique({
+      where: { id },
+      include: {
+        rules: {
+          orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+        },
+      },
+    });
+
+    return serializeSchedule(updated!);
+  }
+
+  async removeSchedule(userId: string, id: string) {
+    const result = await this.prisma.availabilitySchedule.deleteMany({
+      where: { id, userId },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    return { success: true };
+  }
+
+  async applySchedule(userId: string, dto: ApplyAvailabilityScheduleDto) {
+    const scheduleId = dto.scheduleId?.trim();
+    if (!scheduleId) {
+      throw new BadRequestException('scheduleId is required');
+    }
+
+    const schedule = await this.prisma.availabilitySchedule.findFirst({
+      where: { id: scheduleId, userId },
+      include: { rules: true },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    const rules = schedule.rules.map((rule) => ({
+      dayOfWeek: rule.dayOfWeek,
+      startMinute: rule.startMinute,
+      endMinute: rule.endMinute,
+    }));
+
+    if (dto.eventTypeId) {
+      await this.assertOwnedEventType(userId, dto.eventTypeId);
+      return this.replaceEventTypeAvailability(userId, dto.eventTypeId, {
+        mode: 'CUSTOM',
+        rules,
+      });
+    }
+
+    return this.replaceRules(userId, { rules });
   }
 
   private async assertOwnedEventType(userId: string, eventTypeId: string) {
@@ -592,6 +775,46 @@ function startOfUtcToday() {
   const now = new Date();
   now.setUTCHours(0, 0, 0, 0);
   return now;
+}
+
+function normalizeScheduleName(value: string | undefined) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) {
+    throw new BadRequestException('name is required');
+  }
+  if (text.length > 60) {
+    throw new BadRequestException('name must be 60 characters or less');
+  }
+  return text;
+}
+
+function serializeSchedule(schedule: {
+  id: string;
+  name: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  rules: Array<{
+    id: string;
+    scheduleId: string;
+    dayOfWeek: number;
+    startMinute: number;
+    endMinute: number;
+  }>;
+}) {
+  return {
+    id: schedule.id,
+    name: schedule.name,
+    createdAt: schedule.createdAt.toISOString(),
+    updatedAt: schedule.updatedAt.toISOString(),
+    rules: schedule.rules.map((rule) => ({
+      id: rule.id,
+      scheduleId: rule.scheduleId,
+      dayOfWeek: rule.dayOfWeek,
+      startMinute: rule.startMinute,
+      endMinute: rule.endMinute,
+    })),
+  };
 }
 
 function clampInt(value: unknown, field: string, min: number, max: number) {

@@ -11,4 +11,5 @@ export type GetAvailableSlotsInput = {
   start: string;
   end: string;
   guestTimezone?: string;
+  excludeBookingId?: string;
 };

@@ -18,3 +18,9 @@ export type CreatePublicBookingDto = {
 export type CancelBookingDto = {
   reason?: string | null;
 };
+
+export type RescheduleBookingDto = {
+  startTimeUtc?: string;
+  guestTimezone?: string;
+  reason?: string | null;
+};

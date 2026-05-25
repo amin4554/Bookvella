@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   apiRequest,
   type AvailableSlot,
+  type ApiError,
   type BookingCodeResponse,
   type HostBooking,
   type PublicEvent,
@@ -234,12 +235,14 @@ export function PublicBooking({
       );
       setStep("success");
     } catch (caught) {
+      const apiError = caught as ApiError;
       const message =
         caught instanceof Error ? caught.message : "Could not confirm booking";
-      // Specific race-condition detection: slot taken between selection and
-      // confirmation. Bounce back to step 1 with the warning banner up.
+      // Race-condition detection: slot taken between selection and
+      // confirmation. Prefer the API code, keep text fallback for older builds.
       const lower = message.toLowerCase();
       if (
+        apiError.code === "SLOT_CONFLICT" ||
         lower.includes("no longer available") ||
         lower.includes("conflict") ||
         lower.includes("taken")

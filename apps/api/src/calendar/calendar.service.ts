@@ -167,7 +167,11 @@ export class CalendarService {
     });
 
     if (!tokenResponse.access_token) {
-      throw new UnauthorizedException('Google did not return an access token');
+      throw new UnauthorizedException({
+        message: 'Google did not return an access token',
+        code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+        provider: 'GOOGLE',
+      });
     }
 
     const userInfo = await googleJson<GoogleUserInfo>(
@@ -232,9 +236,11 @@ export class CalendarService {
     });
 
     if (!tokenResponse.access_token) {
-      throw new UnauthorizedException(
-        'Microsoft did not return an access token',
-      );
+      throw new UnauthorizedException({
+        message: 'Microsoft did not return an access token',
+        code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+        provider: 'OUTLOOK',
+      });
     }
 
     const userInfo = await graphJson<OutlookUserInfo>(
@@ -390,6 +396,33 @@ export class CalendarService {
     }
 
     return { success: true };
+  }
+
+  async refreshCalendarList(userId: string, id: string) {
+    const calendar = await this.prisma.connectedCalendar.findFirst({
+      where: { id, userId },
+    });
+
+    if (!calendar) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    if (calendar.provider === CalendarProvider.GOOGLE) {
+      await this.syncGoogleCalendarList(calendar.id);
+    } else if (calendar.provider === CalendarProvider.OUTLOOK) {
+      await this.syncOutlookCalendarList(calendar.id);
+    }
+
+    await this.prisma.connectedCalendar.update({
+      where: { id: calendar.id },
+      data: {
+        state: ConnectedCalendarState.ACTIVE,
+        lastSyncedAt: new Date(),
+        lastSyncError: null,
+      },
+    });
+
+    return this.getConnectedCalendar(userId, id);
   }
 
   private async getConnectedCalendar(userId: string, id: string) {
@@ -789,7 +822,11 @@ export class CalendarService {
         where: { id: calendar.id },
         data: { state: ConnectedCalendarState.TOKEN_EXPIRED },
       });
-      throw new UnauthorizedException('Google calendar token expired');
+      throw new UnauthorizedException({
+        message: 'Google calendar token expired',
+        code: 'CALENDAR_TOKEN_EXPIRED',
+        provider: 'GOOGLE',
+      });
     }
 
     const tokenResponse = await googleTokenRequest({
@@ -798,7 +835,11 @@ export class CalendarService {
     });
 
     if (!tokenResponse.access_token) {
-      throw new UnauthorizedException('Google calendar refresh failed');
+      throw new UnauthorizedException({
+        message: 'Google calendar refresh failed',
+        code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+        provider: 'GOOGLE',
+      });
     }
 
     await this.prisma.connectedCalendar.update({
@@ -837,7 +878,11 @@ export class CalendarService {
         where: { id: calendar.id },
         data: { state: ConnectedCalendarState.TOKEN_EXPIRED },
       });
-      throw new UnauthorizedException('Microsoft calendar token expired');
+      throw new UnauthorizedException({
+        message: 'Microsoft calendar token expired',
+        code: 'CALENDAR_TOKEN_EXPIRED',
+        provider: 'OUTLOOK',
+      });
     }
 
     const tokenResponse = await microsoftTokenRequest({
@@ -847,7 +892,11 @@ export class CalendarService {
     });
 
     if (!tokenResponse.access_token) {
-      throw new UnauthorizedException('Microsoft calendar refresh failed');
+      throw new UnauthorizedException({
+        message: 'Microsoft calendar refresh failed',
+        code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+        provider: 'OUTLOOK',
+      });
     }
 
     await this.prisma.connectedCalendar.update({
@@ -914,7 +963,11 @@ async function googleTokenRequest(input: Record<string, string>) {
   });
 
   if (!response.ok) {
-    throw new UnauthorizedException('Google token exchange failed');
+    throw new UnauthorizedException({
+      message: 'Google token exchange failed',
+      code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+      provider: 'GOOGLE',
+    });
   }
 
   return (await response.json()) as GoogleTokenResponse;
@@ -937,7 +990,11 @@ async function microsoftTokenRequest(input: Record<string, string>) {
   );
 
   if (!response.ok) {
-    throw new UnauthorizedException('Microsoft token exchange failed');
+    throw new UnauthorizedException({
+      message: 'Microsoft token exchange failed',
+      code: 'CALENDAR_PROVIDER_AUTH_FAILED',
+      provider: 'OUTLOOK',
+    });
   }
 
   return (await response.json()) as GoogleTokenResponse;
@@ -967,7 +1024,12 @@ async function googleRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Google Calendar request failed: ${response.status}`);
+    throw new InternalServerErrorException({
+      message: `Google Calendar request failed: ${response.status}`,
+      code: 'CALENDAR_PROVIDER_REQUEST_FAILED',
+      provider: 'GOOGLE',
+      status: response.status,
+    });
   }
 
   return response;
@@ -997,7 +1059,12 @@ async function graphRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Microsoft Graph request failed: ${response.status}`);
+    throw new InternalServerErrorException({
+      message: `Microsoft Graph request failed: ${response.status}`,
+      code: 'CALENDAR_PROVIDER_REQUEST_FAILED',
+      provider: 'OUTLOOK',
+      status: response.status,
+    });
   }
 
   return response;

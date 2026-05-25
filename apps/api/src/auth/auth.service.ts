@@ -47,8 +47,18 @@ import type {
 import { hashPassword, verifyPassword } from './password';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
-const REFRESH_TOKEN_TTL_DAYS = 90;
-const MAX_ACTIVE_SESSIONS = 2;
+// "Keep me signed in" → long-lived. Unchecked → short-lived sliding window that
+// effectively dies when the browser closes (the cookie is session-scope too).
+const REFRESH_TOKEN_TTL_DAYS_REMEMBER = 90;
+const REFRESH_TOKEN_TTL_HOURS_SESSION = 12;
+// Hard ceiling, applied at session creation. Past this point the user MUST
+// re-authenticate even if they've been refreshing continuously.
+const ABSOLUTE_SESSION_TTL_DAYS_REMEMBER = 180;
+const ABSOLUTE_SESSION_TTL_HOURS_SESSION = 12;
+// Cap on simultaneous active sessions per user. Most hosts use a desktop +
+// phone + occasional tablet — 5 covers that without leaving a stale long tail
+// of revoked-but-still-listed devices.
+const MAX_ACTIVE_SESSIONS = 5;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const EMAIL_CHANGE_TTL_MINUTES = 30;
 const ACCOUNT_DELETION_TTL_DAYS = 30;
@@ -157,7 +167,9 @@ export class AuthService {
         },
       });
 
-      return this.issueTokenPair(user, sessionContext);
+      return this.issueTokenPair(user, sessionContext, {
+        rememberMe: dto.rememberMe,
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -198,7 +210,9 @@ export class AuthService {
       });
     }
 
-    return this.issueTokenPair(user, sessionContext);
+    return this.issueTokenPair(user, sessionContext, {
+      rememberMe: dto.rememberMe,
+    });
   }
 
   async google(dto: GoogleAuthDto, sessionContext?: SessionContext) {
@@ -211,7 +225,9 @@ export class AuthService {
     });
 
     if (existingByGoogleSub) {
-      return this.issueTokenPair(existingByGoogleSub, sessionContext);
+      return this.issueTokenPair(existingByGoogleSub, sessionContext, {
+        rememberMe: dto.rememberMe,
+      });
     }
 
     const existingByEmail = await this.prisma.user.findUnique({
@@ -228,7 +244,9 @@ export class AuthService {
         },
       });
 
-      return this.issueTokenPair(linked, sessionContext);
+      return this.issueTokenPair(linked, sessionContext, {
+        rememberMe: dto.rememberMe,
+      });
     }
 
     const user = await this.prisma.user.create({
@@ -244,7 +262,9 @@ export class AuthService {
       },
     });
 
-    return this.issueTokenPair(user, sessionContext);
+    return this.issueTokenPair(user, sessionContext, {
+      rememberMe: dto.rememberMe,
+    });
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -264,33 +284,77 @@ export class AuthService {
     });
 
     if (!session) {
+      // The token does not match any active session. Before declaring it bad,
+      // check whether it matches a *previously rotated* token. If so, somebody
+      // is replaying a stale token — almost certainly cookie theft. Revoke the
+      // session aggressively so both the attacker and the legitimate client
+      // have to re-authenticate, which is exactly what we want.
+      const replayed = await this.prisma.userSession.findFirst({
+        where: { previousRefreshTokenHash: refreshTokenHash },
+      });
+
+      if (replayed) {
+        if (replayed.isActive) {
+          await this.prisma.userSession.update({
+            where: { id: replayed.id },
+            data: {
+              isActive: false,
+              lastUsedAt: new Date(),
+              previousRefreshTokenHash: null,
+            },
+          });
+        }
+
+        throw new UnauthorizedException({
+          message:
+            'Refresh token replay detected. For your safety, please sign in again.',
+          code: 'AUTH_REFRESH_REUSED',
+          errorCode: 419,
+          expired: true,
+        });
+      }
+
       throw new UnauthorizedException({
         message: 'Session not found or inactive',
+        code: 'AUTH_SESSION_NOT_FOUND',
         errorCode: 498,
         expired: false,
       });
     }
 
-    if (session.expiresAt <= new Date()) {
+    const now = new Date();
+    if (session.expiresAt <= now || session.absoluteExpiresAt <= now) {
       await this.prisma.userSession.update({
         where: { id: session.id },
-        data: { isActive: false, lastUsedAt: new Date() },
+        data: { isActive: false, lastUsedAt: now },
       });
 
       throw new UnauthorizedException({
         message: 'Refresh token has expired',
+        code: 'AUTH_REFRESH_EXPIRED',
         errorCode: 419,
         expired: true,
       });
     }
 
     const newRefreshToken = createRefreshToken();
+    // Each refresh slides the expiry within the same trust mode the session
+    // was created in. "Keep me signed in = no" sessions stay short-lived even
+    // after many active refreshes. The sliding expiry never exceeds the
+    // absolute expiry set when the session was first created.
+    const rememberMe = session.rememberMe;
+    const nextExpiresAt = clampToAbsoluteExpiry(
+      refreshExpiryDate(rememberMe),
+      session.absoluteExpiresAt,
+    );
     await this.prisma.userSession.update({
       where: { id: session.id },
       data: {
         refreshTokenHash: hashRefreshToken(newRefreshToken),
-        expiresAt: refreshExpiryDate(),
-        lastUsedAt: new Date(),
+        // Remember the just-rotated hash so a future replay of it is caught.
+        previousRefreshTokenHash: refreshTokenHash,
+        expiresAt: nextExpiresAt,
+        lastUsedAt: now,
       },
     });
 
@@ -299,6 +363,7 @@ export class AuthService {
       accessToken: this.signAccessToken(session.user),
       refreshToken: newRefreshToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      rememberMe,
     };
   }
 
@@ -543,8 +608,19 @@ export class AuthService {
       data.businessDisplayName = optionalText(dto.businessDisplayName);
     }
 
+    let previousSlug: string | null = null;
     if (dto.slug !== undefined) {
-      data.slug = slugify(dto.slug);
+      const nextSlug = slugify(dto.slug);
+      data.slug = nextSlug;
+      // Track the prior slug so we can record a redirect after the update
+      // succeeds. Without this an old `/old-slug` link would 404 silently.
+      const current = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { slug: true },
+      });
+      if (current && current.slug !== nextSlug) {
+        previousSlug = current.slug;
+      }
     }
 
     if (dto.timezone !== undefined) {
@@ -604,6 +680,30 @@ export class AuthService {
         where: { id: payload.sub },
         data,
       });
+
+      if (previousSlug && previousSlug !== user.slug) {
+        // Best-effort: record a redirect from old → new host slug. Ignore
+        // unique-constraint races (e.g. the same old slug already has a row).
+        try {
+          await this.prisma.publicLinkRedirect.create({
+            data: {
+              hostUserId: user.id,
+              oldHostSlug: previousSlug,
+              oldEventSlug: null,
+              eventTypeId: null,
+            },
+          });
+        } catch (error) {
+          if (
+            !(
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === 'P2002'
+            )
+          ) {
+            throw error;
+          }
+        }
+      }
 
       return toPublicUser(user);
     } catch (error) {
@@ -1096,7 +1196,10 @@ export class AuthService {
     const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
 
     if (!encodedHeader || !encodedPayload || !encodedSignature) {
-      throw new UnauthorizedException('Malformed token');
+      throw new UnauthorizedException({
+        message: 'Malformed token',
+        code: 'AUTH_TOKEN_MALFORMED',
+      });
     }
 
     const signedData = `${encodedHeader}.${encodedPayload}`;
@@ -1109,7 +1212,10 @@ export class AuthService {
     );
 
     if (!isValid) {
-      throw new UnauthorizedException('Invalid token signature');
+      throw new UnauthorizedException({
+        message: 'Invalid token signature',
+        code: 'AUTH_TOKEN_INVALID',
+      });
     }
 
     const payload = JSON.parse(
@@ -1117,11 +1223,17 @@ export class AuthService {
     ) as AccessTokenPayload;
 
     if (!payload.sub || !payload.exp) {
-      throw new UnauthorizedException('Invalid token payload');
+      throw new UnauthorizedException({
+        message: 'Invalid token payload',
+        code: 'AUTH_TOKEN_INVALID',
+      });
     }
 
     if (payload.exp <= Math.floor(Date.now() / 1000)) {
-      throw new UnauthorizedException('Token has expired');
+      throw new UnauthorizedException({
+        message: 'Token has expired',
+        code: 'AUTH_TOKEN_EXPIRED',
+      });
     }
 
     return payload;
@@ -1167,9 +1279,19 @@ export class AuthService {
     return profile;
   }
 
-  private async issueTokenPair(user: User, sessionContext?: SessionContext) {
+  private async issueTokenPair(
+    user: User,
+    sessionContext?: SessionContext,
+    options: { rememberMe?: boolean } = {},
+  ) {
     const refreshToken = createRefreshToken();
     const ipAddress = optionalText(sessionContext?.ipAddress);
+    const rememberMe = options.rememberMe !== false; // default to true
+    const absoluteExpiresAt = absoluteSessionExpiryDate(rememberMe);
+    const slidingExpiresAt = clampToAbsoluteExpiry(
+      refreshExpiryDate(rememberMe),
+      absoluteExpiresAt,
+    );
 
     await this.prisma.userSession.create({
       data: {
@@ -1178,7 +1300,9 @@ export class AuthService {
         userAgent: optionalText(sessionContext?.userAgent),
         ipAddress,
         ipRegion: describeIpRegion(ipAddress),
-        expiresAt: refreshExpiryDate(),
+        expiresAt: slidingExpiresAt,
+        absoluteExpiresAt,
+        rememberMe,
         lastUsedAt: new Date(),
       },
     });
@@ -1189,6 +1313,7 @@ export class AuthService {
       accessToken: this.signAccessToken(user),
       refreshToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      rememberMe,
     };
   }
 
@@ -1791,10 +1916,36 @@ function buildTotpUri(secret: string, email: string) {
   return url.toString();
 }
 
-function refreshExpiryDate() {
+function refreshExpiryDate(rememberMe: boolean) {
   const expiresAt = new Date();
-  expiresAt.setUTCDate(expiresAt.getUTCDate() + REFRESH_TOKEN_TTL_DAYS);
+  if (rememberMe) {
+    expiresAt.setUTCDate(
+      expiresAt.getUTCDate() + REFRESH_TOKEN_TTL_DAYS_REMEMBER,
+    );
+  } else {
+    expiresAt.setUTCHours(
+      expiresAt.getUTCHours() + REFRESH_TOKEN_TTL_HOURS_SESSION,
+    );
+  }
   return expiresAt;
+}
+
+function absoluteSessionExpiryDate(rememberMe: boolean) {
+  const expiresAt = new Date();
+  if (rememberMe) {
+    expiresAt.setUTCDate(
+      expiresAt.getUTCDate() + ABSOLUTE_SESSION_TTL_DAYS_REMEMBER,
+    );
+  } else {
+    expiresAt.setUTCHours(
+      expiresAt.getUTCHours() + ABSOLUTE_SESSION_TTL_HOURS_SESSION,
+    );
+  }
+  return expiresAt;
+}
+
+function clampToAbsoluteExpiry(slidingExpiry: Date, absoluteExpiry: Date) {
+  return slidingExpiry < absoluteExpiry ? slidingExpiry : absoluteExpiry;
 }
 
 function encodeJson(value: unknown) {

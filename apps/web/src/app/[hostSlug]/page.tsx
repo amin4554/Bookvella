@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { PublicHostProfileView } from "./view";
 import type { PublicHostProfile } from "@/lib/api";
 
@@ -50,19 +50,54 @@ export default async function HostProfilePage({
       { cache: "no-store" },
     );
     if (res.status === 404) {
+      const redirect = await resolveLinkRedirect(hostSlug);
+      if (redirect?.hostSlug) {
+        permanentRedirect(`/${redirect.hostSlug}`);
+      }
       notFound();
     }
     if (!res.ok) {
       throw new Error(`Upstream ${res.status}`);
     }
     data = (await res.json()) as PublicHostProfile;
-  } catch {
+  } catch (error) {
+    // permanentRedirect throws a NEXT_REDIRECT marker that Next.js handles
+    // upstream — let it bubble. Anything else is treated as a hard 404.
+    if (isRedirectError(error)) throw error;
     notFound();
   }
 
   if (!data) notFound();
 
   return <PublicHostProfileView data={data} />;
+}
+
+type RedirectResolution = { hostSlug: string; eventSlug: string | null };
+
+async function resolveLinkRedirect(
+  hostSlug: string,
+  eventSlug?: string,
+): Promise<RedirectResolution | null> {
+  try {
+    const params = new URLSearchParams({ hostSlug });
+    if (eventSlug) params.set("eventSlug", eventSlug);
+    const res = await fetch(`${API_URL}/public/link-redirect?${params}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      redirect: RedirectResolution | null;
+    };
+    return body.redirect;
+  } catch {
+    return null;
+  }
+}
+
+function isRedirectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const digest = (error as { digest?: unknown }).digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
 }
 
 export async function generateMetadata({

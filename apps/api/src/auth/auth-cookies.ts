@@ -5,12 +5,26 @@ export const REFRESH_TOKEN_COOKIE = 'bookvella.refresh';
 export const SESSION_COOKIE = 'bookvella.session';
 
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 15 * 60;
-const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
+const REFRESH_TOKEN_MAX_AGE_SECONDS_REMEMBER = 60 * 60 * 24 * 90;
+const REFRESH_TOKEN_MAX_AGE_SECONDS_SESSION = 60 * 60 * 12;
 
 export function setAuthCookies(
   response: Response,
-  input: { accessToken: string; refreshToken: string },
+  input: {
+    accessToken: string;
+    refreshToken: string;
+    rememberMe?: boolean;
+  },
 ) {
+  // When the user opts out of "Keep me signed in" we hand out session-scope
+  // cookies (no Max-Age) so they evaporate when the browser quits. The server-
+  // side session still has a 12-hour ceiling on top of that, so an attacker
+  // who steals the cookie file from a closed browser can't replay forever.
+  const rememberMe = input.rememberMe !== false;
+  const refreshMaxAge = rememberMe
+    ? REFRESH_TOKEN_MAX_AGE_SECONDS_REMEMBER
+    : REFRESH_TOKEN_MAX_AGE_SECONDS_SESSION;
+
   appendCookie(
     response,
     buildCookie(ACCESS_TOKEN_COOKIE, input.accessToken, {
@@ -22,26 +36,38 @@ export function setAuthCookies(
     response,
     buildCookie(REFRESH_TOKEN_COOKIE, input.refreshToken, {
       httpOnly: true,
-      maxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
+      // Omit Max-Age entirely for session cookies so the browser deletes them
+      // on close.
+      maxAge: rememberMe ? refreshMaxAge : null,
     }),
   );
+  // SESSION_COOKIE is intentionally NOT httpOnly: it's a low-trust "is anyone
+  // logged in?" flag the client can read to decide whether to even attempt an
+  // authed call. The actual auth lives in the httpOnly access/refresh cookies.
   appendCookie(
     response,
     buildCookie(SESSION_COOKIE, 'active', {
-      httpOnly: true,
-      maxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
+      httpOnly: false,
+      maxAge: rememberMe ? refreshMaxAge : null,
     }),
   );
 }
 
 export function clearAuthCookies(response: Response) {
-  for (const name of [
-    ACCESS_TOKEN_COOKIE,
-    REFRESH_TOKEN_COOKIE,
-    SESSION_COOKIE,
-  ]) {
-    appendCookie(response, buildCookie(name, '', { maxAge: 0 }));
-  }
+  appendCookie(
+    response,
+    buildCookie(ACCESS_TOKEN_COOKIE, '', { maxAge: 0, httpOnly: true }),
+  );
+  appendCookie(
+    response,
+    buildCookie(REFRESH_TOKEN_COOKIE, '', { maxAge: 0, httpOnly: true }),
+  );
+  // Mirror the original httpOnly:false flag for the session marker so the
+  // delete header lines up with the cookie that was actually set on the way in.
+  appendCookie(
+    response,
+    buildCookie(SESSION_COOKIE, '', { maxAge: 0, httpOnly: false }),
+  );
 }
 
 export function getCookie(request: Request, name: string) {
@@ -82,14 +108,19 @@ function appendCookie(response: Response, cookie: string) {
 function buildCookie(
   name: string,
   value: string,
-  options: { httpOnly?: boolean; maxAge: number },
+  options: { httpOnly?: boolean; maxAge: number | null },
 ) {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
     'Path=/',
-    `Max-Age=${options.maxAge}`,
     'SameSite=Lax',
   ];
+
+  // Omit Max-Age entirely → session cookie that the browser drops on close.
+  if (options.maxAge !== null) {
+    parts.push(`Max-Age=${options.maxAge}`);
+  }
+
   const domain = process.env.AUTH_COOKIE_DOMAIN?.trim();
 
   if (domain) {

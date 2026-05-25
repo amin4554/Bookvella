@@ -38,6 +38,7 @@ import type {
   CancelBookingDto,
   CreatePublicBookingDto,
   RequestBookingCodeDto,
+  RescheduleBookingDto,
 } from './dto';
 
 const MAX_BUFFER_LOOKAROUND_MS = 24 * 60 * 60 * 1000;
@@ -170,6 +171,45 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     ]);
   }
 
+  async exportBookingsCsv(hostUserId: string) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { hostUserId },
+      include: { eventType: true },
+      orderBy: [{ startTimeUtc: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    return toCsv([
+      [
+        'id',
+        'guest_name',
+        'guest_email',
+        'guest_phone',
+        'service_title',
+        'service_duration_minutes',
+        'start_time_utc',
+        'end_time_utc',
+        'guest_timezone',
+        'status',
+        'cancellation_reason',
+        'created_at',
+      ],
+      ...bookings.map((booking) => [
+        booking.id,
+        booking.guestName,
+        booking.guestEmail,
+        booking.guestPhone ?? '',
+        booking.eventType.title,
+        String(booking.eventType.durationMinutes),
+        booking.startTimeUtc.toISOString(),
+        booking.endTimeUtc.toISOString(),
+        booking.guestTimezone,
+        booking.status,
+        booking.cancellationReason ?? '',
+        booking.createdAt.toISOString(),
+      ]),
+    ]);
+  }
+
   async getBookingFeed(hostUserId: string) {
     const existing = await this.prisma.bookingFeed.findUnique({
       where: { userId: hostUserId },
@@ -251,6 +291,22 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async renderHostBookingIcs(hostUserId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { id: bookingId, hostUserId },
+      include: { eventType: true, host: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    return buildIcsCalendar({
+      hostName: displayName(booking.host),
+      bookings: [bookingToIcsEntry(booking)],
+    });
+  }
+
   async cancelHostBooking(
     hostUserId: string,
     bookingId: string,
@@ -300,6 +356,26 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     await this.calendarService?.writeBookingCancelled(booking.id);
 
     return cancelledBooking;
+  }
+
+  async rescheduleHostBooking(
+    hostUserId: string,
+    bookingId: string,
+    dto: RescheduleBookingDto,
+  ) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { id: bookingId, hostUserId },
+      include: {
+        eventType: true,
+        host: true,
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    return this.rescheduleBooking(booking, dto, 'host');
   }
 
   async requestBookingCode(
@@ -413,7 +489,10 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         });
 
         if (hasConflict) {
-          throw new ConflictException('Selected slot is no longer available');
+          throw new ConflictException({
+            message: 'Selected slot is no longer available',
+            code: 'SLOT_CONFLICT',
+          });
         }
 
         const guestCancelToken = randomBytes(24).toString('hex');
@@ -486,11 +565,26 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       status: booking.status,
       guestName: booking.guestName,
       eventTitle: booking.eventType.title,
+      eventSlug: booking.eventType.slug,
       hostName: displayName(booking.host),
+      hostSlug: booking.host.slug,
       startTimeUtc: booking.startTimeUtc.toISOString(),
       endTimeUtc: booking.endTimeUtc.toISOString(),
       guestTimezone: booking.guestTimezone,
     };
+  }
+
+  async rescheduleByGuestToken(token: string, dto: RescheduleBookingDto) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { guestCancelToken: token },
+      include: { eventType: true, host: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    return this.rescheduleBooking(booking, dto, 'guest');
   }
 
   async cancelByGuestToken(token: string) {
@@ -968,6 +1062,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     guestTimezone: string;
     startTimeUtc: Date;
     endTimeUtc: Date;
+    excludeBookingId?: string;
   }) {
     const availableSlots = await this.schedulingService.getAvailableSlots({
       hostSlug: input.hostSlug,
@@ -975,13 +1070,17 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       start: new Date(input.startTimeUtc.getTime() - 60_000).toISOString(),
       end: new Date(input.endTimeUtc.getTime() + 60_000).toISOString(),
       guestTimezone: input.guestTimezone,
+      excludeBookingId: input.excludeBookingId,
     });
     const isAvailable = availableSlots.some(
       (slot) => slot.startTimeUtc === input.startTimeUtc.toISOString(),
     );
 
     if (!isAvailable) {
-      throw new ConflictException('Selected slot is no longer available');
+      throw new ConflictException({
+        message: 'Selected slot is no longer available',
+        code: 'SLOT_CONFLICT',
+      });
     }
   }
 
@@ -1002,15 +1101,24 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (!verification) {
-      throw new BadRequestException('Verification code not found');
+      throw new BadRequestException({
+        message: 'Verification code not found',
+        code: 'OTP_NOT_FOUND',
+      });
     }
 
     if (verification.expiresAt <= new Date()) {
-      throw new BadRequestException('Verification code has expired');
+      throw new BadRequestException({
+        message: 'Verification code has expired',
+        code: 'OTP_EXPIRED',
+      });
     }
 
     if (verification.attempts >= verification.maxAttempts) {
-      throw new BadRequestException('Too many verification attempts');
+      throw new BadRequestException({
+        message: 'Too many verification attempts',
+        code: 'OTP_ATTEMPTS_EXCEEDED',
+      });
     }
 
     if (!verifyCode(input.verificationCode, verification.codeHash)) {
@@ -1019,7 +1127,10 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         data: { attempts: { increment: 1 } },
       });
 
-      throw new BadRequestException('Invalid verification code');
+      throw new BadRequestException({
+        message: 'Invalid verification code',
+        code: 'OTP_INVALID',
+      });
     }
 
     await tx.otpVerification.update({
@@ -1029,6 +1140,139 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         attempts: { increment: 1 },
       },
     });
+  }
+
+  private async rescheduleBooking(
+    booking: {
+      id: string;
+      hostUserId: string;
+      guestName: string;
+      guestEmail: string;
+      guestPhone: string | null;
+      guestNote: string | null;
+      guestTimezone: string;
+      startTimeUtc: Date;
+      endTimeUtc: Date;
+      status: BookingStatus;
+      guestCancelToken: string | null;
+      eventType: {
+        id: string;
+        slug: string;
+        title: string;
+        durationMinutes: number;
+        bufferBeforeMinutes: number;
+        bufferAfterMinutes: number;
+        locationType: string;
+        locationDetails: string | null;
+      };
+      host: {
+        id: string;
+        email: string;
+        name: string;
+        businessDisplayName?: string | null;
+        slug: string;
+        timezone: string;
+      };
+    },
+    dto: RescheduleBookingDto,
+    actor: 'host' | 'guest',
+  ) {
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new ConflictException('Booking is already cancelled');
+    }
+
+    const startTimeUtc = parseIsoDate(dto.startTimeUtc, 'startTimeUtc');
+    const guestTimezone = normalizeTimezone(
+      dto.guestTimezone ?? booking.guestTimezone,
+    );
+    const endTimeUtc = new Date(
+      startTimeUtc.getTime() + booking.eventType.durationMinutes * 60_000,
+    );
+
+    await this.assertSlotAvailable({
+      hostSlug: booking.host.slug,
+      eventSlug: booking.eventType.slug,
+      guestTimezone,
+      startTimeUtc,
+      endTimeUtc,
+      excludeBookingId: booking.id,
+    });
+
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const hasConflict = await this.hasBookingConflict(tx, {
+          hostUserId: booking.hostUserId,
+          startTimeUtc,
+          endTimeUtc,
+          bufferBeforeMinutes: booking.eventType.bufferBeforeMinutes,
+          bufferAfterMinutes: booking.eventType.bufferAfterMinutes,
+          excludeBookingId: booking.id,
+        });
+
+        if (hasConflict) {
+          throw new ConflictException({
+            message: 'Selected slot is no longer available',
+            code: 'SLOT_CONFLICT',
+          });
+        }
+
+        return tx.booking.update({
+          where: { id: booking.id },
+          data: {
+            startTimeUtc,
+            endTimeUtc,
+            guestTimezone,
+            cancellationReason: null,
+          },
+          include: {
+            eventType: {
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+                durationMinutes: true,
+                locationType: true,
+                locationDetails: true,
+              },
+            },
+          },
+        });
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+
+    await this.scheduleBookingReminder({
+      bookingId: booking.id,
+      hostUserId: booking.hostUserId,
+      startTimeUtc,
+    });
+    await this.calendarService?.writeBookingCancelled(booking.id);
+    await this.calendarService?.writeBookingCreated(booking.id);
+    await this.sendBookingRescheduled({
+      hostEmail: booking.host.email,
+      hostName: displayName(booking.host),
+      eventTitle: booking.eventType.title,
+      guestName: booking.guestName,
+      guestEmail: booking.guestEmail,
+      guestTimezone,
+      hostTimezone: booking.host.timezone,
+      oldStartTimeUtc: booking.startTimeUtc,
+      newStartTimeUtc: startTimeUtc,
+      newEndTimeUtc: endTimeUtc,
+      location:
+        booking.eventType.locationDetails ??
+        formatLocation(booking.eventType.locationType),
+      bookingId: booking.id,
+      actor,
+      reason: optionalText(dto.reason),
+      cancelUrl: booking.guestCancelToken
+        ? buildGuestCancelUrl(booking.guestCancelToken)
+        : null,
+    });
+
+    return updated;
   }
 
   private async sendBookingConfirmations(input: {
@@ -1078,12 +1322,34 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       `Location: ${input.location}`,
       ...(input.guestNote ? ['', `Guest note: ${input.guestNote}`] : []),
     ].join('\n');
+    const icsContent = buildIcsCalendar({
+      hostName: input.hostName,
+      bookings: [
+        {
+          id: input.bookingId,
+          eventTitle: input.eventTitle,
+          guestName: input.guestName,
+          guestEmail: input.guestEmail,
+          startTimeUtc: input.startTimeUtc,
+          endTimeUtc: input.endTimeUtc,
+          location: input.location,
+        },
+      ],
+    });
+    const attachments = [
+      {
+        filename: 'bookvella-booking.ics',
+        contentType: 'text/calendar; method=PUBLISH; charset=UTF-8',
+        content: icsContent,
+      },
+    ];
 
     const deliveries = [
       this.emailService.sendMail({
         to: input.guestEmail,
         subject: `Confirmed: ${input.eventTitle}`,
         text: guestText,
+        attachments,
         html: brandedEmailHtml({
           title: 'Your booking is confirmed',
           intro: `You're booked with ${input.hostName}.`,
@@ -1111,6 +1377,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           to: input.hostEmail,
           subject: `New booking: ${input.eventTitle}`,
           text: hostText,
+          attachments,
           html: brandedEmailHtml({
             title: 'New booking confirmed',
             intro: `${input.guestName} booked ${input.eventTitle}.`,
@@ -1128,6 +1395,124 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     }
 
     await Promise.all(deliveries);
+  }
+
+  private async sendBookingRescheduled(input: {
+    hostEmail: string;
+    hostName: string;
+    eventTitle: string;
+    guestName: string;
+    guestEmail: string;
+    guestTimezone: string;
+    hostTimezone: string;
+    oldStartTimeUtc: Date;
+    newStartTimeUtc: Date;
+    newEndTimeUtc: Date;
+    location: string;
+    bookingId: string;
+    actor: 'host' | 'guest';
+    reason: string | null;
+    cancelUrl: string | null;
+  }) {
+    const guestOldWhen = formatForEmail(
+      input.oldStartTimeUtc,
+      input.guestTimezone,
+    );
+    const guestNewWhen = formatForEmail(
+      input.newStartTimeUtc,
+      input.guestTimezone,
+    );
+    const hostOldWhen = formatForEmail(input.oldStartTimeUtc, input.hostTimezone);
+    const hostNewWhen = formatForEmail(input.newStartTimeUtc, input.hostTimezone);
+    const actorLabel = input.actor === 'host' ? input.hostName : input.guestName;
+    const reasonLines = input.reason ? ['', `Reason: ${input.reason}`] : [];
+    const guestText = [
+      `Your booking was rescheduled.`,
+      '',
+      `Service: ${input.eventTitle}`,
+      `Host: ${input.hostName}`,
+      `Previous time: ${guestOldWhen}`,
+      `New time: ${guestNewWhen}`,
+      `Location: ${input.location}`,
+      ...reasonLines,
+      ...(input.cancelUrl ? ['', `Need to cancel? ${input.cancelUrl}`] : []),
+    ].join('\n');
+    const hostText = [
+      `Booking rescheduled.`,
+      '',
+      `Service: ${input.eventTitle}`,
+      `Guest: ${input.guestName} <${input.guestEmail}>`,
+      `Previous time: ${hostOldWhen}`,
+      `New time: ${hostNewWhen}`,
+      `Location: ${input.location}`,
+      `Changed by: ${actorLabel}`,
+      ...reasonLines,
+    ].join('\n');
+    const icsContent = buildIcsCalendar({
+      hostName: input.hostName,
+      bookings: [
+        {
+          id: input.bookingId,
+          eventTitle: input.eventTitle,
+          guestName: input.guestName,
+          guestEmail: input.guestEmail,
+          startTimeUtc: input.newStartTimeUtc,
+          endTimeUtc: input.newEndTimeUtc,
+          location: input.location,
+        },
+      ],
+    });
+    const attachments = [
+      {
+        filename: 'bookvella-booking.ics',
+        contentType: 'text/calendar; method=REQUEST; charset=UTF-8',
+        content: icsContent,
+      },
+    ];
+
+    await Promise.all([
+      this.emailService.sendMail({
+        to: input.guestEmail,
+        subject: `Rescheduled: ${input.eventTitle}`,
+        text: guestText,
+        attachments,
+        html: brandedEmailHtml({
+          title: 'Your booking was rescheduled',
+          intro: `${input.eventTitle} with ${input.hostName} has a new time.`,
+          rows: [
+            ['Previous time', guestOldWhen],
+            ['New time', guestNewWhen],
+            ['Location', input.location],
+            ...(input.reason
+              ? ([['Reason', input.reason]] as [string, string][])
+              : []),
+          ],
+          links: input.cancelUrl
+            ? [{ label: 'Need to cancel?', url: input.cancelUrl }]
+            : [],
+        }),
+      }),
+      this.emailService.sendMail({
+        to: input.hostEmail,
+        subject: `Rescheduled booking: ${input.eventTitle}`,
+        text: hostText,
+        attachments,
+        html: brandedEmailHtml({
+          title: 'Booking rescheduled',
+          intro: `${input.guestName}'s booking has a new time.`,
+          rows: [
+            ['Guest', `${input.guestName} <${input.guestEmail}>`],
+            ['Previous time', hostOldWhen],
+            ['New time', hostNewWhen],
+            ['Location', input.location],
+            ['Changed by', actorLabel],
+            ...(input.reason
+              ? ([['Reason', input.reason]] as [string, string][])
+              : []),
+          ],
+        }),
+      }),
+    ]);
   }
 
   private async sendBookingCancellation(input: {
@@ -1234,6 +1619,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       endTimeUtc: Date;
       bufferBeforeMinutes: number;
       bufferAfterMinutes: number;
+      excludeBookingId?: string;
     },
   ) {
     const candidateBusy = {
@@ -1246,6 +1632,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     const nearbyBookings = await tx.booking.findMany({
       where: {
         hostUserId: candidate.hostUserId,
+        ...(candidate.excludeBookingId
+          ? { id: { not: candidate.excludeBookingId } }
+          : {}),
         status: BookingStatus.CONFIRMED,
         startTimeUtc: {
           lt: new Date(candidateBusy.endMs + MAX_BUFFER_LOOKAROUND_MS),
@@ -1538,6 +1927,31 @@ function buildIcsCalendar(input: {
     'END:VCALENDAR',
     '',
   ].join('\r\n');
+}
+
+function bookingToIcsEntry(booking: {
+  id: string;
+  guestName: string;
+  guestEmail: string;
+  startTimeUtc: Date;
+  endTimeUtc: Date;
+  eventType: {
+    title: string;
+    locationType: string;
+    locationDetails: string | null;
+  };
+}) {
+  return {
+    id: booking.id,
+    eventTitle: booking.eventType.title,
+    guestName: booking.guestName,
+    guestEmail: booking.guestEmail,
+    startTimeUtc: booking.startTimeUtc,
+    endTimeUtc: booking.endTimeUtc,
+    location:
+      booking.eventType.locationDetails ??
+      formatLocation(booking.eventType.locationType),
+  };
 }
 
 function icsDate(date: Date) {

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -22,6 +23,11 @@ import type {
   UpdateAvailabilityOverrideDto,
   UpdateAvailabilityRuleDto,
 } from './dto';
+import type {
+  ApplyAvailabilityScheduleDto,
+  CreateAvailabilityScheduleDto,
+  UpdateAvailabilityScheduleDto,
+} from './schedules.dto';
 
 @Controller('availability')
 @UseGuards(AuthGuard)
@@ -90,8 +96,21 @@ export class AvailabilityController {
   }
 
   @Get('overrides')
-  listOverrides(@Req() request: AuthenticatedRequest) {
-    return this.availabilityService.listOverrides(request.user!.sub);
+  listOverrides(
+    @Req() request: AuthenticatedRequest,
+    @Query('eventTypeId') eventTypeId?: string,
+    @Query('scope') scope?: string,
+  ) {
+    // Callers can pass ?eventTypeId=<id> to filter to one service, or
+    // ?scope=host to filter to host-wide overrides only. Omitting both returns
+    // everything the host owns, which is what the calendar view uses.
+    const filter =
+      eventTypeId !== undefined && eventTypeId !== ''
+        ? { eventTypeId }
+        : scope === 'host'
+          ? ({ eventTypeId: 'host' } as const)
+          : undefined;
+    return this.availabilityService.listOverrides(request.user!.sub, filter);
   }
 
   @Post('overrides')
@@ -132,5 +151,49 @@ export class AvailabilityController {
     @Body() body: AvailabilitySettingsDto,
   ) {
     return this.availabilityService.updateSettings(request.user!.sub, body);
+  }
+
+  // ── Named schedules (templates) ───────────────────────────────────────────
+
+  @Get('schedules')
+  listSchedules(@Req() request: AuthenticatedRequest) {
+    return this.availabilityService.listSchedules(request.user!.sub);
+  }
+
+  @Post('schedules')
+  createSchedule(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: CreateAvailabilityScheduleDto,
+  ) {
+    return this.availabilityService.createSchedule(request.user!.sub, body);
+  }
+
+  @Patch('schedules/:id')
+  updateSchedule(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UpdateAvailabilityScheduleDto,
+  ) {
+    return this.availabilityService.updateSchedule(
+      request.user!.sub,
+      id,
+      body,
+    );
+  }
+
+  @Delete('schedules/:id')
+  removeSchedule(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.availabilityService.removeSchedule(request.user!.sub, id);
+  }
+
+  @Post('schedules/apply')
+  applySchedule(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: ApplyAvailabilityScheduleDto,
+  ) {
+    return this.availabilityService.applySchedule(request.user!.sub, body);
   }
 }

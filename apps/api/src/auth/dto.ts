@@ -5,12 +5,14 @@ export type RegisterDto = {
   businessDisplayName?: string | null;
   slug?: string;
   timezone?: string;
+  rememberMe?: boolean;
 };
 
 export type LoginDto = {
   email?: string;
   password?: string;
   totpCode?: string;
+  rememberMe?: boolean;
 };
 
 export type RefreshTokenDto = {
@@ -87,4 +89,5 @@ export type UpdateMeDto = {
 export type GoogleAuthDto = {
   credential?: string;
   timezone?: string;
+  rememberMe?: boolean;
 };

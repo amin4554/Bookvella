@@ -107,4 +107,13 @@ export class CalendarController {
   ) {
     return this.calendarService.disconnectCalendar(request.user!.sub, id);
   }
+
+  @Patch('calendars/:id/refresh')
+  @UseGuards(AuthGuard)
+  refreshCalendarList(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.calendarService.refreshCalendarList(request.user!.sub, id);
+  }
 }

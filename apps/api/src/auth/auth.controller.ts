@@ -283,10 +283,12 @@ function toSessionResponse(session: {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  rememberMe?: boolean;
 }) {
   return {
     user: session.user,
     expiresIn: session.expiresIn,
     authenticated: true,
+    rememberMe: session.rememberMe ?? true,
   };
 }

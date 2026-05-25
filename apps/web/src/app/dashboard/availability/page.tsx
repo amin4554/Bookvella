@@ -21,6 +21,7 @@ import {
   type AvailabilityOverrideBlock,
   type AvailabilityOverrideType,
   type AvailabilityRule,
+  type AvailabilitySchedule,
   type AvailabilitySettings,
   type ConnectedCalendar,
   type EventTypeAvailability,
@@ -29,6 +30,7 @@ import {
   type HostBooking,
   type PublicUser,
 } from "@/lib/api";
+import { SchedulesTab } from "@/components/schedules-tab";
 import { formatOffset } from "@/lib/timezones";
 
 // ── data shapes used inside the page (kept local; API shapes live in api.ts) ──
@@ -328,7 +330,15 @@ export default function AvailabilityPage() {
   const [savingRange, setSavingRange] = useState(false);
 
   // Tabs.
-  const [tab, setTab] = useState<"weekly" | "exceptions" | "rules">("weekly");
+  const [tab, setTab] = useState<
+    "weekly" | "exceptions" | "rules" | "schedules"
+  >("weekly");
+
+  // Named schedules (templates).
+  const [schedules, setSchedules] = useState<AvailabilitySchedule[]>([]);
+  const [applyingScheduleId, setApplyingScheduleId] = useState<string | null>(
+    null,
+  );
 
   // Weekly editor draft (separate from saved `rules` so the user can fiddle).
   const [weekDraft, setWeekDraft] = useState<WeeklyDay[]>([]);
@@ -357,6 +367,7 @@ export default function AvailabilityPage() {
           hostBookings,
           services,
           connectedCalendars,
+          scheduleList,
         ] =
           await Promise.all([
             authedApiRequest<PublicUser>("/auth/me"),
@@ -366,6 +377,7 @@ export default function AvailabilityPage() {
             authedApiRequest<HostBooking[]>("/bookings"),
             authedApiRequest<EventType[]>("/event-types"),
             authedApiRequest<ConnectedCalendar[]>("/auth/calendars"),
+            authedApiRequest<AvailabilitySchedule[]>("/availability/schedules"),
           ]);
         const serviceAvailabilityEntries = await Promise.all(
           services
@@ -393,6 +405,7 @@ export default function AvailabilityPage() {
           ),
         );
         setCalendars(connectedCalendars);
+        setSchedules(scheduleList);
         setWeekDraft(buildWeekDraft(ruleList));
       } catch (caught) {
         if (!alive) return;
@@ -459,11 +472,31 @@ export default function AvailabilityPage() {
 
   // ── derived data ────────────────────────────────────────────────────────
 
+  // Overrides scoped to the current view. In host scope, only host-wide rows
+  // (eventTypeId === null) apply. In service scope, host-wide rows show in the
+  // calendar background and the service's own overrides take precedence.
+  const scopedOverrides = useMemo(() => {
+    if (activeServiceId) {
+      return overrides.filter(
+        (override) =>
+          override.eventTypeId === null ||
+          override.eventTypeId === activeServiceId,
+      );
+    }
+    return overrides.filter((override) => override.eventTypeId === null);
+  }, [overrides, activeServiceId]);
+
   const overridesByKey = useMemo(() => {
     const m = new Map<string, AvailabilityOverride>();
-    for (const o of overrides) m.set(overrideKey(o), o);
+    // Seed with host-wide rows first so service-specific rows can clobber them.
+    const sorted = [...scopedOverrides].sort((a, b) => {
+      const aHost = a.eventTypeId === null ? 0 : 1;
+      const bHost = b.eventTypeId === null ? 0 : 1;
+      return aHost - bHost;
+    });
+    for (const override of sorted) m.set(overrideKey(override), override);
     return m;
-  }, [overrides]);
+  }, [scopedOverrides]);
 
   const filteredBookings = useMemo(() => {
     if (!activeServiceId) return bookings;
@@ -493,7 +526,21 @@ export default function AvailabilityPage() {
     [viewYear, viewMonth],
   );
 
-  const exceptionGroups = useMemo(() => groupOverrides(overrides), [overrides]);
+  // Exceptions tab shows only the active scope's exceptions so hosts don't see
+  // unrelated service blocks while editing host defaults and vice versa.
+  const exceptionScopeOverrides = useMemo(() => {
+    if (activeServiceId) {
+      return overrides.filter(
+        (override) => override.eventTypeId === activeServiceId,
+      );
+    }
+    return overrides.filter((override) => override.eventTypeId === null);
+  }, [overrides, activeServiceId]);
+
+  const exceptionGroups = useMemo(
+    () => groupOverrides(exceptionScopeOverrides),
+    [exceptionScopeOverrides],
+  );
 
   const dirty = weekDirty || settingsDirty || dayDraft.dirty;
 
@@ -582,6 +629,7 @@ export default function AvailabilityPage() {
       type: "BLOCKED",
       note: "",
       blocks: [{ start: 9 * 60, end: 17 * 60 }],
+      eventTypeId: activeServiceId ?? null,
     });
     // Auto-exit range mode after the second click so accidental clicks don't
     // reset the selection.
@@ -679,10 +727,25 @@ export default function AvailabilityPage() {
 
   async function saveDayDraft(draft: DayDraft) {
     const key = draft.dateKey;
+    // Day edits target the active scope: when a service is selected, the
+    // override is scoped to that service. Otherwise it is host-wide.
+    const scope = activeServiceId ?? null;
+    // We only PATCH/DELETE the base override row if it matches the current
+    // scope. Otherwise (e.g. the base draft was a host-wide row but the user
+    // is editing inside a service scope) we create a fresh service-scoped row
+    // on top of it so the host-wide row stays intact.
+    const baseOverride = draft.originalOverrideId
+      ? overrides.find((override) => override.id === draft.originalOverrideId)
+      : null;
+    const editableOverrideId =
+      baseOverride && (baseOverride.eventTypeId ?? null) === scope
+        ? baseOverride.id
+        : null;
+
     if (draft.status === "blocked" || draft.status === "dayoff") {
       // Delete any CUSTOM_HOURS override and create/update a BLOCKED one.
-      if (draft.originalOverrideId) {
-        await authedApiRequest(`/availability/overrides/${draft.originalOverrideId}`, {
+      if (editableOverrideId) {
+        await authedApiRequest(`/availability/overrides/${editableOverrideId}`, {
           method: "PATCH",
           body: JSON.stringify({
             type: "BLOCKED",
@@ -697,6 +760,7 @@ export default function AvailabilityPage() {
             date: key,
             type: "BLOCKED",
             note: draft.status === "blocked" ? draft.note.trim() || null : null,
+            eventTypeId: scope,
           }),
         });
       }
@@ -708,13 +772,13 @@ export default function AvailabilityPage() {
       const matchesWeekly = blocksEqual(draft.blocks, weeklyBlocks);
 
       if (matchesWeekly) {
-        if (draft.originalOverrideId) {
-          await authedApiRequest(`/availability/overrides/${draft.originalOverrideId}`, {
+        if (editableOverrideId) {
+          await authedApiRequest(`/availability/overrides/${editableOverrideId}`, {
             method: "DELETE",
           });
         }
-      } else if (draft.originalOverrideId) {
-        await authedApiRequest(`/availability/overrides/${draft.originalOverrideId}`, {
+      } else if (editableOverrideId) {
+        await authedApiRequest(`/availability/overrides/${editableOverrideId}`, {
           method: "PATCH",
           body: JSON.stringify({
             type: "CUSTOM_HOURS",
@@ -730,6 +794,7 @@ export default function AvailabilityPage() {
             type: "CUSTOM_HOURS",
             note: draft.note.trim() || null,
             blocks: draft.blocks.map(blockToWire),
+            eventTypeId: scope,
           }),
         });
       }
@@ -833,6 +898,108 @@ export default function AvailabilityPage() {
     markWeekDirty();
   }
 
+  // ── handlers: schedules tab ─────────────────────────────────────────────
+
+  async function createScheduleFromDraft(name: string) {
+    const rules = rulesFromWeekDraft(weekDraft);
+    try {
+      const created = await authedApiRequest<AvailabilitySchedule>(
+        "/availability/schedules",
+        {
+          method: "POST",
+          body: JSON.stringify({ name, rules }),
+        },
+      );
+      setSchedules((current) => [...current, created]);
+      toast.success(`Template "${created.name}" saved`);
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not save template",
+      );
+    }
+  }
+
+  async function renameSchedule(id: string, name: string) {
+    try {
+      const updated = await authedApiRequest<AvailabilitySchedule>(
+        `/availability/schedules/${id}`,
+        { method: "PATCH", body: JSON.stringify({ name }) },
+      );
+      setSchedules((current) =>
+        current.map((schedule) => (schedule.id === id ? updated : schedule)),
+      );
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not rename template",
+      );
+    }
+  }
+
+  async function deleteSchedule(id: string) {
+    try {
+      await authedApiRequest(`/availability/schedules/${id}`, {
+        method: "DELETE",
+      });
+      setSchedules((current) =>
+        current.filter((schedule) => schedule.id !== id),
+      );
+      toast.success("Template removed");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not delete template",
+      );
+    }
+  }
+
+  async function applySchedule(scheduleId: string) {
+    if (weekDirty || dayDraft.dirty) {
+      const shouldDiscard = window.confirm(
+        "You have unsaved weekly/day edits that will be discarded. Apply the template anyway?",
+      );
+      if (!shouldDiscard) return;
+    }
+    setApplyingScheduleId(scheduleId);
+    try {
+      await authedApiRequest("/availability/schedules/apply", {
+        method: "POST",
+        body: JSON.stringify({
+          scheduleId,
+          eventTypeId: activeServiceId ?? null,
+        }),
+      });
+
+      if (activeServiceId) {
+        const next = await authedApiRequest<EventTypeAvailability>(
+          `/availability/event-types/${activeServiceId}`,
+        );
+        setServiceAvailabilityById((current) => ({
+          ...current,
+          [next.eventTypeId]: next,
+        }));
+        setServiceModeDraft(next.mode);
+        setWeekDraft(
+          buildWeekDraft(next.mode === "CUSTOM" ? next.rules : rules),
+        );
+      } else {
+        const freshRules = await authedApiRequest<AvailabilityRule[]>(
+          "/availability/rules",
+        );
+        setRules(freshRules);
+        setWeekDraft(buildWeekDraft(freshRules));
+      }
+
+      setWeekDirty(false);
+      setDayEdits(null);
+      toast.success("Template applied");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not apply template",
+      );
+    } finally {
+      setApplyingScheduleId(null);
+    }
+  }
+
   // ── handlers: settings tab ──────────────────────────────────────────────
 
   function updateSetting<K extends keyof AvailabilitySettings>(
@@ -900,6 +1067,7 @@ export default function AvailabilityPage() {
           type: draft.type,
           note: draft.note.trim() || null,
           blocks: cleanBlocks,
+          eventTypeId: draft.eventTypeId ?? null,
         }),
       });
       const fresh = await authedApiRequest<AvailabilityOverride[]>(
@@ -934,6 +1102,7 @@ export default function AvailabilityPage() {
       type: dayDraft.status === "available" ? "CUSTOM_HOURS" : "BLOCKED",
       note: dayDraft.note,
       blocks: fallbackBlocks,
+      eventTypeId: activeServiceId ?? null,
     });
   }
 
@@ -1251,6 +1420,12 @@ export default function AvailabilityPage() {
               <TabButton on={tab === "rules"} onClick={() => setTab("rules")}>
                 Booking rules
               </TabButton>
+              <TabButton
+                on={tab === "schedules"}
+                onClick={() => setTab("schedules")}
+              >
+                Schedules
+              </TabButton>
             </div>
 
             {tab === "weekly" ? (
@@ -1272,7 +1447,16 @@ export default function AvailabilityPage() {
               <ExceptionsTab
                 groups={exceptionGroups}
                 editor={exceptionEditor}
-                onStartAdd={() => setExceptionEditor(emptyExceptionDraft())}
+                scopeLabel={
+                  activeService
+                    ? `for "${activeService.title}"`
+                    : "across every service"
+                }
+                onStartAdd={() =>
+                  setExceptionEditor(
+                    emptyExceptionDraft(activeServiceId ?? null),
+                  )
+                }
                 onCancel={() => setExceptionEditor(null)}
                 onSave={saveExceptionDraft}
                 onChange={(next) => setExceptionEditor(next)}
@@ -1284,6 +1468,24 @@ export default function AvailabilityPage() {
               <RulesTab
                 settings={settingsDraft}
                 onChange={updateSetting}
+              />
+            ) : null}
+
+            {tab === "schedules" ? (
+              <SchedulesTab
+                schedules={schedules}
+                applyingId={applyingScheduleId}
+                saving={saving}
+                scopeLabel={
+                  activeService
+                    ? `the "${activeService.title}" service`
+                    : "your default weekly hours"
+                }
+                canSaveFromDraft={weekDraft.length > 0}
+                onApply={applySchedule}
+                onCreateFromDraft={createScheduleFromDraft}
+                onRename={renameSchedule}
+                onDelete={deleteSchedule}
               />
             ) : null}
           </section>
@@ -2437,21 +2639,25 @@ type ExceptionDraft = {
   type: AvailabilityOverrideType;
   note: string;
   blocks: Block[];
+  // null = host-wide (applies to every service). Otherwise the EventType.id.
+  eventTypeId?: string | null;
 };
 
-function emptyExceptionDraft(): ExceptionDraft {
+function emptyExceptionDraft(eventTypeId: string | null = null): ExceptionDraft {
   return {
     startDate: dateKey(new Date()),
     endDate: "",
     type: "BLOCKED",
     note: "",
     blocks: [{ start: 9 * 60, end: 17 * 60 }],
+    eventTypeId,
   };
 }
 
 function ExceptionsTab({
   groups,
   editor,
+  scopeLabel,
   onStartAdd,
   onCancel,
   onSave,
@@ -2460,6 +2666,7 @@ function ExceptionsTab({
 }: {
   groups: ExceptionGroup[];
   editor: ExceptionDraft | null;
+  scopeLabel: string;
   onStartAdd: () => void;
   onCancel: () => void;
   onSave: (draft: ExceptionDraft) => void;
@@ -2470,7 +2677,7 @@ function ExceptionsTab({
     <div className="p-5">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[12px] text-[#6B7280]">
-          Block off vacations or open extra days outside your normal schedule.
+          Block off vacations or open extra days {scopeLabel}.
         </p>
         {!editor ? (
           <button

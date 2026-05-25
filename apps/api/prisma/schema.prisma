@@ -123,12 +123,14 @@ model User {
   eventTypes             EventType[]
   availabilityRules      AvailabilityRule[]
   availabilityOverrides  AvailabilityOverride[]
+  availabilitySchedules  AvailabilitySchedule[]
   bookings               Booking[]
   reviews                Review[]
   dailyAgendaDeliveries  DailyAgendaDelivery[]
   connectedCalendars     ConnectedCalendar[]
   bookingFeed            BookingFeed?
   accountDeletionRequest AccountDeletionRequest?
+  publicLinkRedirects    PublicLinkRedirect[]
 
   @@map("users")
 }
@@ -194,13 +196,24 @@ model NotificationPreference {
 }
 
 model UserSession {
-  id               String   @id @default(uuid())
-  userId           String   @map("user_id")
-  refreshTokenHash String   @map("refresh_token_hash")
-  userAgent        String?  @map("user_agent")
+  id                          String   @id @default(uuid())
+  userId                      String   @map("user_id")
+  refreshTokenHash            String   @map("refresh_token_hash")
+  // The most-recently rotated-out refresh hash. If a client ever presents this
+  // value again it means somebody held on to a stale token — almost certainly
+  // a stolen-cookie replay. We revoke the session on detection.
+  previousRefreshTokenHash    String?  @map("previous_refresh_token_hash")
+  // Hard ceiling on the session, set at creation. Sliding `expiresAt` can be
+  // pushed by refresh but never beyond this. Stops a single sign-in from
+  // becoming a perpetual session via constant refresh.
+  absoluteExpiresAt           DateTime @map("absolute_expires_at")
+  userAgent                   String?  @map("user_agent")
   ipAddress        String?  @map("ip_address")
   ipRegion         String?  @map("ip_region")
   expiresAt        DateTime @map("expires_at")
+  // Whether the original sign-in opted into "Keep me signed in". When false we
+  // hand out short-lived (12h) sliding sessions and session-scope cookies.
+  rememberMe       Boolean  @default(true) @map("remember_me")
   isActive         Boolean  @default(true) @map("is_active")
   lastUsedAt       DateTime @default(now()) @map("last_used_at")
   createdAt        DateTime @default(now()) @map("created_at")
@@ -209,6 +222,7 @@ model UserSession {
 
   @@index([userId])
   @@index([refreshTokenHash])
+  @@index([previousRefreshTokenHash])
   @@map("user_sessions")
 }
 
@@ -239,10 +253,12 @@ model EventType {
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-  reviews  Review[]
-  availability EventTypeAvailability?
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings              Booking[]
+  reviews               Review[]
+  availability          EventTypeAvailability?
+  availabilityOverrides AvailabilityOverride[]
+  publicLinkRedirects   PublicLinkRedirect[]
 
   @@unique([userId, slug])
   @@map("event_types")
@@ -288,22 +304,68 @@ model EventTypeAvailabilityRule {
 }
 
 model AvailabilityOverride {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  date      DateTime @db.Date @map("date")
-  type      AvailabilityOverrideType @default(BLOCKED) @map("type")
-  isBlocked Boolean  @default(true) @map("is_blocked")
-  note      String?
-  blocks    Json?    @map("blocks") // [{startMinute, endMinute}] for CUSTOM_HOURS
-  groupId   String?  @map("group_id") // shared id for multi-day exception ranges
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  eventTypeId String?  @map("event_type_id")
+  date        DateTime @db.Date @map("date")
+  type        AvailabilityOverrideType @default(BLOCKED) @map("type")
+  isBlocked   Boolean  @default(true) @map("is_blocked")
+  note        String?
+  blocks      Json?    @map("blocks") // [{startMinute, endMinute}] for CUSTOM_HOURS
+  groupId     String?  @map("group_id") // shared id for multi-day exception ranges
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType EventType? @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
   @@index([userId])
+  @@index([userId, eventTypeId])
   @@index([groupId])
   @@map("availability_overrides")
+}
+
+model AvailabilitySchedule {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rules AvailabilityScheduleRule[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("availability_schedules")
+}
+
+model AvailabilityScheduleRule {
+  id          String @id @default(uuid())
+  scheduleId  String @map("schedule_id")
+  dayOfWeek   Int    @map("day_of_week")
+  startMinute Int    @map("start_minute")
+  endMinute   Int    @map("end_minute")
+
+  schedule AvailabilitySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId])
+  @@map("availability_schedule_rules")
+}
+
+model PublicLinkRedirect {
+  id            String   @id @default(uuid())
+  hostUserId    String   @map("host_user_id")
+  oldHostSlug   String   @map("old_host_slug")
+  oldEventSlug  String?  @map("old_event_slug")
+  eventTypeId   String?  @map("event_type_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  host      User       @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
+  eventType EventType? @relation(fields: [eventTypeId], references: [id], onDelete: SetNull)
+
+  @@unique([oldHostSlug, oldEventSlug])
+  @@index([hostUserId])
+  @@map("public_link_redirects")
 }
 
 model Booking {

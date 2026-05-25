@@ -17,6 +17,10 @@ export class EmailService {
           to: input.to,
           subject: input.subject,
           text: input.text,
+          attachments: input.attachments?.map((attachment) => ({
+            filename: attachment.filename,
+            contentType: attachment.contentType,
+          })),
         }),
       );
       return { delivered: true, mode: 'console' };
@@ -36,6 +40,7 @@ export class EmailService {
       subject: input.subject,
       text: input.text,
       html: input.html,
+      attachments: input.attachments,
     });
 
     return { delivered: true, mode: 'smtp' };
@@ -53,6 +58,11 @@ async function sendSmtpMail(options: {
   subject: string;
   text: string;
   html?: string;
+  attachments?: {
+    filename: string;
+    contentType: string;
+    content: string | Buffer;
+  }[];
 }) {
   const client = await SmtpClient.connect(
     options.host,
@@ -202,8 +212,15 @@ function buildMessage(options: {
   subject: string;
   text: string;
   html?: string;
+  attachments?: {
+    filename: string;
+    contentType: string;
+    content: string | Buffer;
+  }[];
 }) {
   const boundary = `bookvella-${Date.now().toString(36)}`;
+  const mixedBoundary = `bookvella-mixed-${Date.now().toString(36)}`;
+  const attachments = options.attachments ?? [];
   const headers = [
     `From: ${options.from}`,
     `To: ${options.to}`,
@@ -211,7 +228,7 @@ function buildMessage(options: {
     'MIME-Version: 1.0',
   ];
 
-  if (!options.html) {
+  if (!options.html && attachments.length === 0) {
     return [
       ...headers,
       'Content-Type: text/plain; charset=UTF-8',
@@ -221,20 +238,53 @@ function buildMessage(options: {
     ].join('\r\n');
   }
 
+  const bodyPart = options.html
+    ? buildAlternativePart(boundary, options.text, options.html)
+    : [
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: 7bit',
+        '',
+        escapeMessageBody(options.text),
+      ].join('\r\n');
+
+  if (attachments.length === 0) {
+    return [...headers, bodyPart].join('\r\n');
+  }
+
   return [
     ...headers,
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+    '',
+    `--${mixedBoundary}`,
+    bodyPart,
+    ...attachments.map((attachment) =>
+      [
+        `--${mixedBoundary}`,
+        `Content-Type: ${attachment.contentType}; name="${escapeHeaderParam(attachment.filename)}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-Disposition: attachment; filename="${escapeHeaderParam(attachment.filename)}"`,
+        '',
+        wrapBase64(Buffer.from(attachment.content).toString('base64')),
+      ].join('\r\n'),
+    ),
+    `--${mixedBoundary}--`,
+  ].join('\r\n');
+}
+
+function buildAlternativePart(boundary: string, text: string, html: string) {
+  return [
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
     `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: 7bit',
     '',
-    escapeMessageBody(options.text),
+    escapeMessageBody(text),
     `--${boundary}`,
     'Content-Type: text/html; charset=UTF-8',
     'Content-Transfer-Encoding: 7bit',
     '',
-    escapeMessageBody(options.html),
+    escapeMessageBody(html),
     `--${boundary}--`,
   ].join('\r\n');
 }
@@ -259,6 +309,14 @@ function escapeMessageBody(value: string) {
   // lines starting with '.' are correctly escaped even after normalisation.
   const crlf = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
   return crlf.replace(/^\./gm, '..');
+}
+
+function escapeHeaderParam(value: string) {
+  return value.replace(/["\\]/g, '_');
+}
+
+function wrapBase64(value: string) {
+  return value.match(/.{1,76}/g)?.join('\r\n') ?? '';
 }
 
 function extractAddress(value: string) {

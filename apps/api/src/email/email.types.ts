@@ -3,6 +3,13 @@ export type SendMailInput = {
   subject: string;
   text: string;
   html?: string;
+  attachments?: SendMailAttachment[];
+};
+
+export type SendMailAttachment = {
+  filename: string;
+  contentType: string;
+  content: string | Buffer;
 };
 
 export type SendMailResult = {

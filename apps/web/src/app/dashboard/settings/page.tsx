@@ -2229,6 +2229,26 @@ function CalendarSection() {
     }
   }
 
+  async function refreshCalendarList(calendar: ConnectedCalendar) {
+    setBusyCalendarId(calendar.id);
+    try {
+      const updated = await authedApiRequest<ConnectedCalendar>(
+        `/auth/calendars/${calendar.id}/refresh`,
+        { method: "PATCH" },
+      );
+      replaceCalendar(updated);
+      toast.success("Calendar list refreshed");
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not refresh calendar list",
+      );
+    } finally {
+      setBusyCalendarId(null);
+    }
+  }
+
   const googleCalendars =
     calendars?.filter((c) => c.provider === "GOOGLE") ?? [];
   const outlookCalendars =
@@ -2262,6 +2282,7 @@ function CalendarSection() {
           onUpdateCalendar={updateCalendar}
           onUpdateConflictCalendar={updateConflictCalendar}
           onDisconnectCalendar={disconnectCalendar}
+          onRefreshCalendar={refreshCalendarList}
         />
         <CalendarProviderRow
           label="Outlook / Microsoft 365"
@@ -2280,6 +2301,7 @@ function CalendarSection() {
           onUpdateCalendar={updateCalendar}
           onUpdateConflictCalendar={updateConflictCalendar}
           onDisconnectCalendar={disconnectCalendar}
+          onRefreshCalendar={refreshCalendarList}
         />
         <Row
           title={
@@ -2335,6 +2357,7 @@ function CalendarProviderRow({
   onUpdateCalendar,
   onUpdateConflictCalendar,
   onDisconnectCalendar,
+  onRefreshCalendar,
 }: {
   label: string;
   glyph: React.ReactNode;
@@ -2361,6 +2384,7 @@ function CalendarProviderRow({
     enabled: boolean,
   ) => void;
   onDisconnectCalendar: (calendar: ConnectedCalendar) => void;
+  onRefreshCalendar: (calendar: ConnectedCalendar) => void;
 }) {
   const connected = calendars.length > 0;
 
@@ -2469,11 +2493,12 @@ function CalendarProviderRow({
                 onUpdate={onUpdateCalendar}
                 onUpdateConflict={onUpdateConflictCalendar}
                 onDisconnect={onDisconnectCalendar}
+                onRefresh={onRefreshCalendar}
               />
             </div>
           ))}
           <p className="text-[11px] text-[#9CA3AF]">
-            Reconnect refreshes provider tokens and calendar lists.
+            Refresh pulls calendar-list changes. Reconnect refreshes provider tokens.
           </p>
         </div>
       ) : null}
@@ -2488,6 +2513,7 @@ function CalendarAccountControls({
   onUpdate,
   onUpdateConflict,
   onDisconnect,
+  onRefresh,
 }: {
   calendar: ConnectedCalendar;
   busy: boolean;
@@ -2508,6 +2534,7 @@ function CalendarAccountControls({
     enabled: boolean,
   ) => void;
   onDisconnect: (calendar: ConnectedCalendar) => void;
+  onRefresh: (calendar: ConnectedCalendar) => void;
 }) {
   const providerUnavailable = calendar.state === "TOKEN_EXPIRED";
   const controlDisabled = busy || providerUnavailable;
@@ -2629,11 +2656,24 @@ function CalendarAccountControls({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-white px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
-          Reconnect to refresh the calendar list.
+          Refresh calendars or reconnect if this account needs a new token.
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => onRefresh(calendar)}
+          disabled={busy}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+        >
+          {busy ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
+          Refresh calendars
+        </button>
         <button
           type="button"
           onClick={() => onDisconnect(calendar)}

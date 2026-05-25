@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import {
   assertRuntimeConfig,
   createRateLimitMiddleware,
+  csrfOriginGuard,
   getCorsOrigins,
   getPort,
   securityHeaders,
@@ -20,6 +21,14 @@ async function bootstrap() {
   express.set('trust proxy', 1);
   app.enableShutdownHooks();
   app.use(securityHeaders);
+  app.use(csrfOriginGuard);
+  app.use(
+    createRateLimitMiddleware({
+      windowMs: 15 * 60 * 1000,
+      max: 300,
+      methods: ['POST', 'PATCH', 'DELETE'],
+    }),
+  );
   app.use(
     createRateLimitMiddleware({
       windowMs: 15 * 60 * 1000,
@@ -39,8 +48,34 @@ async function bootstrap() {
         '/auth/totp/disable',
         '/auth/me/delete',
         '/auth/me/delete/confirm',
-        '/booking-codes',
-        '/public/reviews',
+      ],
+      pathPatterns: [
+        /^\/public\/[^/]+\/[^/]+\/booking-codes$/,
+        /^\/public\/[^/]+\/[^/]+\/bookings$/,
+        /^\/public\/bookings\/guest-(cancel|reschedule)\/[^/]+$/,
+        /^\/public\/reviews$/,
+      ],
+    }),
+  );
+  app.use(
+    createRateLimitMiddleware({
+      windowMs: 15 * 60 * 1000,
+      max: 60,
+      paths: ['/uploads/images'],
+      pathPatterns: [/^\/auth\/(google|outlook)\/calendar$/],
+    }),
+  );
+  app.use(
+    createRateLimitMiddleware({
+      windowMs: 15 * 60 * 1000,
+      max: 600,
+      methods: ['GET'],
+      pathPatterns: [
+        /^\/public\/slug-availability$/,
+        /^\/public\/host\/[^/]+$/,
+        /^\/public\/[^/]+\/[^/]+$/,
+        /^\/public\/[^/]+\/[^/]+\/slots$/,
+        /^\/public\/feeds\/[^/]+$/,
       ],
     }),
   );

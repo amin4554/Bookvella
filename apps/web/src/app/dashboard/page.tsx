@@ -556,8 +556,8 @@ function CalendarSyncCard() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-[13px] font-bold">Calendar sync</p>
-            <span className="rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-bold text-[#6B7280]">
-              Coming soon
+            <span className="rounded-full bg-[#ECFDF5] px-1.5 py-0.5 text-[10px] font-bold text-[#047857]">
+              Ready
             </span>
           </div>
           <p className="mt-0.5 text-[11px] text-[#6B7280]">
@@ -574,9 +574,9 @@ function CalendarSyncCard() {
           </div>
         </div>
         <Link
-          href="/dashboard/settings"
+          href="/dashboard/settings#calendar"
           className="shrink-0 rounded-md p-1.5 text-[#9CA3AF] hover:text-[#0B1220]"
-          aria-label="Open settings"
+          aria-label="Open calendar settings"
         >
           <ChevronRight className="size-4" />
         </Link>

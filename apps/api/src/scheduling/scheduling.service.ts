@@ -276,11 +276,6 @@ export class SchedulingService {
         user: {
           include: {
             availabilityRules: true,
-            availabilityOverrides: {
-              where: {
-                date: { gte: start, lte: end },
-              },
-            },
           },
         },
       },
@@ -289,6 +284,17 @@ export class SchedulingService {
     if (!eventType) {
       throw new NotFoundException('Public event not found');
     }
+
+    // Load host-wide (eventTypeId IS NULL) and this-service overrides together
+    // so per-service exceptions can layer on top of host-wide ones for the
+    // same calendar day.
+    const overrideRows = await this.prisma.availabilityOverride.findMany({
+      where: {
+        userId: eventType.userId,
+        date: { gte: start, lte: end },
+        OR: [{ eventTypeId: null }, { eventTypeId: eventType.id }],
+      },
+    });
 
     assertValidTimeZone(eventType.user.timezone, 'host timezone');
 
@@ -325,15 +331,24 @@ export class SchedulingService {
         ? serviceAvailability.rules
         : host.availabilityRules;
 
-    if (weeklyRules.length === 0 && host.availabilityOverrides.length === 0) {
+    if (weeklyRules.length === 0 && overrideRows.length === 0) {
       return [];
     }
 
+    // Service-specific overrides take precedence over host-wide overrides for
+    // the same date. We seed the map with host-wide rows first, then let
+    // matching per-service rows clobber them.
     const overridesByDate = new Map<
       string,
       { type: 'BLOCKED' | 'CUSTOM_HOURS'; blocks: OverrideBlock[] }
     >();
-    for (const override of host.availabilityOverrides) {
+    const sortedOverrides = [...overrideRows].sort((a, b) => {
+      // null < non-null so service-specific wins last.
+      const aHost = a.eventTypeId === null ? 0 : 1;
+      const bHost = b.eventTypeId === null ? 0 : 1;
+      return aHost - bHost;
+    });
+    for (const override of sortedOverrides) {
       const key = override.date.toISOString().slice(0, 10);
       const type =
         // Older rows pre-migration may only have isBlocked=true and no type.
@@ -348,6 +363,9 @@ export class SchedulingService {
     const bookings = await this.prisma.booking.findMany({
       where: {
         hostUserId: eventType.userId,
+        ...(input.excludeBookingId
+          ? { id: { not: input.excludeBookingId } }
+          : {}),
         status: BookingStatus.CONFIRMED,
         startTimeUtc: {
           lt: effectiveEnd,
@@ -494,6 +512,76 @@ export class SchedulingService {
     }
 
     return slots;
+  }
+
+  // Resolves an old public link to its current form. Returns null when no
+  // redirect is on file; otherwise returns the new `/hostSlug` or
+  // `/hostSlug/eventSlug` path the caller should send the visitor to.
+  async resolvePublicLinkRedirect(
+    oldHostSlug: string,
+    oldEventSlug?: string | null,
+  ): Promise<{ hostSlug: string; eventSlug: string | null } | null> {
+    const trimmedHost = oldHostSlug?.trim() ?? '';
+    if (!trimmedHost) {
+      return null;
+    }
+    const trimmedEvent = oldEventSlug?.trim() ? oldEventSlug.trim() : null;
+
+    // 1. Direct hit: the exact (oldHostSlug, oldEventSlug) pair was renamed.
+    if (trimmedEvent) {
+      const exact = await this.prisma.publicLinkRedirect.findFirst({
+        where: { oldHostSlug: trimmedHost, oldEventSlug: trimmedEvent },
+        include: { host: true, eventType: true },
+      });
+      if (exact?.eventType && exact.host.isActive) {
+        return {
+          hostSlug: exact.host.slug,
+          eventSlug: exact.eventType.slug,
+        };
+      }
+    }
+
+    // 2. Host-level redirect: old host slug → current host slug. If a service
+    // slug was on the URL, preserve it so /old/{event} → /new/{event} works
+    // when the event slug itself didn't change.
+    const hostHit = await this.prisma.publicLinkRedirect.findFirst({
+      where: { oldHostSlug: trimmedHost, oldEventSlug: null },
+      include: { host: true },
+    });
+    if (hostHit && hostHit.host.isActive) {
+      if (!trimmedEvent) {
+        return { hostSlug: hostHit.host.slug, eventSlug: null };
+      }
+      // Resolve the event slug against the redirected host: prefer the
+      // current event under the new host with the same slug; otherwise look
+      // for another redirect from (newHostSlug, oldEventSlug).
+      const event = await this.prisma.eventType.findFirst({
+        where: {
+          userId: hostHit.hostUserId,
+          slug: trimmedEvent,
+          deletedAt: null,
+        },
+        select: { slug: true },
+      });
+      if (event) {
+        return { hostSlug: hostHit.host.slug, eventSlug: event.slug };
+      }
+      const eventRedirect = await this.prisma.publicLinkRedirect.findFirst({
+        where: {
+          oldHostSlug: hostHit.host.slug,
+          oldEventSlug: trimmedEvent,
+        },
+        include: { eventType: true },
+      });
+      if (eventRedirect?.eventType) {
+        return {
+          hostSlug: hostHit.host.slug,
+          eventSlug: eventRedirect.eventType.slug,
+        };
+      }
+    }
+
+    return null;
   }
 
   async checkSlugAvailability(input: string | undefined) {

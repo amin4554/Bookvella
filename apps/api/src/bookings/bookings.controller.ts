@@ -1,7 +1,11 @@
 import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { BookingsService } from './bookings.service';
-import type { CreatePublicBookingDto, RequestBookingCodeDto } from './dto';
+import type {
+  CreatePublicBookingDto,
+  RequestBookingCodeDto,
+  RescheduleBookingDto,
+} from './dto';
 
 @Controller('public')
 export class BookingsController {
@@ -46,5 +50,13 @@ export class BookingsController {
   @Post('bookings/guest-cancel/:token')
   cancelByGuestToken(@Param('token') token: string) {
     return this.bookingsService.cancelByGuestToken(token);
+  }
+
+  @Post('bookings/guest-reschedule/:token')
+  rescheduleByGuestToken(
+    @Param('token') token: string,
+    @Body() dto: RescheduleBookingDto,
+  ) {
+    return this.bookingsService.rescheduleByGuestToken(token, dto);
   }
 }

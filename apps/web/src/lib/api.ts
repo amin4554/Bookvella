@@ -32,6 +32,7 @@ export type AuthResponse = {
   user: PublicUser;
   expiresIn: number;
   authenticated: boolean;
+  rememberMe?: boolean;
 };
 
 export type EventType = {
@@ -96,6 +97,7 @@ export type AvailabilityOverrideBlock = {
 export type AvailabilityOverride = {
   id: string;
   userId: string;
+  eventTypeId: string | null;
   date: string; // ISO date string YYYY-MM-DDT00:00:00.000Z
   type: AvailabilityOverrideType;
   isBlocked: boolean;
@@ -103,6 +105,22 @@ export type AvailabilityOverride = {
   blocks: AvailabilityOverrideBlock[] | null;
   groupId: string | null;
   createdAt: string;
+};
+
+export type AvailabilityScheduleRule = {
+  id: string;
+  scheduleId: string;
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+};
+
+export type AvailabilitySchedule = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  rules: AvailabilityScheduleRule[];
 };
 
 export type AvailabilitySettings = {
@@ -279,6 +297,7 @@ export type BookingCodeResponse = {
 export type ApiError = Error & {
   status?: number;
   body?: unknown;
+  code?: string;
 };
 
 export type SlugAvailability = {
@@ -415,19 +434,48 @@ export async function apiRequest<T>(
     const error = new Error(parsed.message) as ApiError;
     error.status = response.status;
     error.body = parsed.body;
+    error.code = parsed.code;
     throw error;
   }
 
   return response.json() as Promise<T>;
 }
 
+// Single in-flight refresh promise shared across concurrent callers. Without
+// this, a Promise.all of authed calls that all 401 at once would each fire
+// their own /auth/refresh, racing on the rotating refresh cookie — the first
+// rotates it, every subsequent call sends a stale token and 401s, dumping the
+// user to the login page.
+let refreshInFlight: Promise<AuthResponse> | null = null;
+
+async function refreshSessionOnce(): Promise<AuthResponse> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const refreshed = await apiRequest<AuthResponse>("/auth/refresh", {
+        method: "POST",
+      });
+      saveAuthSession(refreshed);
+      return refreshed;
+    } finally {
+      // Always clear the slot so the *next* 401 wave can mint a fresh refresh.
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 export async function authedApiRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const session = getAuthSession();
-
-  if (!session?.user) {
+  // Cookie is the authority. localStorage may be cleared independently and we
+  // don't want a stale cache desync to lock out a still-valid cookie.
+  if (!hasActiveSessionCookie()) {
     const error = new Error("Please sign in again") as ApiError;
     error.status = 401;
     throw error;
@@ -442,30 +490,24 @@ export async function authedApiRequest<T>(
       throw error;
     }
 
-    let refreshed: AuthResponse;
-
     try {
-      refreshed = await apiRequest<AuthResponse>("/auth/refresh", {
-        method: "POST",
-      });
+      await refreshSessionOnce();
     } catch {
       await clearServerSession();
       clearAuthSession();
-      const refreshError = new Error("Your session expired. Please sign in again.") as ApiError;
+      const refreshError = new Error(
+        "Your session expired. Please sign in again.",
+      ) as ApiError;
       refreshError.status = 401;
       throw refreshError;
     }
-
-    saveAuthSession(refreshed);
 
     return apiRequest<T>(path, options);
   }
 }
 
 export async function downloadAuthedFile(path: string, filename: string) {
-  const session = getAuthSession();
-
-  if (!session?.user) {
+  if (!hasActiveSessionCookie()) {
     const error = new Error("Please sign in again") as ApiError;
     error.status = 401;
     throw error;
@@ -474,7 +516,7 @@ export async function downloadAuthedFile(path: string, filename: string) {
   let response = await fetch(`${API_URL}${path}`, { credentials: "include" });
 
   if (response.status === 401) {
-    await apiRequest<AuthResponse>("/auth/refresh", { method: "POST" });
+    await refreshSessionOnce();
     response = await fetch(`${API_URL}${path}`, { credentials: "include" });
   }
 
@@ -483,6 +525,7 @@ export async function downloadAuthedFile(path: string, filename: string) {
     const error = new Error(parsed.message) as ApiError;
     error.status = response.status;
     error.body = parsed.body;
+    error.code = parsed.code;
     throw error;
   }
 
@@ -515,15 +558,37 @@ export function updateStoredUser(user: PublicUser) {
   localStorage.setItem("bookvella.user", JSON.stringify(user));
 }
 
+// The non-httpOnly `bookvella.session` cookie is the authoritative "is anyone
+// logged in?" flag — the server sets it alongside the real (httpOnly) access
+// and refresh cookies. We use it as the source of truth and treat localStorage
+// as a profile cache that may be missing/stale.
+export function hasActiveSessionCookie() {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split(";")
+    .some((part) => part.trim().startsWith("bookvella.session=active"));
+}
+
 export function getAuthSession() {
   if (typeof window === "undefined") {
+    return null;
+  }
+
+  // Cookie says we're logged out → nothing the localStorage cache can do about
+  // it. Discard the stale cache so the UI doesn't briefly render a stale avatar.
+  if (!hasActiveSessionCookie()) {
+    if (localStorage.getItem("bookvella.user")) {
+      localStorage.removeItem("bookvella.user");
+    }
     return null;
   }
 
   const userJson = localStorage.getItem("bookvella.user");
 
   if (!userJson) {
-    return null;
+    // Cookie is set but the cached profile is missing — return a placeholder
+    // session so callers proceed and let /auth/me repopulate the cache.
+    return { user: null as unknown as PublicUser };
   }
 
   try {
@@ -532,7 +597,7 @@ export function getAuthSession() {
     };
   } catch {
     clearAuthSession();
-    return null;
+    return { user: null as unknown as PublicUser };
   }
 }
 
@@ -552,9 +617,12 @@ export function publicBookingUrl(hostSlug: string, eventSlug: string) {
 
 async function readErrorBody(
   response: Response,
-): Promise<{ message: string; body: unknown }> {
+): Promise<{ message: string; code?: string; body: unknown }> {
   try {
-    const body = (await response.json()) as { message?: unknown };
+    const body = (await response.json()) as {
+      message?: unknown;
+      code?: unknown;
+    };
     let message: string | null = null;
 
     if (typeof body.message === "string") {
@@ -565,6 +633,7 @@ async function readErrorBody(
 
     return {
       message: message ?? response.statusText ?? "Something went wrong",
+      code: typeof body.code === "string" ? body.code : undefined,
       body,
     };
   } catch {

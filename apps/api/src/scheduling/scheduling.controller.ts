@@ -10,6 +10,24 @@ export class SchedulingController {
     return this.schedulingService.checkSlugAvailability(slug);
   }
 
+  // Public lookup the Next.js frontend hits when a host/service link 404s, to
+  // see if the URL maps to a renamed host or service. Returns the resolved
+  // host + (optional) event slug, or 404 if no redirect applies.
+  @Get('link-redirect')
+  async resolveLinkRedirect(
+    @Query('hostSlug') hostSlug: string,
+    @Query('eventSlug') eventSlug?: string,
+  ) {
+    const result = await this.schedulingService.resolvePublicLinkRedirect(
+      hostSlug,
+      eventSlug ?? null,
+    );
+    if (!result) {
+      return { redirect: null };
+    }
+    return { redirect: result };
+  }
+
   // The public host profile (`/public/host/:hostSlug`) backs the
   // `bookvella.com/{slug}` bridge page that lists every active, non
   // direct-link-only service plus reviews and trust signals.

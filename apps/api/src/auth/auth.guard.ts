@@ -20,7 +20,10 @@ export class AuthGuard implements CanActivate {
       : getCookie(request, ACCESS_TOKEN_COOKIE);
 
     if (!token) {
-      throw new UnauthorizedException('Missing auth session');
+      throw new UnauthorizedException({
+        message: 'Missing auth session',
+        code: 'AUTH_SESSION_MISSING',
+      });
     }
 
     request.user = this.authService.verifyAccessToken(token);

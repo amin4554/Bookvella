@@ -60,6 +60,13 @@ export function AuthCard({
   const [sessionExpired, setSessionExpired] = useState(
     Boolean(message?.toLowerCase().includes("session")),
   );
+  // Defaults to checked because the historical behaviour was always-90-day
+  // sessions. Unchecking now flips to a 12-hour session-scope cookie.
+  const [rememberMe, setRememberMe] = useState(true);
+  // Mirror into a ref so the Google sign-in callback — which is bound once on
+  // mount — always reads the latest value without forcing a button re-render.
+  const rememberMeRef = useRef(rememberMe);
+  rememberMeRef.current = rememberMe;
   const [pendingTotp, setPendingTotp] = useState<
     | null
     | {
@@ -122,6 +129,9 @@ export function AuthCard({
               body: JSON.stringify({
                 credential,
                 timezone: guessTimezoneValue(),
+                // Reuse the same checkbox value the user picked on the login
+                // form. On /register the checkbox is hidden so we default true.
+                rememberMe: isRegister ? true : rememberMeRef.current,
               }),
             });
             saveAuthSession(session);
@@ -137,13 +147,18 @@ export function AuthCard({
           }
         },
       });
+      // GIS button caps at 400 px; we clamp to whatever the wrapper measures
+      // so the rendered button always fills our centered slot consistently.
+      const measured = googleButtonRef.current.offsetWidth;
+      const buttonWidth = Math.max(280, Math.min(400, measured || 360));
       google.accounts.id.renderButton(googleButtonRef.current, {
         theme: "outline",
         size: "large",
         type: "standard",
         shape: "pill",
         text: isRegister ? "signup_with" : "signin_with",
-        width: googleButtonRef.current.offsetWidth || 360,
+        logo_alignment: "center",
+        width: buttonWidth,
       });
     }
 
@@ -189,6 +204,8 @@ export function AuthCard({
       error={error}
       sessionExpired={sessionExpired}
       onDismissSessionExpired={() => setSessionExpired(false)}
+      rememberMe={rememberMe}
+      onRememberMeChange={setRememberMe}
     />
   );
 
@@ -232,7 +249,7 @@ export function AuthCard({
   );
 
   const formColumn = (
-    <div className="relative flex flex-col bg-white px-6 py-8 lg:px-16 lg:py-12">
+    <div className="relative flex flex-col bg-white px-6 py-10 sm:px-10 lg:px-16 lg:py-14">
       <Link
         href="/"
         className="inline-flex items-center gap-2.5 self-start lg:hidden"
@@ -240,15 +257,20 @@ export function AuthCard({
         <BrandLogo />
       </Link>
 
-      <div className="mx-auto mt-12 w-full max-w-[480px] lg:mt-20">
+      <div className="mx-auto mt-10 w-full max-w-[440px] lg:mt-16">
         {headerCopy}
 
-        <div className="mt-8">
+        <div className="mt-9">
           {googleClientId ? (
+            // GIS renders a fixed-pixel-wide button. The flex wrapper centers
+            // it inside the form column so it lines up with the inputs below.
             <div
-              ref={googleButtonRef}
-              className={googleLoading ? "pointer-events-none opacity-60" : ""}
-            />
+              className={`flex w-full justify-center ${
+                googleLoading ? "pointer-events-none opacity-60" : ""
+              }`}
+            >
+              <div ref={googleButtonRef} className="w-full max-w-[400px]" />
+            </div>
           ) : (
             <button
               type="button"
@@ -265,7 +287,7 @@ export function AuthCard({
           )}
         </div>
 
-        <div className="my-6 flex items-center gap-3">
+        <div className="my-7 flex items-center gap-3">
           <span className="h-px flex-1 bg-[#EEE7DF]" />
           <span className="text-xs font-semibold text-[#9CA3AF]">
             or with email
@@ -274,27 +296,9 @@ export function AuthCard({
         </div>
 
         {formNode}
-
-        {!isRegister ? (
-          <>
-            <div className="my-7 flex items-center gap-3">
-              <span className="h-px flex-1 bg-[#EEE7DF]" />
-              <span className="text-xs font-semibold text-[#9CA3AF]">
-                New to Bookvella?
-              </span>
-              <span className="h-px flex-1 bg-[#EEE7DF]" />
-            </div>
-            <Link
-              href="/register"
-              className="block w-full rounded-2xl border border-[#E5E7EB] bg-white px-5 py-4 text-center text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
-            >
-              Create your free booking page →
-            </Link>
-          </>
-        ) : null}
       </div>
 
-      <p className="mt-12 text-center text-[11px] text-[#9CA3AF] lg:mt-auto lg:text-left">
+      <p className="mt-14 text-center text-[11px] text-[#9CA3AF] lg:mt-auto lg:pt-14 lg:text-left">
         Copyright 2026 Bookvella. Made for independent pros.
       </p>
       <LegalInlineLinks className="mt-2 justify-center lg:justify-start" />
@@ -339,10 +343,14 @@ export function AuthCard({
             timezone:
               readOptionalFormText(form, "timezone") ?? guessTimezoneValue(),
             slug: readOptionalFormText(form, "slug"),
+            // Registration creates a logged-in session immediately; respect the
+            // same long-lived default as the login form.
+            rememberMe: true,
           }
         : {
             email: readFormText(form, "email"),
             password: readFormText(form, "password"),
+            rememberMe,
           };
 
       const session = await apiRequest<AuthResponse>(
@@ -385,6 +393,7 @@ export function AuthCard({
           email: pendingTotp.email,
           password: pendingTotp.password,
           totpCode,
+          rememberMe,
         }),
       });
 
@@ -481,6 +490,8 @@ function LoginForm({
   error,
   sessionExpired,
   onDismissSessionExpired,
+  rememberMe,
+  onRememberMeChange,
 }: {
   submitting: boolean;
   showPassword: boolean;
@@ -489,6 +500,8 @@ function LoginForm({
   error: string | null;
   sessionExpired: boolean;
   onDismissSessionExpired: () => void;
+  rememberMe: boolean;
+  onRememberMeChange: (next: boolean) => void;
 }) {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
@@ -563,6 +576,9 @@ function LoginForm({
       <label className="flex items-center gap-2 text-[13px] text-[#374151]">
         <input
           type="checkbox"
+          name="rememberMe"
+          checked={rememberMe}
+          onChange={(event) => onRememberMeChange(event.target.checked)}
           className="size-4 rounded border-[#D1D5DB] text-[#FF5F63] focus:ring-[#FF5F63]"
         />
         Keep me signed in
@@ -1149,6 +1165,7 @@ declare global {
               shape: string;
               text: string;
               width: number;
+              logo_alignment?: string;
             },
           ) => void;
         };
