@@ -60,6 +60,10 @@ export class ReviewsService {
       throw new NotFoundException('Reviewable booking not found');
     }
 
+    if (booking.endTimeUtc.getTime() > Date.now()) {
+      throw new ConflictException('Reviews can be submitted after the booking ends');
+    }
+
     try {
       return await this.prisma.review.create({
         data: {

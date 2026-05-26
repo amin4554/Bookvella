@@ -5,16 +5,15 @@ import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
   title: "Contact / Report | Bookvella",
-  description: "Contact Bookvella or report illegal content.",
+  description: "Contact Bookvella or report content.",
 };
 
 const CONTACT_EMAIL = "support.bookvella@gmail.com";
-const PHONE = "+49 155 1007066";
 
 export default function ContactPage() {
   return (
     <LegalPage
-      eyebrow="Contact and transparency"
+      eyebrow="Contact and reports"
       title={
         <>
           Get in touch or
@@ -22,7 +21,7 @@ export default function ContactPage() {
           report content
         </>
       }
-      intro="Bookvella hosts public profiles, service listings, images, and reviews. You can contact us, exercise privacy rights, or report illegal content from this page."
+      intro="Bookvella is a public student portfolio project that can contain public profiles, service listings, images, bookings, and reviews. Use this page for product questions, privacy requests, security concerns, and content reports."
       maxWidth="max-w-[1000px]"
     >
       <section className="mt-10 grid gap-3 sm:grid-cols-2">
@@ -32,7 +31,7 @@ export default function ContactPage() {
           tint="bg-[#FFF0EF] text-[#FF5F63]"
           title="General and product"
           email={CONTACT_EMAIL}
-          text="Questions, bugs, and product feedback."
+          text="Questions, bugs, portfolio feedback, and account help."
         />
         <Channel
           href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20privacy%20request`}
@@ -40,7 +39,7 @@ export default function ContactPage() {
           tint="bg-[#F4EAFF] text-[#7C3AED]"
           title="Privacy / data rights"
           email={CONTACT_EMAIL}
-          text="GDPR access, deletion, correction, portability, and objection requests."
+          text="Access, deletion, correction, portability, objection, and consent requests."
         />
         <Channel
           href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20illegal%20content%20report`}
@@ -48,15 +47,15 @@ export default function ContactPage() {
           tint="bg-[#FEE2E2] text-[#DC2626]"
           title="Report illegal content"
           email={CONTACT_EMAIL}
-          text="DSA-style notice-and-action point for public profiles, listings, images, or reviews."
+          text="Public profiles, service listings, uploaded images, or reviews."
         />
         <Channel
-          href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20abuse%20or%20safety%20report`}
+          href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20abuse%20or%20security%20report`}
           icon={<AlertTriangle className="size-5" />}
           tint="bg-[#FEF3C7] text-[#B45309]"
-          title="Abuse and safety"
+          title="Abuse and security"
           email={CONTACT_EMAIL}
-          text="Harassment, threats, spam, account compromise, or security concerns."
+          text="Spam, harassment, threats, account compromise, or vulnerabilities."
         />
       </section>
 
@@ -72,18 +71,18 @@ export default function ContactPage() {
             Send reports by email
           </h2>
           <p className="mt-3 text-[14px] leading-[1.65] text-[#6B7280]">
-            Until a backend report form is added, email is the reliable channel.
-            For illegal-content reports, include enough detail for us to identify
-            the content and assess the issue.
+            Email is currently the reliable contact channel for this student
+            project. For content reports, include enough detail to identify the
+            content and understand the issue.
           </p>
           <ul className="mt-5 space-y-3 text-[14px] leading-[1.6] text-[#374151]">
-            <li><strong className="text-[#0B1220]">1. Link:</strong> the Bookvella profile, service, image, or review URL.</li>
-            <li><strong className="text-[#0B1220]">2. Reason:</strong> what law or platform rule you believe is breached.</li>
-            <li><strong className="text-[#0B1220]">3. Context:</strong> screenshots or details that help us understand the report.</li>
-            <li><strong className="text-[#0B1220]">4. Contact:</strong> your name and email so we can acknowledge and follow up.</li>
+            <li><strong className="text-[#0B1220]">1. Link:</strong> the Bookvella profile, service, image, booking, or review URL.</li>
+            <li><strong className="text-[#0B1220]">2. Reason:</strong> what law, right, or platform rule you believe is affected.</li>
+            <li><strong className="text-[#0B1220]">3. Context:</strong> screenshots or details that help explain the report.</li>
+            <li><strong className="text-[#0B1220]">4. Contact:</strong> your email address so we can acknowledge and follow up.</li>
           </ul>
           <a
-            href={`mailto:${CONTACT_EMAIL}?subject=Illegal%20content%20report%20on%20Bookvella`}
+            href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20content%20report`}
             className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13.5px] font-bold text-white shadow-sm"
           >
             Email {CONTACT_EMAIL} <Mail className="size-4" />
@@ -101,7 +100,7 @@ export default function ContactPage() {
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-[13px] text-[#374151] marker:font-bold marker:text-[#FF5F63]">
               <li>You send a report with a link and reason.</li>
               <li>We acknowledge receipt where legally required and practical.</li>
-              <li>We review the content against applicable law and Bookvella terms.</li>
+              <li>We review the content against applicable law and Bookvella&apos;s terms.</li>
               <li>We may leave it up, restrict it, remove it, or suspend an account.</li>
               <li>Affected users can challenge moderation decisions by email.</li>
             </ol>
@@ -109,22 +108,17 @@ export default function ContactPage() {
 
           <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-              Formal legal notices
+              Formal notices
             </p>
-            <p className="mt-2 text-[13.5px] font-semibold">
-              Formal notices can be sent to the postal address listed in the{" "}
-              <Link href="/legal/impressum" className="text-[#FF5F63] hover:underline">
-                Impressum
+            <p className="mt-2 text-[13px] leading-snug text-[#6B7280]">
+              For this non-commercial student project, email is the published
+              contact channel. If Bookvella becomes commercial or actively
+              onboards real users, the{" "}
+              <Link href="/legal/impressum" className="font-bold text-[#FF5F63] hover:underline">
+                Project Notice / Impressum
               </Link>{" "}
-              or raised first by phone at{" "}
-              <a href={`tel:${PHONE.replace(/\s/g, "")}`} className="text-[#FF5F63] hover:underline">
-                {PHONE}
-              </a>
-              .
-            </p>
-            <p className="mt-3 text-[12px] leading-snug text-[#6B7280]">
-              Do not rely on email alone for formal service of legal documents
-              where postal service is required.
+              should be replaced with full provider details and a serviceable
+              address.
             </p>
           </div>
 
@@ -144,7 +138,7 @@ export default function ContactPage() {
       </section>
 
       <p className="mt-12 text-[12px] text-[#9CA3AF]">
-        Last updated May 24, 2026.
+        Last updated May 26, 2026.
       </p>
     </LegalPage>
   );

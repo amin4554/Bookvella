@@ -32,17 +32,40 @@ async function bootstrap() {
   app.use(
     createRateLimitMiddleware({
       windowMs: 15 * 60 * 1000,
+      max: 5,
+      paths: [
+        '/auth/register/otp/request',
+        '/auth/password/change/otp/request',
+        '/auth/email/change/otp/request',
+        '/auth/email/confirm/resend',
+      ],
+      pathPatterns: [/^\/public\/[^/]+\/[^/]+\/booking-codes$/],
+    }),
+  );
+  app.use(
+    createRateLimitMiddleware({
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+      paths: [
+        '/auth/register/otp/verify',
+        '/auth/password/change/otp/verify',
+        '/auth/email/change',
+        '/auth/email/confirm',
+      ],
+      pathPatterns: [/^\/public\/[^/]+\/[^/]+\/bookings$/],
+    }),
+  );
+  app.use(
+    createRateLimitMiddleware({
+      windowMs: 15 * 60 * 1000,
       max: 20,
       paths: [
         '/auth/login',
-        '/auth/register',
         '/auth/refresh',
         '/auth/google',
         '/auth/password/forgot',
         '/auth/password/reset',
         '/auth/password/change',
-        '/auth/email/change',
-        '/auth/email/confirm',
         '/auth/totp/enroll',
         '/auth/totp/verify',
         '/auth/totp/disable',

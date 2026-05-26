@@ -1,29 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Cookie, Mail, ScrollText, Shield } from "lucide-react";
+import { Cookie, Info, Mail, ScrollText, Shield } from "lucide-react";
 import { LegalPage, LegalProse } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Impressum / Legal Notice | Bookvella",
-  description: "Provider information for Bookvella.",
+  title: "Project Notice / Impressum | Bookvella",
+  description: "Project and contact information for Bookvella.",
 };
 
 const CONTACT_EMAIL = "support.bookvella@gmail.com";
-const PHONE = "+49 155 1007066";
 
 const DETAILS = [
-  ["Service name", "Bookvella"],
-  ["Service provider", "Amin Niaziardekani"],
-  ["Legal form", "Natural person / student project"],
-  ["Postal address", "Schwalbenweg 15, 12529 Schoenefeld, Germany"],
-  ["Email", CONTACT_EMAIL],
-  ["Phone / fast contact", PHONE],
-  ["VAT ID", "Not available"],
+  ["Project", "Bookvella"],
+  ["Project type", "Non-commercial student portfolio project"],
+  ["Operator location", "Berlin, Germany"],
+  ["Payments", "Bookvella does not process payments or charge users"],
   ["Commercial register", "Not registered"],
-  [
-    "Responsible for content",
-    "Amin Niaziardekani, Schwalbenweg 15, 12529 Schoenefeld, Germany",
-  ],
+  ["VAT ID", "Not available"],
+  ["Contact", CONTACT_EMAIL],
 ];
 
 export default function ImpressumPage() {
@@ -31,37 +25,35 @@ export default function ImpressumPage() {
     <LegalPage
       title={
         <>
-          Impressum
+          Project Notice
           <br />
-          <span className="text-[#9CA3AF]">/ Legal Notice</span>
+          <span className="text-[#9CA3AF]">/ Impressum</span>
         </>
       }
-      intro="Provider information for Bookvella. German business websites generally need this information to be easy to recognize, directly reachable, and permanently available."
-      maxWidth="max-w-[760px]"
+      intro="Bookvella is currently operated as a non-commercial student portfolio project from Berlin, Germany. It is publicly reachable so the work can be reviewed, but it is not offered as a paid marketplace or commercial SaaS product."
+      maxWidth="max-w-[780px]"
     >
       <section className="mt-10">
         <h2 className="text-[22px] font-bold tracking-[-0.02em]">
-          Service provider
+          Project information
         </h2>
         <dl className="mt-4">
           {DETAILS.map(([term, value]) => (
             <div
               key={term}
-              className="grid gap-2 border-t border-[#EEE7DF] py-3.5 first:border-t-0 sm:grid-cols-[200px_1fr] sm:gap-6"
+              className="grid gap-2 border-t border-[#EEE7DF] py-3.5 first:border-t-0 sm:grid-cols-[190px_1fr] sm:gap-6"
             >
               <dt className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
                 {term}
               </dt>
               <dd className="text-[14.5px] font-semibold text-[#0B1220]">
-                {term === "Email" ? (
+                {term === "Contact" ? (
                   <a
                     href={`mailto:${CONTACT_EMAIL}`}
                     className="text-[#FF5F63] hover:underline"
                   >
                     {CONTACT_EMAIL}
                   </a>
-                ) : term === "Phone / fast contact" ? (
-                  <a href={`tel:${PHONE.replace(/\s/g, "")}`}>{value}</a>
                 ) : (
                   value
                 )}
@@ -71,52 +63,74 @@ export default function ImpressumPage() {
         </dl>
       </section>
 
-      <div className="mt-10 rounded-2xl border border-[#FCD34D] bg-[#FFFBEB] p-5">
+      <div className="mt-10 rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-5">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 size-4 text-[#B45309]" />
+          <Info className="mt-0.5 size-4 text-[#2563EB]" />
           <div>
-            <p className="text-[13.5px] font-bold text-[#92400E]">
-              Confirm before relying on this page
+            <p className="text-[13.5px] font-bold text-[#1D4ED8]">
+              Note about private contact details
             </p>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-[#B45309]">
-              This page uses the personal details provided by the operator. If
-              you do not want a home address or personal contact data public,
-              arrange a legally usable business address and reachable contact
-              channel before launch. A P.O. box is usually not enough for a
-              German Impressum.
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[#1E40AF]">
+              This page intentionally does not publish a private home address or
+              phone number. If Bookvella becomes commercial, adds paid plans,
+              actively onboards real users, or is otherwise operated as a
+              business-like digital service, this page should be replaced with a
+              full legally reviewed Impressum that includes the required
+              provider identity and a valid service address.
             </p>
           </div>
         </div>
       </div>
 
       <LegalProse>
+        <h2>Responsible contact</h2>
+        <p>
+          For product questions, privacy requests, abuse reports, security
+          concerns, or legal notices, contact{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Please
+          include enough context for us to identify the page, account, booking,
+          review, or upload involved.
+        </p>
+
+        <h2>Scope of the project</h2>
+        <p>
+          Bookvella is a portfolio project for demonstrating a booking product:
+          account management, public booking pages, email verification,
+          scheduling, reviews, and calendar-related workflows. It is not a
+          payment processor, employment agency, service provider, or regulated
+          marketplace.
+        </p>
+
         <h2>Online dispute resolution</h2>
         <p>
           The European Commission&apos;s Online Dispute Resolution platform was
-          discontinued on July 20, 2025. For complaints, contact{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> or your
-          local consumer protection authority.
+          discontinued on July 20, 2025. Bookvella does not process payments or
+          sell services through the platform. Please contact{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> if you have a
+          complaint about this project.
         </p>
 
         <h2>Liability for content</h2>
         <p>
-          We create Bookvella&apos;s own content with care. We cannot guarantee that
-          all information is always complete, accurate, or up to date. Hosts and
-          guests are responsible for content they upload, including public
-          profiles, service listings, images, and reviews.
+          We create Bookvella&apos;s own content with care, but cannot guarantee
+          that all information is always complete, accurate, or up to date. If a
+          host or guest uploads content, including profile text, service
+          listings, images, or reviews, that user is responsible for making sure
+          the content is lawful and accurate.
         </p>
 
-        <h2>Liability for external links</h2>
+        <h2>External links</h2>
         <p>
-          Bookvella may contain links to external websites. We have no control
-          over those websites and are not responsible for their content.
+          Bookvella may link to external websites such as calendar providers,
+          websites added by hosts, or social profiles. We do not control those
+          websites and are not responsible for their content.
         </p>
 
         <h2>Copyright</h2>
         <p>
-          Content created by Bookvella is protected by copyright. Content
-          uploaded by hosts and guests remains theirs, subject to the limited
-          license described in the <Link href="/legal/terms">Terms</Link>.
+          Bookvella&apos;s own text, design, and code are protected by applicable
+          copyright law. Content uploaded by users remains theirs, subject to the
+          limited license described in the <Link href="/legal/terms">Terms</Link>.
         </p>
       </LegalProse>
 
@@ -141,7 +155,7 @@ export default function ImpressumPage() {
       </nav>
 
       <p className="mt-8 text-[12px] text-[#9CA3AF]">
-        Last updated May 24, 2026.
+        Last updated May 26, 2026.
       </p>
     </LegalPage>
   );

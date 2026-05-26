@@ -27,6 +27,12 @@ function makePrisma() {
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
     },
+    bookingReviewInvitation: {
+      upsert: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+    },
     dailyAgendaDelivery: {
       create: jest.fn(),
       update: jest.fn(),
@@ -58,6 +64,7 @@ function makeBooking(overrides: Record<string, unknown> = {}) {
     endTimeUtc: new Date('2026-06-01T10:30:00.000Z'),
     eventType: {
       id: 'event-1',
+      slug: 'intro-call',
       title: 'Intro Call',
       bufferBeforeMinutes: 0,
       bufferAfterMinutes: 0,
@@ -69,8 +76,10 @@ function makeBooking(overrides: Record<string, unknown> = {}) {
       email: 'host@example.com',
       name: 'Host',
       businessDisplayName: null,
+      slug: 'host',
       timezone: 'UTC',
     },
+    review: null,
     ...overrides,
   };
 }
@@ -178,6 +187,80 @@ describe('BookingsService reminders', () => {
       expect.objectContaining({
         where: { bookingId: 'booking-1' },
         data: expect.objectContaining({ status: 'SENT' }),
+      }),
+    );
+  });
+});
+
+describe('BookingsService review invitations', () => {
+  it('sends review links only after the booking is due for review', async () => {
+    const prisma = makePrisma();
+    const email = makeEmailService();
+    const booking = makeBooking({
+      endTimeUtc: new Date(Date.now() - 60_000),
+    });
+    prisma.bookingReviewInvitation.findMany.mockResolvedValue([
+      {
+        bookingId: booking.id,
+        sendAt: new Date(Date.now() - 60_000),
+        status: 'PENDING',
+        booking,
+      },
+    ]);
+    const service = new BookingsService(
+      prisma as any,
+      makeSchedulingService() as any,
+      email as any,
+    );
+
+    await expect(service.processDueReviewInvitations()).resolves.toEqual({
+      processed: 1,
+    });
+
+    expect(email.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'guest@example.com',
+        subject: 'How was Intro Call?',
+      }),
+    );
+    expect(prisma.bookingReviewInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { bookingId: 'booking-1' },
+        data: expect.objectContaining({ status: 'SENT' }),
+      }),
+    );
+  });
+
+  it('does not send a review link for cancelled bookings', async () => {
+    const prisma = makePrisma();
+    const email = makeEmailService();
+    const booking = makeBooking({
+      status: BookingStatus.CANCELLED,
+      endTimeUtc: new Date(Date.now() - 60_000),
+    });
+    prisma.bookingReviewInvitation.findMany.mockResolvedValue([
+      {
+        bookingId: booking.id,
+        sendAt: new Date(Date.now() - 60_000),
+        status: 'PENDING',
+        booking,
+      },
+    ]);
+    const service = new BookingsService(
+      prisma as any,
+      makeSchedulingService() as any,
+      email as any,
+    );
+
+    await expect(service.processDueReviewInvitations()).resolves.toEqual({
+      processed: 1,
+    });
+
+    expect(email.sendMail).not.toHaveBeenCalled();
+    expect(prisma.bookingReviewInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { bookingId: 'booking-1' },
+        data: expect.objectContaining({ status: 'CANCELLED' }),
       }),
     );
   });

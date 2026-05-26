@@ -45,6 +45,7 @@ const MAX_BUFFER_LOOKAROUND_MS = 24 * 60 * 60 * 1000;
 const VERIFICATION_CODE_TTL_MINUTES = 10;
 const REMINDER_WORKER_INTERVAL_MS = 60 * 1000;
 const REMINDER_BATCH_SIZE = 25;
+const REVIEW_INVITATION_BATCH_SIZE = 25;
 const DAILY_AGENDA_SEND_MINUTE = 7 * 60;
 const DAILY_AGENDA_WINDOW_MINUTES = 10;
 
@@ -52,6 +53,7 @@ const DAILY_AGENDA_WINDOW_MINUTES = 10;
 export class BookingsService implements OnModuleInit, OnModuleDestroy {
   private reminderWorker: NodeJS.Timeout | null = null;
   private processingReminders = false;
+  private processingReviewInvitations = false;
   private processingDailyAgendas = false;
 
   constructor(
@@ -64,6 +66,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.reminderWorker = setInterval(() => {
       void this.processDueReminders();
+      void this.processDueReviewInvitations();
       void this.processDailyAgendas();
     }, REMINDER_WORKER_INTERVAL_MS);
     this.reminderWorker.unref();
@@ -340,6 +343,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       },
     });
     await this.cancelBookingReminder(booking.id);
+    await this.cancelBookingReviewInvitation(booking.id);
 
     await this.sendBookingCancellation({
       hostUserId,
@@ -525,14 +529,16 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       hostUserId: eventType.userId,
       startTimeUtc,
     });
+    await this.scheduleBookingReviewInvitation({
+      bookingId: booking.id,
+      sendAt: endTimeUtc,
+    });
 
     await this.sendBookingConfirmations({
       hostUserId: eventType.userId,
       hostEmail: eventType.user.email,
       hostName: displayName(eventType.user),
       eventTitle: eventType.title,
-      eventSlug,
-      hostSlug,
       guestName,
       guestEmail,
       guestNote,
@@ -609,6 +615,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       },
     });
     await this.cancelBookingReminder(booking.id);
+    await this.cancelBookingReviewInvitation(booking.id);
 
     await this.sendBookingCancellation({
       hostUserId: booking.host.id,
@@ -733,6 +740,115 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       return { processed };
     } finally {
       this.processingReminders = false;
+    }
+  }
+
+  async processDueReviewInvitations() {
+    if (this.processingReviewInvitations) {
+      return { processed: 0 };
+    }
+
+    this.processingReviewInvitations = true;
+
+    try {
+      const dueInvitations =
+        await this.prisma.bookingReviewInvitation.findMany({
+          where: {
+            status: BookingReminderStatus.PENDING,
+            sendAt: {
+              lte: new Date(),
+            },
+          },
+          include: {
+            booking: {
+              include: {
+                eventType: true,
+                host: true,
+                review: true,
+              },
+            },
+          },
+          orderBy: { sendAt: 'asc' },
+          take: REVIEW_INVITATION_BATCH_SIZE,
+        });
+
+      let processed = 0;
+
+      for (const invitation of dueInvitations) {
+        const claimed = await this.prisma.bookingReviewInvitation.updateMany({
+          where: {
+            bookingId: invitation.bookingId,
+            status: BookingReminderStatus.PENDING,
+          },
+          data: {
+            status: BookingReminderStatus.PROCESSING,
+            lastError: null,
+          },
+        });
+
+        if (claimed.count === 0) {
+          continue;
+        }
+
+        try {
+          if (
+            invitation.booking.status !== BookingStatus.CONFIRMED ||
+            invitation.booking.review
+          ) {
+            await this.prisma.bookingReviewInvitation.update({
+              where: { bookingId: invitation.bookingId },
+              data: {
+                status: BookingReminderStatus.CANCELLED,
+              },
+            });
+            processed += 1;
+            continue;
+          }
+
+          if (invitation.booking.endTimeUtc > new Date()) {
+            await this.prisma.bookingReviewInvitation.update({
+              where: { bookingId: invitation.bookingId },
+              data: {
+                status: BookingReminderStatus.PENDING,
+                sendAt: invitation.booking.endTimeUtc,
+              },
+            });
+            processed += 1;
+            continue;
+          }
+
+          await this.sendBookingReviewInvitation({
+            guestEmail: invitation.booking.guestEmail,
+            guestName: invitation.booking.guestName,
+            hostName: displayName(invitation.booking.host),
+            eventTitle: invitation.booking.eventType.title,
+            eventSlug: invitation.booking.eventType.slug,
+            hostSlug: invitation.booking.host.slug,
+            bookingId: invitation.booking.id,
+          });
+
+          await this.prisma.bookingReviewInvitation.update({
+            where: { bookingId: invitation.bookingId },
+            data: {
+              status: BookingReminderStatus.SENT,
+              sentAt: new Date(),
+            },
+          });
+          processed += 1;
+        } catch (error) {
+          await this.prisma.bookingReviewInvitation.update({
+            where: { bookingId: invitation.bookingId },
+            data: {
+              status: BookingReminderStatus.FAILED,
+              lastError: errorMessage(error),
+            },
+          });
+        }
+      }
+
+      return { processed };
+    } finally {
+      this.processingReviewInvitations = false;
     }
   }
 
@@ -938,6 +1054,44 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  private async scheduleBookingReviewInvitation(input: {
+    bookingId: string;
+    sendAt: Date;
+  }) {
+    await this.prisma.bookingReviewInvitation.upsert({
+      where: { bookingId: input.bookingId },
+      create: {
+        bookingId: input.bookingId,
+        sendAt: input.sendAt,
+        status: BookingReminderStatus.PENDING,
+      },
+      update: {
+        sendAt: input.sendAt,
+        status: BookingReminderStatus.PENDING,
+        sentAt: null,
+        lastError: null,
+      },
+    });
+  }
+
+  private async cancelBookingReviewInvitation(bookingId: string) {
+    await this.prisma.bookingReviewInvitation.updateMany({
+      where: {
+        bookingId,
+        status: {
+          in: [
+            BookingReminderStatus.PENDING,
+            BookingReminderStatus.PROCESSING,
+            BookingReminderStatus.FAILED,
+          ],
+        },
+      },
+      data: {
+        status: BookingReminderStatus.CANCELLED,
+      },
+    });
+  }
+
   private async getHostReminderPreference(hostUserId: string) {
     const preference = await this.prisma.notificationPreference.findUnique({
       where: {
@@ -986,6 +1140,44 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           ['Time', guestWhen],
           ['Location', input.location],
         ],
+      }),
+    });
+  }
+
+  private async sendBookingReviewInvitation(input: {
+    guestEmail: string;
+    guestName: string;
+    hostName: string;
+    eventTitle: string;
+    eventSlug: string;
+    hostSlug: string;
+    bookingId: string;
+  }) {
+    const reviewUrl = buildReviewUrl({
+      hostSlug: input.hostSlug,
+      eventSlug: input.eventSlug,
+      bookingId: input.bookingId,
+    });
+
+    await this.emailService.sendMail({
+      to: input.guestEmail,
+      subject: `How was ${input.eventTitle}?`,
+      text: [
+        `Hi ${input.guestName},`,
+        '',
+        `Thanks for booking ${input.eventTitle} with ${input.hostName}.`,
+        '',
+        `You can leave a review here: ${reviewUrl}`,
+        '',
+        'Bookvella',
+      ].join('\n'),
+      html: brandedEmailHtml({
+        title: 'How was your booking?',
+        intro: `Thanks for booking ${input.eventTitle} with ${input.hostName}. Your review helps future guests decide with confidence.`,
+        cta: {
+          label: 'Leave a review',
+          url: reviewUrl,
+        },
       }),
     });
   }
@@ -1248,6 +1440,10 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       hostUserId: booking.hostUserId,
       startTimeUtc,
     });
+    await this.scheduleBookingReviewInvitation({
+      bookingId: booking.id,
+      sendAt: endTimeUtc,
+    });
     await this.calendarService?.writeBookingCancelled(booking.id);
     await this.calendarService?.writeBookingCreated(booking.id);
     await this.sendBookingRescheduled({
@@ -1280,8 +1476,6 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     hostEmail: string;
     hostName: string;
     eventTitle: string;
-    eventSlug: string;
-    hostSlug: string;
     guestName: string;
     guestEmail: string;
     guestNote: string | null;
@@ -1295,11 +1489,6 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   }) {
     const guestWhen = formatForEmail(input.startTimeUtc, input.guestTimezone);
     const hostWhen = formatForEmail(input.startTimeUtc, input.hostTimezone);
-    const reviewUrl = buildReviewUrl({
-      hostSlug: input.hostSlug,
-      eventSlug: input.eventSlug,
-      bookingId: input.bookingId,
-    });
     const cancelUrl = buildGuestCancelUrl(input.guestCancelToken);
     const guestText = [
       'Your booking is confirmed.',
@@ -1311,7 +1500,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       '',
       `Need to cancel? ${cancelUrl}`,
       '',
-      `After your visit, you can leave a review here: ${reviewUrl}`,
+      'After your visit, we will email you a separate review link.',
     ].join('\n');
     const hostText = [
       'New booking confirmed.',
@@ -1360,7 +1549,6 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           ],
           links: [
             { label: 'Need to cancel?', url: cancelUrl },
-            { label: 'Leave a review after your visit', url: reviewUrl },
           ],
         }),
       }),

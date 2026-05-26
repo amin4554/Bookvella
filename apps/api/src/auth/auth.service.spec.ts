@@ -70,6 +70,12 @@ function makePrisma() {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    accountActionOtp: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      create: jest.fn().mockResolvedValue({}),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
     $transaction: jest.fn(async (callbackOrQueries) =>
       Array.isArray(callbackOrQueries)
         ? Promise.all(callbackOrQueries)
@@ -280,10 +286,53 @@ describe('AuthService email change', () => {
     service = new AuthService(prisma as any, emailService as any);
   });
 
-  it('creates a single-use confirmation token and sends it to the new email', async () => {
+  it('sends an OTP to the current email when starting an email change', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(makeUser())
       .mockResolvedValueOnce(null);
+
+    await expect(
+      service.requestEmailChangeOtp(
+        {
+          sub: 'user-1',
+          email: 'alice@example.com',
+          slug: 'alice',
+          iat: 1,
+          exp: 2,
+        },
+        { newEmail: ' New@Example.com ' },
+      ),
+    ).resolves.toMatchObject({ success: true });
+
+    expect(prisma.accountActionOtp.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        purpose: 'CHANGE_EMAIL',
+        userId: 'user-1',
+        email: 'alice@example.com',
+        payload: { newEmail: 'new@example.com' },
+      }),
+    });
+    expect(emailService.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'alice@example.com',
+        subject: 'Confirm your Bookvella email change',
+      }),
+    );
+  });
+
+  it('after current-email OTP, creates a single-use confirmation token and sends it to the new email', async () => {
+    const code = '424242';
+    prisma.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValueOnce(null);
+    prisma.accountActionOtp.findFirst.mockResolvedValueOnce({
+      id: 'otp-1',
+      attempts: 0,
+      maxAttempts: 5,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      codeHash: hashTestOtpCode(code),
+      payload: { newEmail: 'new@example.com' },
+    });
 
     await expect(
       service.requestEmailChange(
@@ -294,7 +343,7 @@ describe('AuthService email change', () => {
           iat: 1,
           exp: 2,
         },
-        { newEmail: ' New@Example.com ' },
+        { newEmail: ' New@Example.com ', otpCode: code },
       ),
     ).resolves.toMatchObject({ success: true });
 
@@ -635,6 +684,14 @@ function hashTestEmailChangeToken(
 ) {
   return createHash('sha256')
     .update(`${userId}\0${newEmail}\0${token}`)
+    .digest('base64url');
+}
+
+function hashTestOtpCode(code: string) {
+  return createHash('sha256')
+    .update(
+      `${process.env.EMAIL_CODE_SECRET ?? process.env.JWT_PRIVATE_KEY ?? 'bookvella-dev'}:account-action:${code}`,
+    )
     .digest('base64url');
 }
 

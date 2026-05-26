@@ -131,6 +131,7 @@ model User {
   bookingFeed            BookingFeed?
   accountDeletionRequest AccountDeletionRequest?
   publicLinkRedirects    PublicLinkRedirect[]
+  accountActionOtps      AccountActionOtp[]
 
   @@map("users")
 }
@@ -389,6 +390,7 @@ model Booking {
   host      User      @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
   review    Review?
   reminder  BookingReminder?
+  reviewInvitation BookingReviewInvitation?
   calendarSyncs CalendarEventSync[]
 
   @@index([hostUserId, startTimeUtc])
@@ -409,6 +411,21 @@ model BookingReminder {
 
   @@index([status, sendAt])
   @@map("booking_reminders")
+}
+
+model BookingReviewInvitation {
+  bookingId String                @id @map("booking_id")
+  sendAt    DateTime              @map("send_at")
+  status    BookingReminderStatus @default(PENDING)
+  sentAt    DateTime?             @map("sent_at")
+  lastError String?               @map("last_error")
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@map("booking_review_invitations")
 }
 
 model DailyAgendaDelivery {
@@ -527,6 +544,33 @@ model OtpVerification {
 
   @@index([email])
   @@map("otp_verifications")
+}
+
+// Email OTP challenges for self-service account actions: signing up with
+// email+password (no Google), changing the password, and starting an email
+// change. Google sign-ups skip OTP because Google has already verified the
+// address. For change_password the payload holds the new password hash so the
+// user does not have to retype it after entering the code. For change_email
+// the payload holds the requested new address.
+model AccountActionOtp {
+  id          String   @id @default(uuid())
+  purpose     String   // 'SIGNUP' | 'CHANGE_PASSWORD' | 'CHANGE_EMAIL'
+  email       String   // SIGNUP: new account email. Others: current user email.
+  userId      String?  @map("user_id")
+  codeHash    String   @map("code_hash")
+  payload     Json?
+  expiresAt   DateTime @map("expires_at")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5) @map("max_attempts")
+  consumedAt  DateTime? @map("consumed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("account_action_otps")
 }
 
 model Review {

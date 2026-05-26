@@ -31,10 +31,14 @@ import type {
   ChangePasswordDto,
   ConfirmAccountDeletionDto,
   ConfirmEmailChangeDto,
+  ConfirmPasswordChangeOtpDto,
   GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RequestEmailChangeDto,
+  RequestEmailChangeOtpDto,
+  RequestPasswordChangeOtpDto,
+  RequestRegistrationOtpDto,
   RefreshTokenDto,
   RegisterDto,
   RequestPasswordResetDto,
@@ -43,6 +47,7 @@ import type {
   TotpVerifyDto,
   UpdateNotificationPreferencesDto,
   UpdateMeDto,
+  VerifyRegistrationOtpDto,
 } from './dto';
 import { hashPassword, verifyPassword } from './password';
 
@@ -62,6 +67,8 @@ const MAX_ACTIVE_SESSIONS = 5;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const EMAIL_CHANGE_TTL_MINUTES = 30;
 const ACCOUNT_DELETION_TTL_DAYS = 30;
+const ACCOUNT_ACTION_OTP_TTL_MINUTES = 10;
+const ACCOUNT_ACTION_OTP_MAX_ATTEMPTS = 5;
 const TOTP_PERIOD_SECONDS = 30;
 const TOTP_DIGITS = 6;
 const BACKUP_CODE_COUNT = 10;
@@ -165,6 +172,141 @@ export class AuthService {
           slug,
           timezone,
         },
+      });
+
+      return this.issueTokenPair(user, sessionContext, {
+        rememberMe: dto.rememberMe,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'A user with that email or slug already exists',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  // Step 1 of email/password sign-up. Validates the would-be account details,
+  // stores the password hash + chosen slug in an OTP record, and emails a code.
+  // The user is NOT created here — only after verifyRegistrationOtp succeeds.
+  async requestRegistrationOtp(dto: RequestRegistrationOtpDto) {
+    const email = normalizeEmail(dto.email);
+    const password = requirePassword(dto.password);
+    const name = requireText(dto.name, 'name');
+    const timezone = normalizeTimezone(dto.timezone);
+    const businessDisplayName = optionalText(dto.businessDisplayName);
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('An account with that email already exists');
+    }
+
+    const slug = await this.createUniqueSlug(dto.slug ?? name);
+    const code = createOtpCode();
+    const expiresAt = new Date(
+      Date.now() + ACCOUNT_ACTION_OTP_TTL_MINUTES * 60 * 1000,
+    );
+
+    // Drop any outstanding signup OTPs for this email so a stale code can't be
+    // replayed against a brand-new password the user has since picked.
+    await this.prisma.accountActionOtp.updateMany({
+      where: { purpose: 'SIGNUP', email, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+
+    await this.prisma.accountActionOtp.create({
+      data: {
+        purpose: 'SIGNUP',
+        email,
+        codeHash: hashOtpCode(code),
+        expiresAt,
+        maxAttempts: ACCOUNT_ACTION_OTP_MAX_ATTEMPTS,
+        payload: {
+          passwordHash: hashPassword(password),
+          name,
+          slug,
+          timezone,
+          businessDisplayName,
+        },
+      },
+    });
+
+    await this.sendAccountActionOtpEmail({
+      to: email,
+      name,
+      code,
+      expiresAt,
+      subject: 'Confirm your Bookvella account',
+      intro: 'Use this code to finish creating your Bookvella account.',
+    });
+
+    return {
+      success: true,
+      email,
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  // Step 2 of email/password sign-up. Verifies the code, creates the user from
+  // the stored payload, and issues an authenticated session in one shot.
+  async verifyRegistrationOtp(
+    dto: VerifyRegistrationOtpDto,
+    sessionContext?: SessionContext,
+  ) {
+    const email = normalizeEmail(dto.email);
+    const code = requireText(dto.code, 'code');
+
+    const otp = await this.findActiveAccountActionOtp({
+      purpose: 'SIGNUP',
+      email,
+    });
+    await this.assertOtpCode(otp, code);
+
+    const payload = (otp.payload ?? {}) as {
+      passwordHash?: string;
+      name?: string;
+      slug?: string;
+      timezone?: string;
+      businessDisplayName?: string | null;
+    };
+    if (!payload.passwordHash || !payload.name || !payload.slug) {
+      throw new BadRequestException('Sign-up data is incomplete');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      await this.prisma.accountActionOtp.update({
+        where: { id: otp.id },
+        data: { consumedAt: new Date() },
+      });
+      throw new ConflictException('An account with that email already exists');
+    }
+
+    // The slug we reserved at request-time may now be taken (someone else
+    // signed up between request and verify). Fall back to a fresh unique slug.
+    const slug = await this.createUniqueSlug(payload.slug);
+
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          passwordHash: payload.passwordHash,
+          passwordSetAt: new Date(),
+          name: payload.name,
+          businessDisplayName: payload.businessDisplayName ?? null,
+          slug,
+          timezone: payload.timezone ?? 'UTC',
+        },
+      });
+
+      await this.prisma.accountActionOtp.update({
+        where: { id: otp.id },
+        data: { consumedAt: new Date() },
       });
 
       return this.issueTokenPair(user, sessionContext, {
@@ -864,6 +1006,121 @@ export class AuthService {
     return toPublicUser(updated);
   }
 
+  // Step 1 of OTP-gated password change. Verifies the current password (when
+  // the account has one), stores the new password hash on an OTP record, and
+  // emails a code to the user's current email. The password is not changed
+  // until confirmPasswordChangeOtp succeeds.
+  async requestPasswordChangeOtp(
+    payload: AccessTokenPayload,
+    dto: RequestPasswordChangeOtpDto,
+  ) {
+    const newPassword = requirePassword(dto.newPassword);
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.passwordSetAt) {
+      const currentPassword = requirePassword(dto.currentPassword);
+      const passwordCheck = verifyPassword(currentPassword, user.passwordHash);
+
+      if (!passwordCheck.valid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    } else if (!user.googleSub) {
+      throw new BadRequestException('This account cannot set a password here');
+    }
+
+    const code = createOtpCode();
+    const expiresAt = new Date(
+      Date.now() + ACCOUNT_ACTION_OTP_TTL_MINUTES * 60 * 1000,
+    );
+
+    await this.prisma.accountActionOtp.updateMany({
+      where: {
+        purpose: 'CHANGE_PASSWORD',
+        userId: user.id,
+        consumedAt: null,
+      },
+      data: { consumedAt: new Date() },
+    });
+
+    await this.prisma.accountActionOtp.create({
+      data: {
+        purpose: 'CHANGE_PASSWORD',
+        email: user.email,
+        userId: user.id,
+        codeHash: hashOtpCode(code),
+        expiresAt,
+        maxAttempts: ACCOUNT_ACTION_OTP_MAX_ATTEMPTS,
+        payload: {
+          newPasswordHash: hashPassword(newPassword),
+          hadPassword: Boolean(user.passwordSetAt),
+        },
+      },
+    });
+
+    await this.sendAccountActionOtpEmail({
+      to: user.email,
+      name: user.name,
+      code,
+      expiresAt,
+      subject: user.passwordSetAt
+        ? 'Confirm your Bookvella password change'
+        : 'Confirm your new Bookvella password',
+      intro: user.passwordSetAt
+        ? 'Use this code to finish changing your Bookvella password.'
+        : 'Use this code to finish setting a password for your Bookvella account.',
+    });
+
+    return { success: true, expiresAt: expiresAt.toISOString() };
+  }
+
+  // Step 2 of OTP-gated password change. Verifies the code and applies the
+  // already-hashed new password from the OTP payload.
+  async confirmPasswordChangeOtp(
+    payload: AccessTokenPayload,
+    dto: ConfirmPasswordChangeOtpDto,
+  ) {
+    const code = requireText(dto.code, 'code');
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const otp = await this.findActiveAccountActionOtp({
+      purpose: 'CHANGE_PASSWORD',
+      userId: user.id,
+    });
+    await this.assertOtpCode(otp, code);
+
+    const otpPayload = (otp.payload ?? {}) as { newPasswordHash?: string };
+    if (!otpPayload.newPasswordHash) {
+      throw new BadRequestException('Password change data is missing');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: otpPayload.newPasswordHash,
+        passwordSetAt: new Date(),
+      },
+    });
+
+    await this.prisma.accountActionOtp.update({
+      where: { id: otp.id },
+      data: { consumedAt: new Date() },
+    });
+
+    return toPublicUser(updated);
+  }
+
   async disconnectGoogle(payload: AccessTokenPayload) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
@@ -1012,9 +1269,12 @@ export class AuthService {
     };
   }
 
-  async requestEmailChange(
+  // Step 1 of OTP-gated email change. Sends a 6-digit code to the user's
+  // CURRENT email address. Once verified in requestEmailChange, the existing
+  // confirm-on-the-new-email flow continues as before.
+  async requestEmailChangeOtp(
     payload: AccessTokenPayload,
-    dto: RequestEmailChangeDto,
+    dto: RequestEmailChangeOtpDto,
   ) {
     const newEmail = normalizeEmail(dto.newEmail);
     const user = await this.prisma.user.findUnique({
@@ -1036,6 +1296,90 @@ export class AuthService {
     if (existing && existing.id !== user.id) {
       throw new ConflictException('That email is already in use');
     }
+
+    const code = createOtpCode();
+    const expiresAt = new Date(
+      Date.now() + ACCOUNT_ACTION_OTP_TTL_MINUTES * 60 * 1000,
+    );
+
+    await this.prisma.accountActionOtp.updateMany({
+      where: {
+        purpose: 'CHANGE_EMAIL',
+        userId: user.id,
+        consumedAt: null,
+      },
+      data: { consumedAt: new Date() },
+    });
+
+    await this.prisma.accountActionOtp.create({
+      data: {
+        purpose: 'CHANGE_EMAIL',
+        email: user.email,
+        userId: user.id,
+        codeHash: hashOtpCode(code),
+        expiresAt,
+        maxAttempts: ACCOUNT_ACTION_OTP_MAX_ATTEMPTS,
+        payload: { newEmail },
+      },
+    });
+
+    await this.sendAccountActionOtpEmail({
+      to: user.email,
+      name: user.name,
+      code,
+      expiresAt,
+      subject: 'Confirm your Bookvella email change',
+      intro:
+        'Use this code to confirm you authorised an email change on your Bookvella account.',
+    });
+
+    return { success: true, expiresAt: expiresAt.toISOString() };
+  }
+
+  async requestEmailChange(
+    payload: AccessTokenPayload,
+    dto: RequestEmailChangeDto,
+  ) {
+    const newEmail = normalizeEmail(dto.newEmail);
+    const otpCode = requireText(dto.otpCode, 'otpCode');
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (newEmail === user.email) {
+      throw new BadRequestException('Choose a different email address');
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: newEmail },
+    });
+
+    if (existing && existing.id !== user.id) {
+      throw new ConflictException('That email is already in use');
+    }
+
+    // Require an authorised CHANGE_EMAIL OTP issued to the CURRENT email, and
+    // make sure it was issued for THIS new email — preventing a code obtained
+    // for one target address from being replayed against a different one.
+    const otp = await this.findActiveAccountActionOtp({
+      purpose: 'CHANGE_EMAIL',
+      userId: user.id,
+    });
+    await this.assertOtpCode(otp, otpCode);
+    const otpPayload = (otp.payload ?? {}) as { newEmail?: string };
+    if (otpPayload.newEmail !== newEmail) {
+      throw new BadRequestException(
+        'Confirmation code was issued for a different email address',
+      );
+    }
+    await this.prisma.accountActionOtp.update({
+      where: { id: otp.id },
+      data: { consumedAt: new Date() },
+    });
 
     const token = createEmailChangeToken();
     const now = new Date();
@@ -1063,6 +1407,58 @@ export class AuthService {
     });
 
     await this.sendEmailChangeConfirmation(user, newEmail, token, expiresAt);
+
+    return {
+      success: true,
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  // Rotates the confirmation token on the most-recent pending email change
+  // and resends it to the new address. Used by the "Resend code" button on the
+  // step that prompts for the new-mailbox code — the current-email OTP was
+  // already consumed when /auth/email/change ran, so we should not force the
+  // user back through it just to get a fresh new-mailbox code.
+  async resendEmailChangeConfirmation(payload: AccessTokenPayload) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const pending = await this.prisma.accountEmailChange.findFirst({
+      where: { userId: user.id, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!pending) {
+      throw new BadRequestException(
+        'No email change is pending. Start a new email change first.',
+      );
+    }
+
+    const token = createEmailChangeToken();
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() + EMAIL_CHANGE_TTL_MINUTES * 60 * 1000,
+    );
+
+    const updated = await this.prisma.accountEmailChange.update({
+      where: { id: pending.id },
+      data: {
+        tokenHash: hashEmailChangeToken(user.id, pending.newEmail, token),
+        expiresAt,
+      },
+    });
+
+    await this.sendEmailChangeConfirmation(
+      user,
+      updated.newEmail,
+      token,
+      expiresAt,
+    );
 
     return {
       success: true,
@@ -1389,6 +1785,111 @@ export class AuthService {
     return `${baseSlug}-${randomBytes(3).toString('hex')}`;
   }
 
+  private async findActiveAccountActionOtp(filter: {
+    purpose: 'SIGNUP' | 'CHANGE_PASSWORD' | 'CHANGE_EMAIL';
+    email?: string;
+    userId?: string;
+  }) {
+    const otp = await this.prisma.accountActionOtp.findFirst({
+      where: {
+        purpose: filter.purpose,
+        consumedAt: null,
+        ...(filter.email !== undefined ? { email: filter.email } : {}),
+        ...(filter.userId !== undefined ? { userId: filter.userId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otp) {
+      throw new BadRequestException({
+        message: 'Verification code not found. Request a new one.',
+        code: 'OTP_NOT_FOUND',
+      });
+    }
+
+    return otp;
+  }
+
+  // Generic OTP check used by every account-action OTP step. Increments the
+  // attempt counter on every wrong guess, expires the row at the configured
+  // TTL, and locks out the row entirely after maxAttempts so a stolen email
+  // peek can't be brute-forced.
+  private async assertOtpCode(
+    otp: {
+      id: string;
+      codeHash: string;
+      attempts: number;
+      maxAttempts: number;
+      expiresAt: Date;
+    },
+    code: string,
+  ) {
+    if (otp.expiresAt <= new Date()) {
+      throw new BadRequestException({
+        message: 'Verification code has expired. Request a new one.',
+        code: 'OTP_EXPIRED',
+      });
+    }
+
+    if (otp.attempts >= otp.maxAttempts) {
+      throw new BadRequestException({
+        message: 'Too many attempts. Request a new verification code.',
+        code: 'OTP_ATTEMPTS_EXCEEDED',
+      });
+    }
+
+    if (!verifyOtpCode(code, otp.codeHash)) {
+      await this.prisma.accountActionOtp.update({
+        where: { id: otp.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException({
+        message: 'Verification code is incorrect.',
+        code: 'OTP_INVALID',
+      });
+    }
+
+    await this.prisma.accountActionOtp.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    });
+  }
+
+  private async sendAccountActionOtpEmail(input: {
+    to: string;
+    name: string;
+    code: string;
+    expiresAt: Date;
+    subject: string;
+    intro: string;
+  }) {
+    const text = [
+      `Hi ${input.name},`,
+      '',
+      input.intro,
+      '',
+      `Your code: ${input.code}`,
+      `Expires in ${ACCOUNT_ACTION_OTP_TTL_MINUTES} minutes.`,
+      '',
+      'If you did not request this, ignore this email.',
+      '',
+      'Bookvella',
+    ].join('\n');
+
+    await this.emailService.sendMail({
+      to: input.to,
+      subject: input.subject,
+      text,
+      html: [
+        `<p>Hi ${escapeHtml(input.name)},</p>`,
+        `<p>${escapeHtml(input.intro)}</p>`,
+        `<p style="font-size:22px;font-weight:bold;letter-spacing:0.3em;">${escapeHtml(input.code)}</p>`,
+        `<p>Expires in ${ACCOUNT_ACTION_OTP_TTL_MINUTES} minutes.</p>`,
+        '<p>If you did not request this, you can ignore this email.</p>',
+      ].join(''),
+    });
+  }
+
   private async sendPasswordResetEmail(
     user: User,
     token: string,
@@ -1688,6 +2189,26 @@ function createEmailChangeToken() {
 
 function createTotpSecret() {
   return base32Encode(randomBytes(20));
+}
+
+function createOtpCode() {
+  return randomInt(100000, 1000000).toString();
+}
+
+function hashOtpCode(code: string) {
+  return createHash('sha256')
+    .update(
+      `${process.env.EMAIL_CODE_SECRET ?? process.env.JWT_PRIVATE_KEY ?? 'bookvella-dev'}:account-action:${code}`,
+    )
+    .digest('base64url');
+}
+
+function verifyOtpCode(code: string, hash: string) {
+  const candidate = Buffer.from(hashOtpCode(code), 'base64url');
+  const stored = Buffer.from(hash, 'base64url');
+  return (
+    candidate.length === stored.length && timingSafeEqual(candidate, stored)
+  );
 }
 
 function createBackupCodes() {

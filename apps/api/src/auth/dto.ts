@@ -28,6 +28,34 @@ export type ChangePasswordDto = {
   newPassword?: string;
 };
 
+export type RequestRegistrationOtpDto = {
+  email?: string;
+  password?: string;
+  name?: string;
+  businessDisplayName?: string | null;
+  slug?: string;
+  timezone?: string;
+};
+
+export type VerifyRegistrationOtpDto = {
+  email?: string;
+  code?: string;
+  rememberMe?: boolean;
+};
+
+export type RequestPasswordChangeOtpDto = {
+  currentPassword?: string;
+  newPassword?: string;
+};
+
+export type ConfirmPasswordChangeOtpDto = {
+  code?: string;
+};
+
+export type RequestEmailChangeOtpDto = {
+  newEmail?: string;
+};
+
 export type RequestPasswordResetDto = {
   email?: string;
 };
@@ -39,6 +67,7 @@ export type ResetPasswordDto = {
 
 export type RequestEmailChangeDto = {
   newEmail?: string;
+  otpCode?: string;
 };
 
 export type ConfirmEmailChangeDto = {

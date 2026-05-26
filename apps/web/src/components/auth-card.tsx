@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { LegalInlineLinks } from "@/components/legal-footer";
+import { OtpStep } from "@/components/otp-step";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   type ApiError,
@@ -41,6 +42,11 @@ type AuthCardProps = {
   message?: string;
   redirectTo?: string;
 };
+
+type GoogleCredentialHandler = (credential?: string) => void | Promise<void>;
+
+let initializedGoogleClientId: string | null = null;
+let googleCredentialHandler: GoogleCredentialHandler | null = null;
 
 export function AuthCard({
   mode,
@@ -73,6 +79,26 @@ export function AuthCard({
         password: string;
       }
   >(null);
+  // After the email/password sign-up form is submitted we keep the user on the
+  // register card with this OTP step visible. The actual user creation only
+  // happens after the code is verified.
+  const [pendingSignupOtp, setPendingSignupOtp] = useState<
+    | null
+    | {
+        email: string;
+        expiresAt: string | null;
+        // Cached register-form payload so we can resend the code without
+        // forcing the user to retype everything.
+        request: {
+          name: string;
+          email: string;
+          password: string;
+          timezone: string;
+          slug?: string;
+        };
+      }
+  >(null);
+  const [signupOtpCode, setSignupOtpCode] = useState("");
   const isRegister = mode === "register";
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   void state;
@@ -108,50 +134,71 @@ export function AuthCard({
     if (!googleClientId || !googleButtonRef.current) return;
 
     const scriptId = "google-identity-services";
+    let active = true;
+
+    const handleCredential: GoogleCredentialHandler = async (credential) => {
+      if (!active) return;
+
+      if (!credential) {
+        setError("Google sign-in did not return a credential");
+        return;
+      }
+
+      setGoogleLoading(true);
+      setError(null);
+
+      try {
+        const session = await apiRequest<AuthResponse>("/auth/google", {
+          method: "POST",
+          body: JSON.stringify({
+            credential,
+            timezone: guessTimezoneValue(),
+            // Reuse the same checkbox value the user picked on the login
+            // form. On /register the checkbox is hidden so we default true.
+            rememberMe: isRegister ? true : rememberMeRef.current,
+          }),
+        });
+
+        if (!active) return;
+
+        saveAuthSession(session);
+        router.push(safeRedirect(redirectTo));
+      } catch (caught) {
+        if (!active) return;
+
+        setError(
+          caught instanceof Error ? caught.message : "Google sign-in failed",
+        );
+      } finally {
+        if (active) {
+          setGoogleLoading(false);
+        }
+      }
+    };
+
+    googleCredentialHandler = handleCredential;
 
     function renderGoogleButton() {
+      if (!active) return;
+
       const google = window.google;
       const clientId = googleClientId;
 
       if (!google || !googleButtonRef.current || !clientId) return;
 
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async ({ credential }) => {
-          if (!credential) {
-            setError("Google sign-in did not return a credential");
-            return;
-          }
+      if (initializedGoogleClientId !== clientId) {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: ({ credential }) => {
+            void googleCredentialHandler?.(credential);
+          },
+        });
+        initializedGoogleClientId = clientId;
+      }
 
-          setGoogleLoading(true);
-          setError(null);
-
-          try {
-            const session = await apiRequest<AuthResponse>("/auth/google", {
-              method: "POST",
-              body: JSON.stringify({
-                credential,
-                timezone: guessTimezoneValue(),
-                // Reuse the same checkbox value the user picked on the login
-                // form. On /register the checkbox is hidden so we default true.
-                rememberMe: isRegister ? true : rememberMeRef.current,
-              }),
-            });
-            saveAuthSession(session);
-            router.push(safeRedirect(redirectTo));
-          } catch (caught) {
-            setError(
-              caught instanceof Error
-                ? caught.message
-                : "Google sign-in failed",
-            );
-          } finally {
-            setGoogleLoading(false);
-          }
-        },
-      });
       // Match the full form width so the Google row aligns with the divider,
       // inputs, and primary actions below it.
+      googleButtonRef.current.replaceChildren();
       const measured = googleButtonRef.current.offsetWidth;
       const buttonWidth = Math.max(280, Math.round(measured || 440));
       google.accounts.id.renderButton(googleButtonRef.current, {
@@ -165,10 +212,25 @@ export function AuthCard({
       });
     }
 
+    const cleanup = () => {
+      active = false;
+      if (googleCredentialHandler === handleCredential) {
+        googleCredentialHandler = null;
+      }
+    };
+
     const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
     if (existing) {
-      renderGoogleButton();
-      return;
+      if (window.google) {
+        renderGoogleButton();
+        return cleanup;
+      }
+
+      existing.addEventListener("load", renderGoogleButton);
+      return () => {
+        existing.removeEventListener("load", renderGoogleButton);
+        cleanup();
+      };
     }
 
     const script = document.createElement("script");
@@ -178,16 +240,43 @@ export function AuthCard({
     script.defer = true;
     script.onload = renderGoogleButton;
     document.head.appendChild(script);
+
+    return cleanup;
   }, [googleClientId, isRegister, router, redirectTo]);
 
   const formNode = isRegister ? (
-    <RegisterForm
-      submitting={submitting}
-      showPassword={showPassword}
-      onTogglePassword={() => setShowPassword((value) => !value)}
-      onSubmit={handleSubmit}
-      error={error}
-    />
+    pendingSignupOtp ? (
+      <OtpStep
+        title="Confirm your email"
+        recipient={pendingSignupOtp.email}
+        expiresAt={pendingSignupOtp.expiresAt}
+        value={signupOtpCode}
+        onChange={setSignupOtpCode}
+        onSubmit={handleSignupOtpSubmit}
+        onResend={handleSignupOtpResend}
+        onBack={() => {
+          setPendingSignupOtp(null);
+          setSignupOtpCode("");
+          setError(null);
+        }}
+        backLabel="← Use a different email"
+        submitLabel="Confirm and create my page →"
+        submittingLabel="Creating account…"
+        submitting={submitting}
+        error={error}
+        accent="register"
+        theme="card"
+        helper="Tip: codes can land in spam. Resend if it hasn't arrived in a minute."
+      />
+    ) : (
+      <RegisterForm
+        submitting={submitting}
+        showPassword={showPassword}
+        onTogglePassword={() => setShowPassword((value) => !value)}
+        onSubmit={handleSubmit}
+        error={error}
+      />
+    )
   ) : pendingTotp ? (
     <TotpStep
       submitting={submitting}
@@ -348,31 +437,47 @@ export function AuthCard({
     const form = new FormData(event.currentTarget);
 
     try {
-      const body = isRegister
-        ? {
-            name: buildFullName(
-              readFormText(form, "firstName"),
-              readFormText(form, "lastName"),
-            ),
-            email: readFormText(form, "email"),
-            password: readFormText(form, "password"),
-            timezone:
-              readOptionalFormText(form, "timezone") ?? guessTimezoneValue(),
-            slug: readOptionalFormText(form, "slug"),
-            // Registration creates a logged-in session immediately; respect the
-            // same long-lived default as the login form.
-            rememberMe: true,
-          }
-        : {
-            email: readFormText(form, "email"),
-            password: readFormText(form, "password"),
-            rememberMe,
-          };
+      if (isRegister) {
+        // Sign-up no longer creates the user in one shot — request an OTP and
+        // hand off to the SignupOtpStep below to finish the flow.
+        const request = {
+          name: buildFullName(
+            readFormText(form, "firstName"),
+            readFormText(form, "lastName"),
+          ),
+          email: readFormText(form, "email"),
+          password: readFormText(form, "password"),
+          timezone:
+            readOptionalFormText(form, "timezone") ?? guessTimezoneValue(),
+          slug: readOptionalFormText(form, "slug"),
+        };
+        const response = await apiRequest<{
+          success: boolean;
+          email: string;
+          expiresAt: string;
+        }>("/auth/register/otp/request", {
+          method: "POST",
+          body: JSON.stringify(request),
+        });
+        setPendingSignupOtp({
+          email: response.email,
+          expiresAt: response.expiresAt,
+          request,
+        });
+        setError(null);
+        return;
+      }
 
-      const session = await apiRequest<AuthResponse>(
-        isRegister ? "/auth/register" : "/auth/login",
-        { method: "POST", body: JSON.stringify(body) },
-      );
+      const body = {
+        email: readFormText(form, "email"),
+        password: readFormText(form, "password"),
+        rememberMe,
+      };
+
+      const session = await apiRequest<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
 
       saveAuthSession(session);
       router.push(safeRedirect(redirectTo));
@@ -390,6 +495,60 @@ export function AuthCard({
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSignupOtpSubmit(code: string) {
+    if (!pendingSignupOtp) return;
+    if (code.length !== 6) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const session = await apiRequest<AuthResponse>(
+        "/auth/register/otp/verify",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email: pendingSignupOtp.email,
+            code,
+            rememberMe: true,
+          }),
+        },
+      );
+      saveAuthSession(session);
+      router.push(safeRedirect(redirectTo));
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Code is invalid or expired",
+      );
+      // Clear the input so the user can retype without grabbing the mouse —
+      // OtpStep auto-focuses the first cell whenever value becomes empty.
+      setSignupOtpCode("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSignupOtpResend() {
+    if (!pendingSignupOtp) return;
+    setError(null);
+    try {
+      const response = await apiRequest<{
+        success: boolean;
+        email: string;
+        expiresAt: string;
+      }>("/auth/register/otp/request", {
+        method: "POST",
+        body: JSON.stringify(pendingSignupOtp.request),
+      });
+      setPendingSignupOtp({
+        ...pendingSignupOtp,
+        expiresAt: response.expiresAt,
+      });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not resend the code",
+      );
     }
   }
 

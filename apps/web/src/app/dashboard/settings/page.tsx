@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { OtpStep } from "@/components/otp-step";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   type AccountDeletionResponse,
@@ -998,28 +999,37 @@ function EmailChangeModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<"request" | "confirm" | "done">("request");
+  // Three steps now: enter the new email → confirm it from the CURRENT mailbox
+  // (proves the person at the keyboard owns the account) → confirm it from the
+  // NEW mailbox (proves they actually own the new address).
+  const [step, setStep] = useState<
+    "request" | "verifyCurrent" | "confirm" | "done"
+  >("request");
   const [newEmail, setNewEmail] = useState("");
+  const [currentCode, setCurrentCode] = useState("");
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [currentOtpExpiresAt, setCurrentOtpExpiresAt] = useState<string | null>(
+    null,
+  );
 
-  async function requestChange(event: FormEvent<HTMLFormElement>) {
+  async function requestCurrentOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
     setSubmitting(true);
     try {
-      const response =
-        await authedApiRequest<EmailChangeRequestResponse>(
-          "/auth/email/change",
-          {
-            method: "POST",
-            body: JSON.stringify({ newEmail: newEmail.trim() }),
-          },
-        );
-      setExpiresAt(response.expiresAt);
-      setStep("confirm");
+      const response = await authedApiRequest<{
+        success: boolean;
+        expiresAt: string;
+      }>("/auth/email/change/otp/request", {
+        method: "POST",
+        body: JSON.stringify({ newEmail: newEmail.trim() }),
+      });
+      setCurrentOtpExpiresAt(response.expiresAt);
+      setCurrentCode("");
+      setStep("verifyCurrent");
     } catch (caught) {
       setErrorMessage(
         caught instanceof Error
@@ -1031,8 +1041,56 @@ function EmailChangeModal({
     }
   }
 
-  async function confirmChange(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function verifyCurrentOtp(codeValue: string) {
+    if (codeValue.length !== 6 || submitting) return;
+    setErrorMessage(null);
+    setSubmitting(true);
+    try {
+      const response = await authedApiRequest<EmailChangeRequestResponse>(
+        "/auth/email/change",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            newEmail: newEmail.trim(),
+            otpCode: codeValue,
+          }),
+        },
+      );
+      setExpiresAt(response.expiresAt);
+      setCode("");
+      setStep("confirm");
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error
+          ? caught.message
+          : "Code is invalid or expired",
+      );
+      setCurrentCode("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resendCurrentOtp() {
+    setErrorMessage(null);
+    try {
+      const response = await authedApiRequest<{
+        success: boolean;
+        expiresAt: string;
+      }>("/auth/email/change/otp/request", {
+        method: "POST",
+        body: JSON.stringify({ newEmail: newEmail.trim() }),
+      });
+      setCurrentOtpExpiresAt(response.expiresAt);
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error ? caught.message : "Could not resend the code",
+      );
+    }
+  }
+
+  async function confirmChange(codeValue: string) {
+    if (codeValue.length !== 6 || submitting) return;
     setErrorMessage(null);
     setSubmitting(true);
     try {
@@ -1040,7 +1098,7 @@ function EmailChangeModal({
         "/auth/email/confirm",
         {
           method: "POST",
-          body: JSON.stringify({ token: code.trim() }),
+          body: JSON.stringify({ token: codeValue }),
         },
       );
       setStep("done");
@@ -1055,20 +1113,37 @@ function EmailChangeModal({
           ? caught.message
           : "Code is invalid or expired",
       );
+      setCode("");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    setErrorMessage(null);
+    try {
+      const response = await authedApiRequest<{
+        success: boolean;
+        expiresAt: string;
+      }>("/auth/email/confirm/resend", { method: "POST" });
+      setExpiresAt(response.expiresAt);
+    } catch (caught) {
+      setErrorMessage(
+        caught instanceof Error ? caught.message : "Could not resend the code",
+      );
     }
   }
 
   return (
     <ModalShell title="Change email address" onClose={onClose}>
       {step === "request" ? (
-        <form className="space-y-4" onSubmit={requestChange}>
+        <form className="space-y-4" onSubmit={requestCurrentOtp}>
           <p className="text-[13px] text-[#6B7280]">
-            We&apos;ll send a 6-digit confirmation code to the new email. Your
-            current email is{" "}
-            <span className="font-semibold text-[#0B1220]">{currentEmail}</span>
-            .
+            For your security we&apos;ll first send a 6-digit code to your
+            current email{" "}
+            <span className="font-semibold text-[#0B1220]">{currentEmail}</span>{" "}
+            to confirm it&apos;s you. Then we&apos;ll send a second code to the
+            new address.
           </p>
           <label className="block">
             <span className="text-[13px] font-bold text-[#0B1220]">
@@ -1102,70 +1177,50 @@ function EmailChangeModal({
               className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {submitting ? "Sending…" : "Send code"}
+              {submitting ? "Sending…" : "Send code to current email"}
             </button>
           </div>
         </form>
+      ) : step === "verifyCurrent" ? (
+        <OtpStep
+          title="Confirm it's you"
+          recipient={currentEmail}
+          expiresAt={currentOtpExpiresAt}
+          value={currentCode}
+          onChange={setCurrentCode}
+          onSubmit={verifyCurrentOtp}
+          onResend={resendCurrentOtp}
+          onBack={() => {
+            setCurrentCode("");
+            setErrorMessage(null);
+            setStep("request");
+          }}
+          backLabel="← Use a different email"
+          submitLabel="Send code to new email"
+          submittingLabel="Sending…"
+          submitting={submitting}
+          error={errorMessage}
+        />
       ) : step === "confirm" ? (
-        <form className="space-y-4" onSubmit={confirmChange}>
-          <p className="text-[13px] text-[#6B7280]">
-            Enter the 6-digit code we sent to{" "}
-            <span className="font-semibold text-[#0B1220]">{newEmail}</span>.
-            {expiresAt ? (
-              <>
-                {" "}
-                Expires{" "}
-                <span className="font-semibold text-[#0B1220]">
-                  {formatRelativeDate(expiresAt)}
-                </span>
-                .
-              </>
-            ) : null}
-          </p>
-          <label className="block">
-            <span className="text-[13px] font-bold text-[#0B1220]">
-              Confirmation code
-            </span>
-            <input
-              required
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChange={(event) =>
-                setCode(event.target.value.replace(/[^0-9]/g, ""))
-              }
-              placeholder="123456"
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
-            />
-          </label>
-          {errorMessage ? (
-            <p className="text-[13px] font-bold text-[#B91C1C]">
-              {errorMessage}
-            </p>
-          ) : null}
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCode("");
-                setErrorMessage(null);
-                setStep("request");
-              }}
-              className="text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
-            >
-              ← Use a different email
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || code.length !== 6}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
-            >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {submitting ? "Confirming…" : "Confirm change"}
-            </button>
-          </div>
-        </form>
+        <OtpStep
+          title="Confirm your new email"
+          recipient={newEmail}
+          expiresAt={expiresAt}
+          value={code}
+          onChange={setCode}
+          onSubmit={confirmChange}
+          onResend={resendConfirmation}
+          onBack={() => {
+            setCode("");
+            setErrorMessage(null);
+            setStep("request");
+          }}
+          backLabel="← Start over"
+          submitLabel="Confirm change"
+          submittingLabel="Confirming…"
+          submitting={submitting}
+          error={errorMessage}
+        />
       ) : (
         <div className="space-y-3 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
@@ -1194,6 +1249,16 @@ function PasswordForm({
   const [showPasswords, setShowPasswords] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
   const hasPassword = Boolean(user.hasPassword);
+  // OTP gate when CHANGING an existing password. Adding a password to a
+  // Google-only account stays single-step because there's nothing to
+  // double-confirm yet. The cached credentials let "Resend code" re-issue the
+  // OTP without forcing the user to retype anything.
+  const [otpStep, setOtpStep] = useState<{
+    expiresAt: string | null;
+    credentials: { currentPassword: string; newPassword: string };
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1213,19 +1278,35 @@ function PasswordForm({
 
     setSaving(true);
     try {
-      const updated = await authedApiRequest<PublicUser>(
-        "/auth/password/change",
-        {
+      if (hasPassword) {
+        // Validates current password server-side, stores the new hash on the
+        // OTP record, and emails a code. The change does not land until the
+        // OTP step below succeeds.
+        const response = await authedApiRequest<{
+          success: boolean;
+          expiresAt: string;
+        }>("/auth/password/change/otp/request", {
           method: "POST",
-          body: JSON.stringify({
-            currentPassword: hasPassword ? currentPassword : undefined,
-            newPassword,
-          }),
-        },
-      );
-      onUserUpdated(updated);
-      formRef.current?.reset();
-      toast.success(hasPassword ? "Password changed" : "Password added");
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        setOtpStep({
+          expiresAt: response.expiresAt,
+          credentials: { currentPassword, newPassword },
+        });
+        setOtpCode("");
+        setOtpError(null);
+      } else {
+        const updated = await authedApiRequest<PublicUser>(
+          "/auth/password/change",
+          {
+            method: "POST",
+            body: JSON.stringify({ newPassword }),
+          },
+        );
+        onUserUpdated(updated);
+        formRef.current?.reset();
+        toast.success("Password added");
+      }
     } catch (caught) {
       toast.error(
         caught instanceof Error ? caught.message : "Could not update password",
@@ -1233,6 +1314,77 @@ function PasswordForm({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function submitOtp(code: string) {
+    if (code.length !== 6 || saving) return;
+    setSaving(true);
+    setOtpError(null);
+    try {
+      const updated = await authedApiRequest<PublicUser>(
+        "/auth/password/change/otp/verify",
+        {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        },
+      );
+      onUserUpdated(updated);
+      formRef.current?.reset();
+      setOtpStep(null);
+      setOtpCode("");
+      toast.success("Password changed");
+    } catch (caught) {
+      setOtpError(
+        caught instanceof Error ? caught.message : "Code is invalid or expired",
+      );
+      setOtpCode("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resendOtp() {
+    if (!otpStep) return;
+    setOtpError(null);
+    try {
+      const response = await authedApiRequest<{
+        success: boolean;
+        expiresAt: string;
+      }>("/auth/password/change/otp/request", {
+        method: "POST",
+        body: JSON.stringify(otpStep.credentials),
+      });
+      setOtpStep({ ...otpStep, expiresAt: response.expiresAt });
+    } catch (caught) {
+      setOtpError(
+        caught instanceof Error ? caught.message : "Could not resend the code",
+      );
+    }
+  }
+
+  if (otpStep) {
+    return (
+      <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <OtpStep
+          title="Confirm this password change"
+          recipient={user.email}
+          expiresAt={otpStep.expiresAt}
+          value={otpCode}
+          onChange={setOtpCode}
+          onSubmit={submitOtp}
+          onResend={resendOtp}
+          onBack={() => {
+            setOtpStep(null);
+            setOtpCode("");
+            setOtpError(null);
+          }}
+          submitLabel="Confirm password change"
+          submittingLabel="Confirming…"
+          submitting={saving}
+          error={otpError}
+        />
+      </div>
+    );
   }
 
   return (
@@ -1286,7 +1438,13 @@ function PasswordForm({
           ) : (
             <KeyRound className="size-4" />
           )}
-          {saving ? "Saving…" : hasPassword ? "Change password" : "Add password"}
+          {saving
+            ? hasPassword
+              ? "Sending code…"
+              : "Saving…"
+            : hasPassword
+              ? "Send confirmation code"
+              : "Add password"}
         </button>
       </div>
     </form>

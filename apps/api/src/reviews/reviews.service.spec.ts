@@ -30,6 +30,7 @@ function makeBooking(overrides: Record<string, unknown> = {}) {
     eventTypeId: 'event-1',
     guestName: 'Guest Name',
     guestEmail: 'guest@example.com',
+    endTimeUtc: new Date(Date.now() - 60_000),
     eventType: { id: 'event-1', title: 'Intro Call', slug: 'intro' },
     ...overrides,
   };
@@ -120,6 +121,16 @@ describe('ReviewsService – submitPublicReview', () => {
 
     await expect(service.submitPublicReview(validDto())).rejects.toThrow(
       NotFoundException,
+    );
+  });
+
+  it('throws ConflictException before the booking has ended', async () => {
+    prisma.booking.findUnique.mockResolvedValue(
+      makeBooking({ endTimeUtc: new Date(Date.now() + 60_000) }),
+    );
+
+    await expect(service.submitPublicReview(validDto())).rejects.toThrow(
+      ConflictException,
     );
   });
 

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Banknote, Handshake, Link as LinkIcon, Shield } from "lucide-react";
+import { Banknote, GraduationCap, Handshake, Shield } from "lucide-react";
 import { LegalPage, LegalProse, Toc } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Bookvella",
+  title: "Terms of Use | Bookvella",
   description: "The rules for using Bookvella as a host or guest.",
 };
 
@@ -13,159 +13,171 @@ const CONTACT_EMAIL = "support.bookvella@gmail.com";
 export default function TermsPage() {
   return (
     <LegalPage
-      title="Terms of Service"
-      intro="The rules that apply when you use Bookvella, whether you create a host account or book a service as a guest."
+      title="Terms of Use"
+      intro="These terms apply when you use Bookvella. Bookvella is currently a non-commercial student portfolio project with public access, not a paid marketplace or payment platform."
     >
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         <SummaryCard
-          icon={<LinkIcon className="size-5" />}
-          tint="bg-[#FFF0EF] text-[#FF5F63]"
-          title="Bookvella is the platform"
-          text="We provide booking software and public booking pages."
+          icon={<GraduationCap className="size-5" />}
+          tint="bg-[#EFF6FF] text-[#2563EB]"
+          title="Student portfolio project"
+          text="Bookvella is public so the product can be reviewed, tested, and demonstrated."
         />
         <SummaryCard
           icon={<Handshake className="size-5" />}
           tint="bg-[#F4EAFF] text-[#7C3AED]"
-          title="Your service contract is with the host"
-          text="Hosts are independent providers, not Bookvella employees."
+          title="Hosts are independent"
+          text="If a host offers a real service, the service relationship is between host and guest."
         />
         <SummaryCard
           icon={<Banknote className="size-5" />}
           tint="bg-[#E0F7EF] text-[#0D9488]"
-          title="No payments through Bookvella"
-          text="Bookvella currently does not collect payments or commissions."
+          title="No payments"
+          text="Bookvella does not process payments, charge commissions, or sell subscriptions."
         />
         <SummaryCard
           icon={<Shield className="size-5" />}
           tint="bg-[#FEF3C7] text-[#B45309]"
-          title="Illegal or abusive content is not allowed"
-          text="Profiles, services, images, and reviews must follow the law and these terms."
+          title="Use it responsibly"
+          text="Do not upload illegal content, spam people, or submit fake bookings or reviews."
         />
       </div>
 
       <Toc
         items={[
-          { href: "#service", label: "What Bookvella is" },
+          { href: "#project", label: "What Bookvella is" },
           { href: "#accounts", label: "Accounts" },
-          { href: "#hosts", label: "Host responsibilities" },
-          { href: "#guests", label: "Guest responsibilities" },
-          { href: "#consumer", label: "Consumer information" },
-          { href: "#content", label: "Reviews and content" },
+          { href: "#hosts", label: "Hosts" },
+          { href: "#guests", label: "Guests" },
+          { href: "#reviews", label: "Reviews" },
+          { href: "#content", label: "Content" },
           { href: "#moderation", label: "Moderation" },
+          { href: "#availability", label: "Availability" },
           { href: "#liability", label: "Liability" },
-          { href: "#law", label: "Governing law" },
+          { href: "#law", label: "Law and contact" },
         ]}
       />
 
       <LegalProse>
-        <h2 id="service">1. What Bookvella is</h2>
+        <h2 id="project">1. What Bookvella is</h2>
         <p>
-          Bookvella is booking and scheduling software for independent service
-          providers. Bookvella provides accounts, public pages, service listings,
-          availability tools, email verification, booking confirmations,
-          cancellation links, and review features.
+          Bookvella is booking and scheduling software built as a student
+          portfolio project. It demonstrates host accounts, public booking
+          pages, service listings, availability tools, email verification,
+          booking confirmations, cancellation and rescheduling links, reviews,
+          uploads, and optional calendar-related features.
         </p>
         <p>
-          Bookvella is not the provider of the underlying host service. When a
-          guest books a service, the service contract is normally between the
-          guest and the host.
+          Bookvella is not the provider of any host service. It is not a payment
+          processor, financial service, employment agency, travel agency,
+          healthcare provider, or regulated marketplace.
         </p>
 
-        <h2 id="accounts">2. Accounts and eligibility</h2>
+        <h2 id="accounts">2. Accounts</h2>
         <p>
-          Hosts must be at least 18 years old, or the age of majority where they
-          live, to create an account. You are responsible for keeping your login
-          details secure and for all activity under your account.
+          You may create a host account to test or demonstrate the product. You
+          must provide accurate account information, keep your login credentials
+          secure, and not use another person&apos;s account without permission.
+        </p>
+        <p>
+          Because Bookvella is a portfolio project, accounts, data, and features
+          may be changed, limited, suspended, or deleted if needed for security,
+          maintenance, legal compliance, or project operation.
         </p>
 
         <h2 id="hosts">3. Host responsibilities</h2>
         <p>Hosts agree that they will:</p>
         <ul>
-          <li>only offer services they are legally allowed and qualified to provide;</li>
-          <li>keep service descriptions, prices, durations, locations, photos, and availability accurate;</li>
-          <li>honor confirmed bookings or cancel them promptly with a clear reason;</li>
-          <li>provide guests with any required legal business information, cancellation terms, and consumer information;</li>
-          <li>handle guest personal data only for the booking and service relationship;</li>
-          <li>not use Bookvella to spam, harass, mislead, or discriminate against guests.</li>
+          <li>only publish services they are legally allowed and qualified to provide;</li>
+          <li>keep service descriptions, prices, duration, location, photos, and availability accurate;</li>
+          <li>make clear whether a listing is only a test/demo listing or a real service;</li>
+          <li>honor confirmed real bookings or cancel/reschedule promptly with a clear reason;</li>
+          <li>provide guests with any legal business, consumer, cancellation, tax, invoice, or professional information that applies to the host&apos;s own service;</li>
+          <li>use guest personal data only for the booking and related service communication;</li>
+          <li>not use Bookvella for spam, harassment, fraud, misleading listings, illegal services, or discriminatory conduct.</li>
         </ul>
 
         <h2 id="guests">4. Guest responsibilities</h2>
         <p>Guests agree that they will:</p>
         <ul>
           <li>provide accurate booking details and a reachable email address;</li>
-          <li>verify bookings with the email code sent by Bookvella;</li>
-          <li>cancel as early as possible if they cannot attend;</li>
-          <li>not book in another person&apos;s name without permission;</li>
-          <li>leave reviews only for genuine booking experiences.</li>
+          <li>verify bookings with the one-time code sent by Bookvella;</li>
+          <li>not submit fake bookings, abusive notes, or bookings in another person&apos;s name without permission;</li>
+          <li>cancel or reschedule as early as possible if they cannot attend;</li>
+          <li>check the host&apos;s service details before relying on a booking.</li>
         </ul>
 
-        <h2 id="consumer">5. Consumer and marketplace information</h2>
+        <h2 id="reviews">5. Reviews</h2>
         <p>
-          Because Bookvella hosts independent service listings, guests should
-          check the host profile and service details before booking. Hosts are
-          responsible for any legally required pre-contract information, including
-          trader identity, total price, cancellation/no-show rules, and any
-          withdrawal rights that apply to their service.
+          Reviews may only be submitted through a valid review link connected to
+          a confirmed booking. Reviews must reflect a genuine booking experience
+          and must not be fake, abusive, defamatory, discriminatory, or illegal.
         </p>
         <p>
-          Bookvella currently does not process payments. Any payment, refund,
-          invoice, tax, VAT, or receipt question is handled directly between the
-          host and guest unless Bookvella later adds payment features and updates
-          these terms.
+          Hosts may hide or show reviews on their public profile. Bookvella may
+          remove or restrict reviews that appear unlawful, abusive, spammy, or
+          inconsistent with these terms.
         </p>
 
-        <h2 id="content">6. Reviews and user content</h2>
+        <h2 id="content">6. User content</h2>
         <p>
-          Hosts and guests keep ownership of content they upload, including
-          profile text, service text, images, and reviews. By uploading content,
-          you give Bookvella a limited, worldwide, non-exclusive license to host,
-          display, reproduce, and technically process that content for operating
-          and improving the service.
+          Hosts and guests remain responsible for content they upload or submit,
+          including profile text, service listings, images, booking notes, and
+          reviews. You must have the rights needed to upload that content.
         </p>
         <p>
-          Reviews must be truthful, relevant to a real booking, and not abusive,
-          defamatory, discriminatory, or illegal.
+          By uploading content, you give Bookvella a limited, non-exclusive
+          license to host, display, reproduce, and technically process the
+          content only as needed to operate, secure, and improve the project.
         </p>
 
-        <h2 id="moderation">7. Moderation, suspension, and reports</h2>
+        <h2 id="moderation">7. Moderation and reports</h2>
         <p>
-          We may remove content, restrict access, or suspend accounts if content
-          appears illegal, harmful, misleading, abusive, spammy, or in breach of
-          these terms. Where legally required and reasonable, we will explain the
-          decision and provide a way to challenge it.
+          We may remove content, restrict features, suspend accounts, or block
+          access where content or behavior appears illegal, harmful, misleading,
+          abusive, spammy, or in breach of these terms.
         </p>
         <p>
-          Illegal content and abuse reports can be sent through{" "}
+          Reports can be sent through{" "}
           <Link href="/legal/contact">Contact / Report</Link> or by email to{" "}
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
         </p>
 
-        <h2 id="liability">8. Disclaimers and liability</h2>
+        <h2 id="availability">8. Changes and availability</h2>
         <p>
-          Bookvella is provided on an &quot;as is&quot; and &quot;as available&quot; basis. We do not
-          guarantee uninterrupted availability or error-free operation. We are not
-          responsible for the quality, safety, legality, punctuality, or outcome
-          of services provided by hosts, or for guest conduct.
+          Bookvella is provided for portfolio, testing, and demonstration
+          purposes. We do not guarantee uninterrupted availability, permanent
+          data storage, error-free operation, or that every feature will remain
+          available.
+        </p>
+
+        <h2 id="liability">9. Liability</h2>
+        <p>
+          Bookvella is provided on an &quot;as is&quot; and &quot;as available&quot; basis. To the
+          extent permitted by law, Bookvella is not responsible for host service
+          quality, safety, legality, punctuality, pricing, payments, tax issues,
+          guest conduct, or the outcome of appointments arranged between hosts
+          and guests.
         </p>
         <p>
           Nothing in these terms excludes liability that cannot be excluded by
-          law, including liability for intent, gross negligence, or personal
-          injury where applicable.
+          law, including liability for intent, gross negligence, or injury to
+          life, body, or health where applicable.
         </p>
 
-        <h2 id="law">9. Governing law and complaints</h2>
+        <h2 id="law">10. Governing law and contact</h2>
         <p>
           These terms are governed by German law, without affecting mandatory
-          consumer protections in a consumer&apos;s country of residence.
+          consumer protections that may apply in a user&apos;s country of residence.
         </p>
         <p>
-          The EU Online Dispute Resolution platform was discontinued on July 20,
-          2025. You can contact us directly at{" "}
+          The European Commission&apos;s Online Dispute Resolution platform was
+          discontinued on July 20, 2025. Questions or complaints can be sent to{" "}
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
         </p>
 
         <p className="mt-12 text-[12px] text-[#9CA3AF]">
-          Version 1.0. Last updated May 24, 2026. Effective May 24, 2026.
+          Version 1.1. Last updated May 26, 2026. Effective May 26, 2026.
         </p>
       </LegalProse>
     </LegalPage>

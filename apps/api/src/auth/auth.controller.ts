@@ -24,31 +24,44 @@ import type {
   ChangePasswordDto,
   ConfirmAccountDeletionDto,
   ConfirmEmailChangeDto,
+  ConfirmPasswordChangeOtpDto,
   GoogleAuthDto,
   LoginDto,
   LogoutDto,
   RequestEmailChangeDto,
+  RequestEmailChangeOtpDto,
+  RequestPasswordChangeOtpDto,
+  RequestRegistrationOtpDto,
   RefreshTokenDto,
-  RegisterDto,
   RequestPasswordResetDto,
   ResetPasswordDto,
   TotpDisableDto,
   TotpVerifyDto,
   UpdateNotificationPreferencesDto,
   UpdateMeDto,
+  VerifyRegistrationOtpDto,
 } from './dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
-  async register(
+  // Email/password sign-up is OTP-gated. The legacy single-shot /auth/register
+  // endpoint is gone; clients must call the request → verify pair below.
+  // Google sign-up stays one-shot because Google has already verified the
+  // address.
+  @Post('register/otp/request')
+  requestRegistrationOtp(@Body() dto: RequestRegistrationOtpDto) {
+    return this.authService.requestRegistrationOtp(dto);
+  }
+
+  @Post('register/otp/verify')
+  async verifyRegistrationOtp(
     @Req() request: AuthenticatedRequest,
-    @Body() dto: RegisterDto,
+    @Body() dto: VerifyRegistrationOtpDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const session = await this.authService.register(
+    const session = await this.authService.verifyRegistrationOtp(
       dto,
       getSessionContext(request),
     );
@@ -124,6 +137,9 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
+  // Direct password change without OTP — kept for the add-password flow on
+  // Google-only accounts (no current password, so the OTP gate does not add
+  // signal). Day-to-day password rotation goes through the OTP pair below.
   @Post('password/change')
   @UseGuards(AuthGuard)
   changePassword(
@@ -131,6 +147,24 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(request.user!, dto);
+  }
+
+  @Post('password/change/otp/request')
+  @UseGuards(AuthGuard)
+  requestPasswordChangeOtp(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: RequestPasswordChangeOtpDto,
+  ) {
+    return this.authService.requestPasswordChangeOtp(request.user!, dto);
+  }
+
+  @Post('password/change/otp/verify')
+  @UseGuards(AuthGuard)
+  confirmPasswordChangeOtp(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: ConfirmPasswordChangeOtpDto,
+  ) {
+    return this.authService.confirmPasswordChangeOtp(request.user!, dto);
   }
 
   @Delete('google')
@@ -198,6 +232,15 @@ export class AuthController {
     return result;
   }
 
+  @Post('email/change/otp/request')
+  @UseGuards(AuthGuard)
+  requestEmailChangeOtp(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: RequestEmailChangeOtpDto,
+  ) {
+    return this.authService.requestEmailChangeOtp(request.user!, dto);
+  }
+
   @Post('email/change')
   @UseGuards(AuthGuard)
   requestEmailChange(
@@ -205,6 +248,12 @@ export class AuthController {
     @Body() dto: RequestEmailChangeDto,
   ) {
     return this.authService.requestEmailChange(request.user!, dto);
+  }
+
+  @Post('email/confirm/resend')
+  @UseGuards(AuthGuard)
+  resendEmailChangeConfirmation(@Req() request: AuthenticatedRequest) {
+    return this.authService.resendEmailChangeConfirmation(request.user!);
   }
 
   @Post('email/confirm')
