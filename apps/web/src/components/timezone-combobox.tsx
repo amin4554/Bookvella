@@ -155,13 +155,13 @@ export function TimezoneCombobox({
   const clock = formatLocalClock(value);
 
   const triggerClass = cn(
-    "flex w-full items-center gap-3 rounded-xl border bg-white text-left transition",
+    "flex w-full items-center gap-3 rounded-xl border bg-surface-card text-left transition",
     tone === "compact"
-      ? "h-10 border-[#E5E7EB] px-3 text-sm hover:border-[#FF5F63]/40"
+      ? "h-10 border-line-soft px-3 text-sm hover:border-brand/40"
       : tone === "ghost"
-        ? "h-10 border-transparent bg-transparent px-2 text-sm hover:bg-[#FFFBF7]"
-        : "h-12 border-[#E8DED7] bg-[#FFFBF7] px-4 text-sm hover:border-[#FF5F63]/40",
-    open && "border-[#FF5F63] shadow-[0_0_0_4px_rgba(255,95,99,0.15)]",
+        ? "h-10 border-transparent bg-transparent px-2 text-sm hover:bg-surface-page"
+        : "h-12 border-line-warm bg-surface-page px-4 text-sm hover:border-brand/40",
+    open && "border-brand shadow-[0_0_0_4px_rgba(255,95,99,0.15)]",
     disabled && "cursor-not-allowed opacity-60",
     className,
   );
@@ -178,16 +178,16 @@ export function TimezoneCombobox({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <Globe className="size-4 shrink-0 text-[#9CA3AF]" />
+        <Globe className="size-4 shrink-0 text-ink-muted" />
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate font-semibold text-[#0B1220]">{city}</p>
-          <p className="truncate text-[11px] text-[#6B7280] tabular-nums">
+          <p className="truncate font-semibold text-ink-strong">{city}</p>
+          <p className="truncate text-[11px] text-ink-soft tabular-nums">
             {value}
-            <span className="mx-1 text-[#D1D5DB]">·</span>
+            <span className="mx-1 text-ink-faint">·</span>
             {offset}
             {clock ? (
               <>
-                <span className="mx-1 text-[#D1D5DB]">·</span>
+                <span className="mx-1 text-ink-faint">·</span>
                 {clock}
               </>
             ) : null}
@@ -195,16 +195,16 @@ export function TimezoneCombobox({
         </div>
         <ChevronDown
           className={cn(
-            "size-4 shrink-0 text-[#9CA3AF] transition",
+            "size-4 shrink-0 text-ink-muted transition",
             open && "rotate-180",
           )}
         />
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-xl border border-[#EEE7DF] bg-white shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]">
-          <div className="flex items-center gap-2 border-b border-[#EEE7DF] px-3 py-2.5">
-            <Search className="size-4 shrink-0 text-[#9CA3AF]" />
+        <div className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-xl border border-line-cream bg-surface-card shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]">
+          <div className="flex items-center gap-2 border-b border-line-cream px-3 py-2.5">
+            <Search className="size-4 shrink-0 text-ink-muted" />
             <input
               ref={inputRef}
               type="search"
@@ -215,9 +215,9 @@ export function TimezoneCombobox({
                 setActiveIndex(0);
               }}
               onKeyDown={onKeyDown}
-              className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9CA3AF]"
+              className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-muted"
             />
-            <kbd className="hidden rounded border border-[#EEE7DF] bg-[#FFFBF7] px-1.5 py-0.5 text-[10px] font-semibold text-[#9CA3AF] sm:inline">
+            <kbd className="hidden rounded border border-line-cream bg-surface-page px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted sm:inline">
               esc
             </kbd>
           </div>
@@ -226,9 +226,9 @@ export function TimezoneCombobox({
             <button
               type="button"
               onClick={() => commit(detected)}
-              className="flex w-full items-center gap-2 border-b border-[#EEE7DF] bg-[#FFFBF7] px-3 py-2 text-left text-[12px] font-semibold text-[#0B1220] hover:bg-[#FFF0EF]"
+              className="flex w-full items-center gap-2 border-b border-line-cream bg-surface-page px-3 py-2 text-left text-[12px] font-semibold text-ink-strong hover:bg-brand-tint-100"
             >
-              <Globe className="size-3.5 text-[#FF5F63]" />
+              <Globe className="size-3.5 text-brand" />
               Use my timezone — {timezoneCity(detected)} ({formatOffset(detected)})
             </button>
           ) : null}
@@ -239,13 +239,13 @@ export function TimezoneCombobox({
             className="max-h-[280px] overflow-y-auto py-1"
           >
             {flatOptions.length === 0 ? (
-              <p className="px-3 py-6 text-center text-[12px] text-[#9CA3AF]">
+              <p className="px-3 py-6 text-center text-[12px] text-ink-muted">
                 No timezones match &ldquo;{query}&rdquo;.
               </p>
             ) : (
               grouped.map(([region, items]) => (
                 <div key={region} className="px-1.5 pb-1">
-                  <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                  <p className="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
                     {region}
                   </p>
                   {items.map((zone) => {
@@ -264,23 +264,23 @@ export function TimezoneCombobox({
                         className={cn(
                           "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition",
                           isActive
-                            ? "bg-[#FFF0EF] text-[#0B1220]"
-                            : "text-[#374151] hover:bg-[#FFFBF7]",
+                            ? "bg-brand-tint-100 text-ink-strong"
+                            : "text-ink-body hover:bg-surface-page",
                         )}
                       >
                         <span className="flex-1 truncate">
                           <span className="font-semibold">
                             {timezoneCity(zone)}
                           </span>{" "}
-                          <span className="text-[11px] text-[#9CA3AF] tabular-nums">
+                          <span className="text-[11px] text-ink-muted tabular-nums">
                             {zone}
                           </span>
                         </span>
-                        <span className="shrink-0 text-[11px] font-semibold text-[#6B7280] tabular-nums">
+                        <span className="shrink-0 text-[11px] font-semibold text-ink-soft tabular-nums">
                           {formatOffset(zone)}
                         </span>
                         {isSelected ? (
-                          <Check className="size-3.5 text-[#FF5F63]" />
+                          <Check className="size-3.5 text-brand" />
                         ) : null}
                       </button>
                     );

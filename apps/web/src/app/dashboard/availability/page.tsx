@@ -1547,8 +1547,8 @@ export default function AvailabilityPage() {
     if (calendars.length === 0) {
       return {
         text: "Calendar sync not connected",
-        className: "border-[#EEE7DF] bg-white text-[#6B7280]",
-        dotClassName: "bg-[#D1D5DB]",
+        className: "border-line-cream bg-surface-card text-ink-soft",
+        dotClassName: "bg-line-strong",
       };
     }
 
@@ -1568,16 +1568,16 @@ export default function AvailabilityPage() {
     if (hasError) {
       return {
         text: "Calendar sync needs attention",
-        className: "border-amber-200 bg-amber-50 text-amber-800",
-        dotClassName: "bg-amber-500",
+        className: "border-warning-border bg-warning-tint text-warning-strong",
+        dotClassName: "bg-warning-amber",
       };
     }
 
     if (activeCount === 0) {
       return {
         text: "Calendar sync paused",
-        className: "border-[#EEE7DF] bg-white text-[#6B7280]",
-        dotClassName: "bg-[#9CA3AF]",
+        className: "border-line-cream bg-surface-card text-ink-soft",
+        dotClassName: "bg-ink-muted",
       };
     }
 
@@ -1585,8 +1585,8 @@ export default function AvailabilityPage() {
       text: latestSync
         ? `Calendar synced ${formatRelativeCalendarTime(new Date(latestSync))}`
         : `Calendar connected (${activeCount})`,
-      className: "border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46]",
-      dotClassName: "bg-[#10B981]",
+      className: "border-success-border bg-success-tint text-success-deep",
+      dotClassName: "bg-success-bright",
     };
   }, [calendars]);
 
@@ -1607,14 +1607,14 @@ export default function AvailabilityPage() {
           >
             Availability
           </h1>
-          <p className="mt-1.5 text-[13px] text-[#6B7280]">
+          <p className="mt-1.5 text-[13px] text-ink-soft">
             Pick a day on the calendar to edit, or set defaults below.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {dirty ? (
-            <span className="inline-flex h-9 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 text-[12px] font-bold text-amber-800">
-              <span className="size-1.5 rounded-full bg-amber-500" /> Unsaved
+            <span className="inline-flex h-9 items-center gap-2 rounded-full border border-warning-border bg-warning-tint px-3 text-[12px] font-bold text-warning-strong">
+              <span className="size-1.5 rounded-full bg-warning-amber" /> Unsaved
               changes
             </span>
           ) : null}
@@ -1623,7 +1623,7 @@ export default function AvailabilityPage() {
               href={`/${user.slug}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
             >
               <Eye className="size-4" /> Preview as guest
             </a>
@@ -1632,7 +1632,7 @@ export default function AvailabilityPage() {
             type="button"
             disabled={saving || loading || !dirty}
             onClick={saveAll}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -1646,14 +1646,14 @@ export default function AvailabilityPage() {
           activeServiceId={activeServiceId}
           onPick={pickAvailabilityScope}
         />
-        <span className="text-[12px] text-[#D1D5DB]">·</span>
-        <p className="inline-flex items-center gap-1.5 text-[12px] text-[#6B7280]">
-          <Globe className="size-3.5 text-[#9CA3AF]" />
+        <span className="text-[12px] text-ink-faint">·</span>
+        <p className="inline-flex items-center gap-1.5 text-[12px] text-ink-soft">
+          <Globe className="size-3.5 text-ink-muted" />
           {tzLabel}
         </p>
-        <span className="text-[12px] text-[#D1D5DB]">·</span>
-        <span className="text-[12px] text-[#6B7280]">
-          <span className="font-semibold tabular-nums text-[#0B1220]">
+        <span className="text-[12px] text-ink-faint">·</span>
+        <span className="text-[12px] text-ink-soft">
+          <span className="font-semibold tabular-nums text-ink-strong">
             {totalWeekHours.toFixed(0)}h
           </span>{" "}
           bookable per week
@@ -1683,31 +1683,31 @@ export default function AvailabilityPage() {
       </div>
 
       {/* Block-reason legend */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[#EEE7DF] bg-white px-4 py-2.5 text-[11.5px]">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line-cream bg-surface-card px-4 py-2.5 text-[11.5px]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
           Why a time may be blocked
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[#374151]">
-          <span className="size-2 rounded-sm bg-[#FF5F63]" /> Outside availability
+        <span className="inline-flex items-center gap-1.5 text-ink-body">
+          <span className="size-2 rounded-sm bg-brand" /> Outside availability
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[#374151]">
-          <span className="size-2 rounded-sm bg-[#A855F7]" /> Already booked
+        <span className="inline-flex items-center gap-1.5 text-ink-body">
+          <span className="size-2 rounded-sm bg-purple" /> Already booked
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[#374151]">
-          <span className="size-2 rounded-sm bg-[#9CA3AF]" /> Blocked date
+        <span className="inline-flex items-center gap-1.5 text-ink-body">
+          <span className="size-2 rounded-sm bg-ink-muted" /> Blocked date
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[#374151]">
-          <span className="size-2 rounded-sm bg-[#3B82F6]" /> External calendar event
+        <span className="inline-flex items-center gap-1.5 text-ink-body">
+          <span className="size-2 rounded-sm bg-info-bright" /> External calendar event
         </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-[#6B7280]">
+        <span className="ml-auto inline-flex items-center gap-1.5 text-ink-soft">
           <Lock className="size-3" /> Private event details aren&apos;t shown.
         </span>
       </div>
 
       {error ? (
-        <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-xl border border-line-cream bg-surface-card p-6 shadow-sm">
           <p className="font-semibold">Availability unavailable</p>
-          <p className="mt-1 text-sm text-[#6B7280]">{error}</p>
+          <p className="mt-1 text-sm text-ink-soft">{error}</p>
         </div>
       ) : null}
 
@@ -1768,8 +1768,8 @@ export default function AvailabilityPage() {
           </section>
 
           {/* Tabs */}
-          <section className="mt-8 rounded-2xl border border-[#EEE7DF] bg-white shadow-sm">
-            <div className="flex flex-wrap items-center gap-5 border-b border-[#EEE7DF] px-5">
+          <section className="mt-8 rounded-2xl border border-line-cream bg-surface-card shadow-sm">
+            <div className="flex flex-wrap items-center gap-5 border-b border-line-cream px-5">
               <TabButton on={tab === "weekly"} onClick={() => setTab("weekly")}>
                 {activeService ? "Service weekly hours" : "Default weekly hours"}
               </TabButton>
@@ -1855,7 +1855,7 @@ export default function AvailabilityPage() {
       ) : null}
 
       {loading && !error ? (
-        <div className="mt-8 rounded-2xl border border-[#EEE7DF] bg-white p-10 text-center text-[13px] text-[#9CA3AF]">
+        <div className="mt-8 rounded-2xl border border-line-cream bg-surface-card p-10 text-center text-[13px] text-ink-muted">
           Loading availability…
         </div>
       ) : null}
@@ -1911,16 +1911,16 @@ function CalendarCard({
     return date >= lo && date <= hi;
   }
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="Previous month"
             onClick={() => onShiftMonth(-1)}
-            className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-[#FFFBF7]"
+            className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-surface-page"
           >
-            <ChevronLeft className="size-4 text-[#6B7280]" />
+            <ChevronLeft className="size-4 text-ink-soft" />
           </button>
           <h2 className="text-[16px] font-bold tabular-nums">
             {MONTH_NAMES[viewMonth]} {viewYear}
@@ -1929,9 +1929,9 @@ function CalendarCard({
             type="button"
             aria-label="Next month"
             onClick={() => onShiftMonth(1)}
-            className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-[#FFFBF7]"
+            className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-surface-page"
           >
-            <ChevronRight className="size-4 text-[#6B7280]" />
+            <ChevronRight className="size-4 text-ink-soft" />
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -1940,8 +1940,8 @@ function CalendarCard({
             onClick={onToggleRangeMode}
             className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition ${
               rangeMode
-                ? "border-[#FF5F63] bg-[#FFF0EF] text-[#FF5F63]"
-                : "border-[#E5E7EB] bg-white text-[#0B1220] hover:bg-[#FFFBF7]"
+                ? "border-brand bg-brand-tint-100 text-brand"
+                : "border-line-soft bg-surface-card text-ink-strong hover:bg-surface-page"
             }`}
             title={
               rangeMode
@@ -1955,7 +1955,7 @@ function CalendarCard({
           <button
             type="button"
             onClick={onPickToday}
-            className="text-[12px] font-bold text-[#FF5F63] hover:underline"
+            className="text-[12px] font-bold text-brand hover:underline"
           >
             Today
           </button>
@@ -1963,8 +1963,8 @@ function CalendarCard({
       </div>
 
       {rangeMode || rangeStart ? (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-[#FCC9C5] bg-[#FFF5F4] px-3 py-2 text-[11.5px] font-semibold text-[#7c2222]">
-          <CalendarRange className="size-3.5 text-[#FF5F63]" />
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-brand-tint-300 bg-danger-warm-tint px-3 py-2 text-[11.5px] font-semibold text-danger-brown">
+          <CalendarRange className="size-3.5 text-brand" />
           {rangeStart && !rangeEnd
             ? `Start: ${formatDateShort(rangeStart)} — click another day to pick the end`
             : rangeStart && rangeEnd
@@ -1977,7 +1977,7 @@ function CalendarCard({
         {SHORT_DAYS_MON_FIRST.map((d) => (
           <div
             key={d}
-            className="pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#9CA3AF]"
+            className="pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-ink-muted"
           >
             {d}
           </div>
@@ -2039,30 +2039,30 @@ function CalendarCard({
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEE7DF] pt-3">
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#6B7280]">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-cream pt-3">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-soft">
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#16A34A]" /> Bookable
+            <span className="size-2 rounded-full bg-success" /> Bookable
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#A855F7]" /> Has bookings
+            <span className="size-2 rounded-full bg-purple" /> Has bookings
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#DC2626]" /> Blocked
+            <span className="size-2 rounded-full bg-danger-strong" /> Blocked
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#9CA3AF]" /> Day off
+            <span className="size-2 rounded-full bg-ink-muted" /> Day off
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#3B82F6]" /> External event
+            <span className="size-2 rounded-full bg-info-bright" /> External event
           </span>
         </div>
         <button
           type="button"
           onClick={onApplyRange}
-          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#0B1220] hover:underline"
+          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-ink-strong hover:underline"
         >
-          <CalendarRange className="size-3.5 text-[#9CA3AF]" /> Apply to date
+          <CalendarRange className="size-3.5 text-ink-muted" /> Apply to date
           range
         </button>
       </div>
@@ -2096,7 +2096,7 @@ function CalendarCell({
   if (state === "outside") {
     return (
       <div className="relative aspect-square rounded-[10px] p-2">
-        <span className="text-[14px] font-bold leading-none text-[#D1D5DB]">
+        <span className="text-[14px] font-bold leading-none text-ink-faint">
           {date.getDate()}
         </span>
       </div>
@@ -2109,31 +2109,31 @@ function CalendarCell({
     "past" | "bookable" | "dayoff" | "blocked" | "fully",
     string
   > = {
-    past: "text-[#9CA3AF] cursor-default",
-    bookable: "bg-white hover:bg-[#FFFBF7] hover:border-[#FCC9C5]",
-    dayoff: "bg-[#FAFAF8] text-[#9CA3AF]",
-    blocked: "bg-[#FEF2F2]",
-    fully: "bg-[#F4EAFF]",
+    past: "text-ink-muted cursor-default",
+    bookable: "bg-surface-card hover:bg-surface-page hover:border-brand-tint-300",
+    dayoff: "bg-surface-cream text-ink-muted",
+    blocked: "bg-danger-tint",
+    fully: "bg-purple-tint",
   };
 
   const selectedClasses =
     selected || isRangeEdge
-      ? "!bg-gradient-to-br from-[#FF6267] to-[#FF8A4C] !border-transparent shadow-md text-white"
+      ? "!bg-gradient-to-br from-brand-coral to-brand-orange !border-transparent shadow-md text-white"
       : inRange
-        ? "!bg-[#FFE7E1] !border-[#FCC9C5]"
+        ? "!bg-danger-warm !border-brand-tint-300"
         : "";
 
   const todayClasses =
-    today && !selected && !isRangeEdge ? "ring-2 ring-inset ring-[#FF5F63]" : "";
+    today && !selected && !isRangeEdge ? "ring-2 ring-inset ring-brand" : "";
 
   const dotColor =
     state === "blocked"
-      ? "bg-[#DC2626]"
+      ? "bg-danger-strong"
       : state === "fully"
-        ? "bg-[#A855F7]"
+        ? "bg-purple"
         : state === "dayoff"
-          ? "bg-[#9CA3AF]"
-          : "bg-[#16A34A]";
+          ? "bg-ink-muted"
+          : "bg-success";
 
   const indicator =
     state === "blocked"
@@ -2161,14 +2161,14 @@ function CalendarCell({
           selected || isRangeEdge
             ? "text-white"
             : state === "blocked"
-              ? "text-[#B91C1C]"
+              ? "text-danger"
               : state === "fully"
-                ? "text-[#7C3AED]"
+                ? "text-purple-strong"
                 : state === "dayoff"
-                  ? "text-[#9CA3AF]"
+                  ? "text-ink-muted"
                   : state === "past"
-                    ? "text-[#9CA3AF]"
-                    : "text-[#0B1220]"
+                    ? "text-ink-muted"
+                    : "text-ink-strong"
         }`}
       >
         {date.getDate()}
@@ -2178,12 +2178,12 @@ function CalendarCell({
         <span className="absolute bottom-1.5 left-2 flex items-center gap-1">
           <span
             className={`size-1.5 rounded-full ${
-              selected ? "bg-white" : dotColor
+              selected ? "bg-surface-card" : dotColor
             }`}
           />
           <span
             className={`text-[10px] font-bold tabular-nums ${
-              selected ? "text-white" : "text-[#6B7280]"
+              selected ? "text-white" : "text-ink-soft"
             }`}
           >
             {indicator}
@@ -2199,7 +2199,7 @@ function CalendarCell({
           className={`absolute top-1.5 right-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ${
             selected || isRangeEdge
               ? "bg-white/30 text-white"
-              : "bg-[#DBEAFE] text-[#1D4ED8]"
+              : "bg-info-tint text-info"
           }`}
         >
           {externalCount}
@@ -2269,26 +2269,26 @@ function DayEditor({
   }
 
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-sm">
-      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-sm">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
         Selected day
       </p>
       <div className="mt-1 flex items-baseline justify-between gap-2">
         <h2 className="text-[20px] font-bold tabular-nums">{dateLabel}</h2>
-        <span className="text-[12px] text-[#6B7280] tabular-nums">{sub}</span>
+        <span className="text-[12px] text-ink-soft tabular-nums">{sub}</span>
       </div>
 
       {isPast ? (
-        <p className="mt-3 rounded-lg border border-[#EEE7DF] bg-[#FAFAF8] px-3 py-2 text-[12px] text-[#9CA3AF]">
+        <p className="mt-3 rounded-lg border border-line-cream bg-surface-cream px-3 py-2 text-[12px] text-ink-muted">
           You can&apos;t edit availability in the past.
         </p>
       ) : (
         <>
           <div className="mt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
               Status
             </p>
-            <div className="mt-1.5 inline-flex w-full rounded-[10px] border border-[#E5E7EB] bg-[#FFFBF7] p-[3px] gap-[2px]">
+            <div className="mt-1.5 inline-flex w-full rounded-[10px] border border-line-soft bg-surface-page p-[3px] gap-[2px]">
               <SegButton on={draft.status === "available"} onClick={() => onStatus("available")}>
                 Available
               </SegButton>
@@ -2304,20 +2304,20 @@ function DayEditor({
           {draft.status === "available" ? (
             <div className="mt-4">
               <div className="flex items-baseline justify-between">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
                   Bookable hours
                 </p>
                 <button
                   type="button"
                   onClick={onReset}
-                  className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+                  className="text-[11px] font-bold text-brand hover:underline"
                 >
                   Reset to default
                 </button>
               </div>
               <div className="mt-2 space-y-2">
                 {draft.blocks.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+                  <p className="rounded-lg border border-dashed border-line-cream bg-surface-page px-3 py-3 text-center text-[12px] text-ink-muted">
                     No bookable hours yet.
                   </p>
                 ) : null}
@@ -2333,7 +2333,7 @@ function DayEditor({
               <button
                 type="button"
                 onClick={onAddBlock}
-                className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#FCC9C5] bg-[#FFF7F5] px-3 text-[12px] font-bold text-[#FF5F63] hover:bg-[#FFF0EF]"
+                className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand-tint-300 bg-brand-tint-50 px-3 text-[12px] font-bold text-brand hover:bg-brand-tint-100"
               >
                 <Plus className="size-3.5" /> Add time block
               </button>
@@ -2341,26 +2341,26 @@ function DayEditor({
           ) : null}
 
           {draft.status === "dayoff" ? (
-            <div className="mt-4 rounded-xl border border-[#EEE7DF] bg-[#FAFAF8] p-4 text-center">
-              <p className="text-[13px] font-bold text-[#6B7280]">
+            <div className="mt-4 rounded-xl border border-line-cream bg-surface-cream p-4 text-center">
+              <p className="text-[13px] font-bold text-ink-soft">
                 No bookings on this day
               </p>
-              <p className="mt-1 text-[11px] text-[#9CA3AF]">
+              <p className="mt-1 text-[11px] text-ink-muted">
                 Guests will see this date as unavailable.
               </p>
             </div>
           ) : null}
 
           {draft.status === "blocked" ? (
-            <div className="mt-4 rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-4">
-              <p className="text-center text-[13px] font-bold text-[#B91C1C]">
+            <div className="mt-4 rounded-xl border border-danger-border bg-danger-tint p-4">
+              <p className="text-center text-[13px] font-bold text-danger">
                 Blocked
               </p>
-              <p className="mt-1 text-center text-[11px] text-[#7F1D1D]">
+              <p className="mt-1 text-center text-[11px] text-danger-deep">
                 Hidden from your public booking page.
               </p>
               <label className="mt-3 block text-left">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#7F1D1D]">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-danger-deep">
                   Reason (optional)
                 </span>
                 <input
@@ -2369,7 +2369,7 @@ function DayEditor({
                   onChange={(e) => onNote(e.target.value)}
                   maxLength={120}
                   placeholder="e.g. Annual leave"
-                  className="mt-1.5 block h-9 w-full rounded-lg border border-[#FECACA] bg-white px-3 text-[12px] outline-none focus:border-[#B91C1C] focus:shadow-[0_0_0_4px_rgba(220,38,38,0.15)]"
+                  className="mt-1.5 block h-9 w-full rounded-lg border border-danger-border bg-surface-card px-3 text-[12px] outline-none focus:border-danger focus:shadow-[0_0_0_4px_rgba(220,38,38,0.15)]"
                 />
               </label>
             </div>
@@ -2378,18 +2378,18 @@ function DayEditor({
       )}
 
       {/* Combined Bookvella + external calendar events on this day */}
-      <div className="mt-5 border-t border-[#EEE7DF] pt-4">
+      <div className="mt-5 border-t border-line-cream pt-4">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
             Calendar events
           </p>
           {busyEventsLoading ? (
-            <span className="text-[10px] text-[#9CA3AF]">Syncing…</span>
+            <span className="text-[10px] text-ink-muted">Syncing…</span>
           ) : null}
         </div>
         <div className="mt-2 space-y-2">
           {bookings.length === 0 && busyEvents.length === 0 ? (
-            <p className="rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+            <p className="rounded-lg border border-line-cream bg-surface-page px-3 py-3 text-center text-[12px] text-ink-muted">
               {busyEventsLoading
                 ? "Loading external events…"
                 : "Nothing scheduled on this date."}
@@ -2457,20 +2457,20 @@ function ExternalEventRow({
 
   return (
     <div
-      className={`rounded-lg border bg-white p-2.5 transition ${
+      className={`rounded-lg border bg-surface-card p-2.5 transition ${
         ignored
-          ? "border-dashed border-[#E5E7EB] bg-[#FAFAF8]"
-          : "border-[#EEE7DF]"
+          ? "border-dashed border-line-soft bg-surface-cream"
+          : "border-line-cream"
       }`}
     >
       <div className="flex items-center gap-3">
         <span
           className={`size-2 rounded-full ${ignored ? "opacity-40" : ""}`}
-          style={{ background: event.calendarColor ?? "#6B7280" }}
+          style={{ background: event.calendarColor ?? "var(--color-ink-soft)" }}
         />
         <span
           className={`w-24 text-[11px] font-bold tabular-nums ${
-            ignored ? "text-[#9CA3AF] line-through" : "text-[#6B7280]"
+            ignored ? "text-ink-muted line-through" : "text-ink-soft"
           }`}
         >
           {timeLabel}
@@ -2478,16 +2478,16 @@ function ExternalEventRow({
         <div className="min-w-0 flex-1 leading-tight">
           <p
             className={`truncate text-[12px] font-bold ${
-              ignored ? "text-[#9CA3AF] line-through" : "text-[#0B1220]"
+              ignored ? "text-ink-muted line-through" : "text-ink-strong"
             }`}
           >
             {ignored ? "Available (ignored)" : "Busy"}
           </p>
-          <p className="truncate text-[10px] text-[#6B7280]">
+          <p className="truncate text-[10px] text-ink-soft">
             {providerLabel} · {calendarLabel}
           </p>
         </div>
-        <span className="rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[9px] font-bold text-[#374151]">
+        <span className="rounded-full bg-line-subtle px-1.5 py-0.5 text-[9px] font-bold text-ink-body">
           External
         </span>
         <button
@@ -2503,10 +2503,10 @@ function ExternalEventRow({
               ? "Treat as busy again"
               : "I'm actually available during this event"
           }
-          className={`inline-flex size-6 items-center justify-center rounded-md border text-[#6B7280] transition hover:text-[#0B1220] ${
+          className={`inline-flex size-6 items-center justify-center rounded-md border text-ink-soft transition hover:text-ink-strong ${
             ignored
-              ? "border-[#10B981] bg-[#ECFDF5] text-[#047857] hover:bg-[#D1FAE5]"
-              : "border-[#E5E7EB] bg-white hover:border-[#FCC9C5] hover:bg-[#FFF7F5]"
+              ? "border-success-bright bg-success-tint text-success-strong hover:bg-success-tint-strong"
+              : "border-line-soft bg-surface-card hover:border-brand-tint-300 hover:bg-brand-tint-50"
           }`}
         >
           {ignored ? (
@@ -2517,13 +2517,13 @@ function ExternalEventRow({
         </button>
       </div>
       {ignored ? (
-        <p className="mt-2 border-t border-dashed border-[#E5E7EB] pt-2 text-[10.5px] italic text-[#6B7280]">
+        <p className="mt-2 border-t border-dashed border-line-soft pt-2 text-[10.5px] italic text-ink-soft">
           This event won&apos;t block bookings. Click the arrow above to treat
           it as busy again.
         </p>
       ) : (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#F3F4F6] pt-2">
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-subtle pt-2">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-muted">
             Block also
           </span>
           <BufferStepper
@@ -2541,7 +2541,7 @@ function ExternalEventRow({
             onCommit={onCommit}
           />
           {saving ? (
-            <span className="text-[10px] text-[#9CA3AF]">Saving…</span>
+            <span className="text-[10px] text-ink-muted">Saving…</span>
           ) : null}
         </div>
       )}
@@ -2579,7 +2579,7 @@ function BufferStepper({
   return (
     <div className="inline-flex items-center gap-1.5">
       <div
-        className={`inline-flex h-8 items-stretch overflow-hidden rounded-md border border-[#E5E7EB] bg-white ${
+        className={`inline-flex h-8 items-stretch overflow-hidden rounded-md border border-line-soft bg-surface-card ${
           disabled ? "opacity-60" : ""
         }`}
       >
@@ -2589,7 +2589,7 @@ function BufferStepper({
           aria-label={`Decrease ${label}`}
           disabled={disabled || value <= 0}
           onClick={() => bump(-step)}
-          className="flex w-6 items-center justify-center text-[14px] font-bold text-[#6B7280] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
+          className="flex w-6 items-center justify-center text-[14px] font-bold text-ink-soft hover:bg-surface-soft disabled:cursor-not-allowed disabled:text-ink-faint"
         >
           −
         </button>
@@ -2607,7 +2607,7 @@ function BufferStepper({
             if (Number.isFinite(next)) onChange(clamp(next));
           }}
           onBlur={onCommit}
-          className="w-10 border-x border-[#E5E7EB] bg-white text-center text-[11px] font-bold tabular-nums text-[#0B1220] outline-none focus:bg-[#FFFBF7] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="w-10 border-x border-line-soft bg-surface-card text-center text-[11px] font-bold tabular-nums text-ink-strong outline-none focus:bg-surface-page [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <button
           type="button"
@@ -2615,12 +2615,12 @@ function BufferStepper({
           aria-label={`Increase ${label}`}
           disabled={disabled || value >= max}
           onClick={() => bump(step)}
-          className="flex w-6 items-center justify-center text-[14px] font-bold text-[#6B7280] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
+          className="flex w-6 items-center justify-center text-[14px] font-bold text-ink-soft hover:bg-surface-soft disabled:cursor-not-allowed disabled:text-ink-faint"
         >
           +
         </button>
       </div>
-      <span className="text-[10px] text-[#6B7280]">{label}</span>
+      <span className="text-[10px] text-ink-soft">{label}</span>
     </div>
   );
 }
@@ -2687,15 +2687,15 @@ function RangeEditor({
   }
 
   return (
-    <div className="rounded-2xl border border-[#FCC9C5] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-brand-tint-300 bg-surface-card p-5 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#FF5F63]">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-brand">
           Selected range
         </p>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md p-1 text-[#9CA3AF] hover:bg-[#FFF6F0] hover:text-[#0B1220]"
+          className="rounded-md p-1 text-ink-muted hover:bg-surface-blush hover:text-ink-strong"
           aria-label="Cancel range selection"
         >
           <X className="size-4" />
@@ -2705,16 +2705,16 @@ function RangeEditor({
         <h2 className="text-[18px] font-bold tabular-nums">
           {formatRangeLabel(start, end)}
         </h2>
-        <span className="text-[12px] text-[#6B7280] tabular-nums">
+        <span className="text-[12px] text-ink-soft tabular-nums">
           {dayCount} day{dayCount === 1 ? "" : "s"}
         </span>
       </div>
 
       <div className="mt-4">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
           What should happen on these dates?
         </p>
-        <div className="mt-1.5 inline-flex w-full rounded-[10px] border border-[#E5E7EB] bg-[#FFFBF7] p-[3px] gap-[2px]">
+        <div className="mt-1.5 inline-flex w-full rounded-[10px] border border-line-soft bg-surface-page p-[3px] gap-[2px]">
           <SegButton
             on={draft.type === "BLOCKED"}
             onClick={() => setStatus("BLOCKED")}
@@ -2728,7 +2728,7 @@ function RangeEditor({
             Custom hours
           </SegButton>
         </div>
-        <p className="mt-2 text-[11.5px] text-[#6B7280]">
+        <p className="mt-2 text-[11.5px] text-ink-soft">
           {isBlocked
             ? "Guests can't book any of these dates."
             : "Replace the weekly schedule with these time blocks on every day in the range."}
@@ -2738,20 +2738,20 @@ function RangeEditor({
       {!isBlocked ? (
         <div className="mt-4">
           <div className="flex items-baseline justify-between">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
               Bookable hours
             </p>
             <button
               type="button"
               onClick={addBlock}
-              className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+              className="text-[11px] font-bold text-brand hover:underline"
             >
               + Add block
             </button>
           </div>
           <div className="mt-2 space-y-2">
             {draft.blocks.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+              <p className="rounded-lg border border-dashed border-line-cream bg-surface-page px-3 py-3 text-center text-[12px] text-ink-muted">
                 Add at least one time block.
               </p>
             ) : null}
@@ -2769,14 +2769,14 @@ function RangeEditor({
 
       <div className="mt-4">
         <label className="block">
-          <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
             Reason {isBlocked ? "(optional)" : "(optional, shown to you only)"}
           </span>
           <input
             value={draft.note}
             onChange={(event) => onChange({ ...draft, note: event.target.value })}
             placeholder={isBlocked ? "Vacation, holiday, sick day…" : "Extended summer hours…"}
-            className="mt-1.5 h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="mt-1.5 h-10 w-full rounded-lg border border-line-soft bg-surface-card px-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           />
         </label>
       </div>
@@ -2786,7 +2786,7 @@ function RangeEditor({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
         >
           {saving
             ? "Saving…"
@@ -2798,7 +2798,7 @@ function RangeEditor({
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#FFFBF7] disabled:opacity-60"
+          className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-page disabled:opacity-60"
         >
           Cancel
         </button>
@@ -2859,14 +2859,14 @@ function TimePartsInput({
   }
 
   const wrapperClass = compact
-    ? "inline-flex h-7 items-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-1"
-    : "inline-flex h-9 items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-white px-1.5";
+    ? "inline-flex h-7 items-center gap-1 rounded-md border border-line-soft bg-surface-card px-1"
+    : "inline-flex h-9 items-center gap-1.5 rounded-md border border-line-soft bg-surface-card px-1.5";
   const inputClass = compact
-    ? "h-5 w-[28px] rounded border border-transparent bg-[#FFFBF7] px-0.5 text-center text-[11px] font-bold tabular-nums outline-none focus:border-[#FF5F63] focus:bg-white"
-    : "h-7 w-[36px] rounded border border-transparent bg-[#FFFBF7] px-1 text-center text-[12px] font-semibold tabular-nums outline-none focus:border-[#FF5F63] focus:bg-white";
+    ? "h-5 w-[28px] rounded border border-transparent bg-surface-page px-0.5 text-center text-[11px] font-bold tabular-nums outline-none focus:border-brand focus:bg-surface-card"
+    : "h-7 w-[36px] rounded border border-transparent bg-surface-page px-1 text-center text-[12px] font-semibold tabular-nums outline-none focus:border-brand focus:bg-surface-card";
   const unitClass = compact
-    ? "text-[10px] font-bold text-[#9CA3AF]"
-    : "text-[11px] font-bold text-[#9CA3AF]";
+    ? "text-[10px] font-bold text-ink-muted"
+    : "text-[11px] font-bold text-ink-muted";
 
   return (
     <div className={wrapperClass} onBlur={handleBlur}>
@@ -2957,14 +2957,14 @@ function BlockRow({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-2.5 py-2">
+    <div className="flex items-center gap-2 rounded-lg border border-line-cream bg-surface-page px-2.5 py-2">
       <TimePartsInput
         key={`start-${block.start}`}
         value={block.start}
         ariaLabel="Start time"
         onCommit={commitStart}
       />
-      <span className="text-[#9CA3AF]">—</span>
+      <span className="text-ink-muted">—</span>
       <TimePartsInput
         key={`end-${block.end}`}
         value={block.end}
@@ -2975,7 +2975,7 @@ function BlockRow({
         type="button"
         onClick={onRemove}
         aria-label="Remove time block"
-        className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-white hover:text-[#B91C1C]"
+        className="ml-auto rounded-md p-1.5 text-ink-muted hover:bg-surface-card hover:text-danger"
       >
         <X className="size-3.5" />
       </button>
@@ -2991,17 +2991,17 @@ function BookingRow({ booking }: { booking: HostBooking }) {
     hour12: false,
   });
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] p-2.5">
-      <span className="w-12 text-[11px] font-bold tabular-nums text-[#A855F7]">
+    <div className="flex items-center gap-3 rounded-lg border border-line-cream bg-surface-page p-2.5">
+      <span className="w-12 text-[11px] font-bold tabular-nums text-purple">
         {timeLabel}
       </span>
       <div className="min-w-0 flex-1 leading-tight">
         <p className="truncate text-[12px] font-bold">{booking.guestName}</p>
-        <p className="text-[10px] text-[#6B7280]">
+        <p className="text-[10px] text-ink-soft">
           {booking.eventType.title} · {booking.eventType.durationMinutes} min
         </p>
       </div>
-      <span className="rounded-full bg-[#E6F4EA] px-1.5 py-0.5 text-[9px] font-bold text-[#16A34A]">
+      <span className="rounded-full bg-success-mint px-1.5 py-0.5 text-[9px] font-bold text-success">
         Confirmed
       </span>
     </div>
@@ -3020,7 +3020,7 @@ function ServiceFilterSegmented({
   // No services yet — show a quiet placeholder instead of an empty seg control.
   if (eventTypes.length === 0) {
     return (
-      <span className="inline-flex h-9 items-center rounded-[10px] border border-dashed border-[#EEE7DF] bg-white px-3 text-[12px] font-bold text-[#9CA3AF]">
+      <span className="inline-flex h-9 items-center rounded-[10px] border border-dashed border-line-cream bg-surface-card px-3 text-[12px] font-bold text-ink-muted">
         No services yet
       </span>
     );
@@ -3031,7 +3031,7 @@ function ServiceFilterSegmented({
   const visibleServices = eventTypes.filter((service) => service.isActive);
 
   return (
-    <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] border border-[#E5E7EB] bg-[#FFFBF7] p-[3px] gap-[2px]">
+    <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] border border-line-soft bg-surface-page p-[3px] gap-[2px]">
       <ServiceSegmentedButton
         on={activeServiceId === null}
         onClick={() => onPick(null)}
@@ -3067,8 +3067,8 @@ function ServiceSegmentedButton({
       className={[
         "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
         on
-          ? "bg-white text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
-          : "text-[#6B7280] hover:text-[#0B1220]",
+          ? "bg-surface-card text-ink-strong shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+          : "text-ink-soft hover:text-ink-strong",
       ].join(" ")}
     >
       {children}
@@ -3092,8 +3092,8 @@ function SegButton({
       className={[
         "flex-1 rounded-md px-3 py-1.5 text-[12px] font-bold transition",
         on
-          ? "bg-white text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
-          : "text-[#6B7280] hover:text-[#0B1220]",
+          ? "bg-surface-card text-ink-strong shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+          : "text-ink-soft hover:text-ink-strong",
       ].join(" ")}
     >
       {children}
@@ -3117,8 +3117,8 @@ function TabButton({
       className={[
         "py-2.5 text-[13px] font-bold border-b-2",
         on
-          ? "text-[#FF5F63] border-[#FF5F63]"
-          : "text-[#9CA3AF] border-transparent hover:text-[#0B1220]",
+          ? "text-brand border-brand"
+          : "text-ink-muted border-transparent hover:text-ink-strong",
       ].join(" ")}
     >
       {children}
@@ -3159,26 +3159,26 @@ function WeeklyTab({
   return (
     <div className="p-5">
       {serviceTitle && serviceMode ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-cream bg-surface-page p-3.5">
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-bold text-[#0B1220]">
+            <p className="truncate text-[13px] font-bold text-ink-strong">
               {serviceTitle}
             </p>
-            <p className="mt-0.5 text-[11px] text-[#6B7280]">
+            <p className="mt-0.5 text-[11px] text-ink-soft">
               {serviceMode === "HOST_DEFAULT"
                 ? "Inherits your default weekly hours."
                 : "Uses custom weekly hours for this service."}
             </p>
           </div>
-          <div className="inline-flex rounded-[10px] border border-[#E5E7EB] bg-white p-[3px] gap-[2px]">
+          <div className="inline-flex rounded-[10px] border border-line-soft bg-surface-card p-[3px] gap-[2px]">
             <button
               type="button"
               onClick={() => onServiceModeChange("HOST_DEFAULT")}
               className={[
                 "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
                 serviceMode === "HOST_DEFAULT"
-                  ? "bg-[#FFFBF7] text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
-                  : "text-[#6B7280] hover:text-[#0B1220]",
+                  ? "bg-surface-page text-ink-strong shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+                  : "text-ink-soft hover:text-ink-strong",
               ].join(" ")}
             >
               Use default
@@ -3189,8 +3189,8 @@ function WeeklyTab({
               className={[
                 "whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-bold transition",
                 serviceMode === "CUSTOM"
-                  ? "bg-[#FFFBF7] text-[#0B1220] shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
-                  : "text-[#6B7280] hover:text-[#0B1220]",
+                  ? "bg-surface-page text-ink-strong shadow-[0_1px_2px_rgba(17,24,39,0.08)]"
+                  : "text-ink-soft hover:text-ink-strong",
               ].join(" ")}
             >
               Custom hours
@@ -3198,12 +3198,12 @@ function WeeklyTab({
           </div>
         </div>
       ) : (
-        <p className="text-[12px] text-[#6B7280]">
+        <p className="text-[12px] text-ink-soft">
           Used as the starting point for every new date. Changes don&apos;t affect
           dates you&apos;ve already edited.
         </p>
       )}
-      <div className="mt-4 divide-y divide-[#EEE7DF] rounded-xl border border-[#EEE7DF]">
+      <div className="mt-4 divide-y divide-line-cream rounded-xl border border-line-cream">
         {ordered.map((day) => (
           <WeeklyDayRow
             key={day.dayIndex}
@@ -3215,9 +3215,9 @@ function WeeklyTab({
           />
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-between text-[11px] text-[#9CA3AF]">
+      <div className="mt-3 flex items-center justify-between text-[11px] text-ink-muted">
         <span>
-          <span className="font-bold tabular-nums text-[#0B1220]">
+          <span className="font-bold tabular-nums text-ink-strong">
             {weekTotal.toFixed(1).replace(/\.0$/, "")}
           </span>{" "}
           hours bookable per week
@@ -3225,9 +3225,9 @@ function WeeklyTab({
         <button
           type="button"
           onClick={onCopyMonday}
-          className="inline-flex items-center gap-1 text-[12px] font-bold text-[#0B1220] hover:underline"
+          className="inline-flex items-center gap-1 text-[12px] font-bold text-ink-strong hover:underline"
         >
-          <Copy className="size-3 text-[#9CA3AF]" /> Copy Monday to all weekdays
+          <Copy className="size-3 text-ink-muted" /> Copy Monday to all weekdays
         </button>
       </div>
     </div>
@@ -3252,7 +3252,7 @@ function WeeklyDayRow({
       <div className="flex items-center gap-2.5">
         <Switch on={day.enabled} onClick={onToggle} />
         <span
-          className={`text-[13px] font-bold ${day.enabled ? "text-[#0B1220]" : "text-[#9CA3AF]"}`}
+          className={`text-[13px] font-bold ${day.enabled ? "text-ink-strong" : "text-ink-muted"}`}
         >
           {day.label}
         </span>
@@ -3271,13 +3271,13 @@ function WeeklyDayRow({
             <button
               type="button"
               onClick={onAddBlock}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-[#FCC9C5] bg-[#FFF7F5] px-2 text-[11px] font-bold text-[#FF5F63] hover:bg-[#FFF0EF]"
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-brand-tint-300 bg-brand-tint-50 px-2 text-[11px] font-bold text-brand hover:bg-brand-tint-100"
             >
               <Plus className="size-3" /> Add range
             </button>
           </>
         ) : (
-          <span className="text-[12px] italic text-[#9CA3AF]">Day off</span>
+          <span className="text-[12px] italic text-ink-muted">Day off</span>
         )}
       </div>
     </div>
@@ -3312,7 +3312,7 @@ function WeeklyBlockChip({
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-2 py-1">
+    <div className="flex items-center gap-1.5 rounded-lg border border-line-cream bg-surface-page px-2 py-1">
       <TimePartsInput
         key={`start-${block.start}`}
         value={block.start}
@@ -3320,7 +3320,7 @@ function WeeklyBlockChip({
         compact
         onCommit={commitStart}
       />
-      <span className="text-[#9CA3AF]">–</span>
+      <span className="text-ink-muted">–</span>
       <TimePartsInput
         key={`end-${block.end}`}
         value={block.end}
@@ -3332,7 +3332,7 @@ function WeeklyBlockChip({
         type="button"
         onClick={onRemove}
         aria-label="Remove range"
-        className="rounded-md p-1 text-[#9CA3AF] hover:text-[#B91C1C]"
+        className="rounded-md p-1 text-ink-muted hover:text-danger"
       >
         <X className="size-3" />
       </button>
@@ -3360,11 +3360,11 @@ function Switch({
       onClick={onClick}
       aria-pressed={on}
       className={`relative ${w} ${h} shrink-0 rounded-full transition ${
-        on ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]" : "bg-[#E5E7EB]"
+        on ? "bg-gradient-to-r from-brand-coral to-brand-orange" : "bg-line-soft"
       }`}
     >
       <span
-        className={`absolute top-[2px] ${knob} rounded-full bg-white shadow-sm transition-all ${
+        className={`absolute top-[2px] ${knob} rounded-full bg-surface-card shadow-sm transition-all ${
           on ? onPos : off
         }`}
       />
@@ -3417,14 +3417,14 @@ function ExceptionsTab({
   return (
     <div className="p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[12px] text-[#6B7280]">
+        <p className="text-[12px] text-ink-soft">
           Block off vacations or open extra days {scopeLabel}.
         </p>
         {!editor ? (
           <button
             type="button"
             onClick={onStartAdd}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[12px] font-bold text-[#0B1220] hover:bg-[#FFFBF7]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-soft bg-surface-card px-2.5 text-[12px] font-bold text-ink-strong hover:bg-surface-page"
           >
             <Plus className="size-3.5" /> Add
           </button>
@@ -3442,7 +3442,7 @@ function ExceptionsTab({
 
       <div className="mt-4 space-y-2">
         {groups.length === 0 && !editor ? (
-          <p className="rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-4 py-6 text-center text-[12px] text-[#9CA3AF]">
+          <p className="rounded-xl border border-dashed border-line-cream bg-surface-page px-4 py-6 text-center text-[12px] text-ink-muted">
             No exceptions yet.
           </p>
         ) : null}
@@ -3469,10 +3469,10 @@ function ExceptionEditor({
   const isBlocked = draft.type === "BLOCKED";
 
   return (
-    <div className="mt-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+    <div className="mt-3 rounded-xl border border-line-cream bg-surface-page p-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
             Type
           </span>
           <select
@@ -3483,14 +3483,14 @@ function ExceptionEditor({
                 type: e.target.value as AvailabilityOverrideType,
               })
             }
-            className="mt-1.5 h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="mt-1.5 h-9 w-full rounded-lg border border-line-soft bg-surface-card px-2 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           >
             <option value="BLOCKED">Blocked (vacation, holiday)</option>
             <option value="CUSTOM_HOURS">Extra opening / custom hours</option>
           </select>
         </label>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
             Start date
           </span>
           <input
@@ -3498,11 +3498,11 @@ function ExceptionEditor({
             value={draft.startDate}
             min={dateKey(new Date())}
             onChange={(e) => onChange({ ...draft, startDate: e.target.value })}
-            className="mt-1.5 h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="mt-1.5 h-9 w-full rounded-lg border border-line-soft bg-surface-card px-2 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
             End date (optional)
           </span>
           <input
@@ -3510,13 +3510,13 @@ function ExceptionEditor({
             value={draft.endDate}
             min={draft.startDate || dateKey(new Date())}
             onChange={(e) => onChange({ ...draft, endDate: e.target.value })}
-            className="mt-1.5 h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="mt-1.5 h-9 w-full rounded-lg border border-line-soft bg-surface-card px-2 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           />
         </label>
       </div>
 
       <label className="mt-3 block">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
           Note (optional)
         </span>
         <input
@@ -3525,13 +3525,13 @@ function ExceptionEditor({
           maxLength={120}
           onChange={(e) => onChange({ ...draft, note: e.target.value })}
           placeholder={isBlocked ? "e.g. Annual leave" : "e.g. Pop-up market"}
-          className="mt-1.5 h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+          className="mt-1.5 h-9 w-full rounded-lg border border-line-soft bg-surface-card px-2 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
         />
       </label>
 
       {!isBlocked ? (
         <div className="mt-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
             Time blocks
           </p>
           <div className="mt-1.5 space-y-2">
@@ -3569,7 +3569,7 @@ function ExceptionEditor({
                 ],
               });
             }}
-            className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-[#FCC9C5] bg-[#FFF7F5] px-3 text-[12px] font-bold text-[#FF5F63] hover:bg-[#FFF0EF]"
+            className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-brand-tint-300 bg-brand-tint-50 px-3 text-[12px] font-bold text-brand hover:bg-brand-tint-100"
           >
             <Plus className="size-3.5" /> Add time block
           </button>
@@ -3580,14 +3580,14 @@ function ExceptionEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex h-9 items-center rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          className="inline-flex h-9 items-center rounded-lg border border-line-soft bg-surface-card px-3 text-[12px] font-bold text-ink-strong hover:bg-surface-soft"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={onSave}
-          className="inline-flex h-9 items-center rounded-lg bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[12px] font-bold text-white shadow-sm hover:brightness-105"
+          className="inline-flex h-9 items-center rounded-lg bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[12px] font-bold text-white shadow-sm hover:brightness-105"
         >
           Save exception
         </button>
@@ -3605,23 +3605,23 @@ function ExceptionRow({
 }) {
   if (group.type === "BLOCKED") {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[#B91C1C]">
-          <span className="size-1.5 rounded-full bg-[#DC2626]" /> Blocked
+      <div className="flex items-center gap-3 rounded-xl border border-danger-border bg-danger-tint px-4 py-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-card px-2 py-0.5 text-[10px] font-bold text-danger">
+          <span className="size-1.5 rounded-full bg-danger-strong" /> Blocked
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold tabular-nums">
             {formatRangeLabel(group.start, group.end)}
           </p>
           {group.note ? (
-            <p className="text-[11px] text-[#6B7280]">{group.note}</p>
+            <p className="text-[11px] text-ink-soft">{group.note}</p>
           ) : null}
         </div>
         <button
           type="button"
           onClick={onDelete}
           aria-label="Remove exception"
-          className="rounded-md p-1.5 text-[#9CA3AF] hover:bg-white hover:text-[#B91C1C]"
+          className="rounded-md p-1.5 text-ink-muted hover:bg-surface-card hover:text-danger"
         >
           <X className="size-3.5" />
         </button>
@@ -3634,9 +3634,9 @@ function ExceptionRow({
     .join(", ");
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[#065F46]">
-        <span className="size-1.5 rounded-full bg-[#10B981]" /> Extra opening
+    <div className="flex items-center gap-3 rounded-xl border border-success-border bg-success-tint px-4 py-3">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-card px-2 py-0.5 text-[10px] font-bold text-success-deep">
+        <span className="size-1.5 rounded-full bg-success-bright" /> Extra opening
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-bold tabular-nums">
@@ -3644,14 +3644,14 @@ function ExceptionRow({
           {blocksLabel ? ` · ${blocksLabel}` : ""}
         </p>
         {group.note ? (
-          <p className="text-[11px] text-[#6B7280]">{group.note}</p>
+          <p className="text-[11px] text-ink-soft">{group.note}</p>
         ) : null}
       </div>
       <button
         type="button"
         onClick={onDelete}
         aria-label="Remove exception"
-        className="rounded-md p-1.5 text-[#9CA3AF] hover:bg-white hover:text-[#B91C1C]"
+        className="rounded-md p-1.5 text-ink-muted hover:bg-surface-card hover:text-danger"
       >
         <X className="size-3.5" />
       </button>
@@ -3673,7 +3673,7 @@ function RulesTab({
 }) {
   return (
     <div className="p-5">
-      <p className="text-[12px] text-[#6B7280]">
+      <p className="text-[12px] text-ink-soft">
         Limits that apply to every service. Override per-service in the service
         editor.
       </p>
@@ -3727,12 +3727,12 @@ function RulesTab({
           }
         />
       </div>
-      <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3.5">
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-line-cream bg-surface-page p-3.5">
         <div className="min-w-0">
           <p className="text-[13px] font-bold">
             Show buffer time on the public page
           </p>
-          <p className="mt-0.5 text-[11px] text-[#6B7280]">
+          <p className="mt-0.5 text-[11px] text-ink-soft">
             Off: slots stay tight. On: guests see your cleanup gaps as real time.
           </p>
         </div>
@@ -3761,13 +3761,13 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+        className="mt-1.5 h-10 w-full rounded-lg border border-line-soft bg-surface-card px-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -3775,7 +3775,7 @@ function SelectField({
           </option>
         ))}
       </select>
-      <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{hint}</p>
+      <p className="mt-1.5 text-[11px] text-ink-muted">{hint}</p>
     </label>
   );
 }

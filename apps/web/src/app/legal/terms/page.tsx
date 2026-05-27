@@ -19,25 +19,25 @@ export default function TermsPage() {
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         <SummaryCard
           icon={<GraduationCap className="size-5" />}
-          tint="bg-[#EFF6FF] text-[#2563EB]"
+          tint="bg-info-tint text-info"
           title="Student portfolio project"
           text="Bookvella is public so the product can be reviewed, tested, and demonstrated."
         />
         <SummaryCard
           icon={<Handshake className="size-5" />}
-          tint="bg-[#F4EAFF] text-[#7C3AED]"
+          tint="bg-purple-tint text-purple-strong"
           title="Hosts are independent"
           text="If a host offers a real service, the service relationship is between host and guest."
         />
         <SummaryCard
           icon={<Banknote className="size-5" />}
-          tint="bg-[#E0F7EF] text-[#0D9488]"
+          tint="bg-success-tint-soft text-success-teal"
           title="No payments"
           text="Bookvella does not process payments, charge commissions, or sell subscriptions."
         />
         <SummaryCard
           icon={<Shield className="size-5" />}
-          tint="bg-[#FEF3C7] text-[#B45309]"
+          tint="bg-warning-tint text-warning"
           title="Use it responsibly"
           text="Do not upload illegal content, spam people, or submit fake bookings or reviews."
         />
@@ -176,7 +176,7 @@ export default function TermsPage() {
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
         </p>
 
-        <p className="mt-12 text-[12px] text-[#9CA3AF]">
+        <p className="mt-12 text-[12px] text-ink-muted">
           Version 1.1. Last updated May 26, 2026. Effective May 26, 2026.
         </p>
       </LegalProse>
@@ -196,13 +196,13 @@ function SummaryCard({
   text: string;
 }) {
   return (
-    <div className="flex gap-3.5 rounded-2xl border border-[#EEE7DF] bg-white p-4">
+    <div className="flex gap-3.5 rounded-2xl border border-line-cream bg-surface-card p-4">
       <div className={`grid size-10 shrink-0 place-items-center rounded-xl ${tint}`}>
         {icon}
       </div>
       <div>
         <p className="text-[13.5px] font-bold">{title}</p>
-        <p className="mt-1 text-[12.5px] leading-snug text-[#6B7280]">{text}</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-ink-soft">{text}</p>
       </div>
     </div>
   );

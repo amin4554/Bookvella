@@ -57,7 +57,7 @@ export function BrandLogo({
       />
       <span
         className={`font-bold tracking-tight ${
-          inverse ? "text-white" : "text-[#0B1220]"
+          inverse ? "text-white" : "text-ink-strong"
         }`}
         style={{ fontSize: wordPx * 0.62, letterSpacing: "-0.02em" }}
       >

@@ -35,7 +35,7 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
     >
       <Link
         href={`/${host.slug}`}
-        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-ink-soft hover:text-ink-strong"
       >
         <ArrowLeft className="size-3.5" />
         {host.name.split(/\s+/)[0]}&apos;s profile
@@ -52,7 +52,7 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
       >
         {!eventType.imageUrl ? (
           <div className="absolute inset-0 grid place-items-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-white/70 text-[#FF5F63] backdrop-blur">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-card/70 text-brand backdrop-blur">
               <Scissors className="size-6" />
             </span>
           </div>
@@ -69,25 +69,25 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             {eventType.title}
           </h1>
           {priceLabel ? (
-            <p className="text-[20px] font-bold text-[#FF5F63]">
+            <p className="text-[20px] font-bold text-brand">
               {priceLabel}
             </p>
           ) : null}
         </div>
         {eventType.category ? (
-          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#E8DED7] bg-white px-2.5 py-1 text-[11.5px] font-semibold text-[#374151]">
-            <Tag className="size-3.5 text-[#9CA3AF]" />
+          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line-warm bg-surface-card px-2.5 py-1 text-[11.5px] font-semibold text-ink-body">
+            <Tag className="size-3.5 text-ink-muted" />
             {eventType.category}
           </span>
         ) : null}
         {eventType.description ? (
-          <p className="mt-3 text-[13.5px] leading-[1.6] text-[#374151]">
+          <p className="mt-3 text-[13.5px] leading-[1.6] text-ink-body">
             {eventType.description}
           </p>
         ) : null}
         <ul className="mt-4 space-y-2 text-[13px]">
           <li className="flex items-center gap-2.5">
-            <Clock className="size-4 text-[#FF5F63]" />
+            <Clock className="size-4 text-brand" />
             <span>
               <strong>{eventType.durationMinutes} minutes</strong> · ends after
               one session
@@ -106,12 +106,12 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             </span>
           </li>
           <li className="flex items-center gap-2.5">
-            <UserRound className="size-4 text-[#0D9488]" />
+            <UserRound className="size-4 text-success-teal" />
             <span>One guest per session</span>
           </li>
           {eventType.bufferBeforeMinutes + eventType.bufferAfterMinutes > 0 ? (
             <li className="flex items-center gap-2.5">
-              <Timer className="size-4 text-[#A855F7]" />
+              <Timer className="size-4 text-purple" />
               <span>
                 {formatBuffer(
                   eventType.bufferBeforeMinutes,
@@ -121,21 +121,21 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             </li>
           ) : null}
           <li className="flex items-center gap-2.5">
-            <MailCheck className="size-4 text-[#10B981]" />
+            <MailCheck className="size-4 text-success-bright" />
             <span>Email-verified booking · one-click cancel link</span>
           </li>
         </ul>
       </div>
 
       {included.length > 0 ? (
-        <div className="rounded-2xl border border-[#EEE7DF] bg-white p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+        <div className="rounded-2xl border border-line-cream bg-surface-card p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
             What&apos;s included
           </p>
           <ul className="mt-3 space-y-2 text-[13px]">
             {included.slice(0, 6).map((item, idx) => (
               <li key={idx} className="flex items-start gap-2">
-                <Check className="mt-1 size-3.5 shrink-0 text-[#16A34A]" />
+                <Check className="mt-1 size-3.5 shrink-0 text-success" />
                 <span>{item}</span>
               </li>
             ))}
@@ -145,14 +145,14 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
 
       {eventType.galleryImageUrls && eventType.galleryImageUrls.length > 0 ? (
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
             More photos
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {eventType.galleryImageUrls.slice(0, 6).map((url, idx) => (
               <div
                 key={idx}
-                className="aspect-square overflow-hidden rounded-lg border border-[#EEE7DF] bg-cover bg-center"
+                className="aspect-square overflow-hidden rounded-lg border border-line-cream bg-cover bg-center"
                 style={{ backgroundImage: `url(${url})` }}
               />
             ))}
@@ -161,25 +161,25 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
       ) : null}
 
       {eventType.preparationNotes ? (
-        <div className="rounded-2xl border border-[#FCC9C5] bg-[#FFF7F5] p-4">
+        <div className="rounded-2xl border border-brand-tint-300 bg-brand-tint-50 p-4">
           <div className="flex items-center gap-2">
-            <Info className="size-4 text-[#FF5F63]" />
+            <Info className="size-4 text-brand" />
             <p className="text-[12.5px] font-bold">Before your appointment</p>
           </div>
-          <p className="mt-2 text-[12.5px] leading-[1.6] text-[#374151]">
+          <p className="mt-2 text-[12.5px] leading-[1.6] text-ink-body">
             {eventType.preparationNotes}
           </p>
         </div>
       ) : null}
 
       {/* Host bio */}
-      <div className="rounded-2xl border border-[#EEE7DF] bg-white p-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+      <div className="rounded-2xl border border-line-cream bg-surface-card p-4">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
           Your host
         </p>
         <div className="mt-3 flex items-center gap-3">
           <div
-            className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[15px] font-bold text-white"
+            className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[15px] font-bold text-white"
             style={
               host.profileImageUrl
                 ? {
@@ -196,14 +196,14 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
           </div>
           <div className="min-w-0">
             <p className="text-[14px] font-bold">{host.name}</p>
-            <p className="text-[12px] text-[#6B7280]">
+            <p className="text-[12px] text-ink-soft">
               {host.headline ?? host.businessCategory ?? "Bookvella host"}
             </p>
           </div>
         </div>
         {reviewSummary.reviewCount > 0 ? (
           <div className="mt-3 flex items-center gap-2 text-[12px]">
-            <span className="text-amber-500">
+            <span className="text-warning-amber">
               {"★".repeat(
                 Math.max(
                   0,
@@ -214,7 +214,7 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             <span className="font-bold tabular-nums">
               {(reviewSummary.averageRating ?? 0).toFixed(1)}
             </span>
-            <span className="tabular-nums text-[#9CA3AF]">
+            <span className="tabular-nums text-ink-muted">
               · {reviewSummary.reviewCount}{" "}
               {reviewSummary.reviewCount === 1 ? "review" : "reviews"}
             </span>
@@ -225,12 +225,12 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
       {reviews.length > 0 ? (
         <div>
           <div className="flex items-baseline justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
               Recent reviews
             </p>
             <Link
               href={`/${host.slug}#reviews`}
-              className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+              className="text-[11px] font-bold text-brand hover:underline"
             >
               See all
             </Link>
@@ -239,29 +239,29 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
             {reviews.slice(0, 2).map((review) => (
               <div
                 key={review.id}
-                className="rounded-xl border border-[#EEE7DF] bg-white p-3"
+                className="rounded-xl border border-line-cream bg-surface-card p-3"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[11px] font-bold text-white">
+                    <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[11px] font-bold text-white">
                       {(review.guestName || "?").charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="text-[12.5px] font-bold leading-tight">
                         {review.guestName}
                       </p>
-                      <p className="text-[10px] text-[#9CA3AF]">
+                      <p className="text-[10px] text-ink-muted">
                         {eventType.title} · {relativeTime(review.createdAt)}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] text-amber-500">
+                  <span className="text-[11px] text-warning-amber">
                     {"★".repeat(
                       Math.max(0, Math.min(5, Math.round(review.rating))),
                     )}
                   </span>
                 </div>
-                <p className="mt-2 text-[12.5px] leading-snug text-[#374151]">
+                <p className="mt-2 text-[12.5px] leading-snug text-ink-body">
                   &ldquo;{review.comment}&rdquo;
                 </p>
               </div>
@@ -270,8 +270,8 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
         </div>
       ) : null}
 
-      <div className="flex items-start gap-2.5 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3 text-[11.5px] leading-snug text-[#6B7280]">
-        <Lock className="mt-0.5 size-3.5 shrink-0 text-[#0D9488]" />
+      <div className="flex items-start gap-2.5 rounded-xl border border-line-cream bg-surface-page p-3 text-[11.5px] leading-snug text-ink-soft">
+        <Lock className="mt-0.5 size-3.5 shrink-0 text-success-teal" />
         <p>
           Your details are shared only with {host.name.split(/\s+/)[0]} to
           confirm your booking. We never display them publicly.
@@ -282,9 +282,9 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
 }
 
 function LocationIcon({ type }: { type: PublicEvent["eventType"]["locationType"] }) {
-  if (type === "VIDEO") return <Video className="size-4 text-[#A855F7]" />;
-  if (type === "PHONE") return <Phone className="size-4 text-[#A855F7]" />;
-  return <MapPin className="size-4 text-[#A855F7]" />;
+  if (type === "VIDEO") return <Video className="size-4 text-purple" />;
+  if (type === "PHONE") return <Phone className="size-4 text-purple" />;
+  return <MapPin className="size-4 text-purple" />;
 }
 
 function formatBuffer(before: number, after: number): string {

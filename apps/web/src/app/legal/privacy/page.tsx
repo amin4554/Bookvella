@@ -175,7 +175,7 @@ export default function PrivacyPage() {
           <Link href="/legal/contact">Contact / Report</Link>.
         </p>
 
-        <p className="mt-12 text-[12px] text-[#9CA3AF]">
+        <p className="mt-12 text-[12px] text-ink-muted">
           Version 1.2. Last updated May 27, 2026. Effective May 27, 2026.
         </p>
       </LegalProse>

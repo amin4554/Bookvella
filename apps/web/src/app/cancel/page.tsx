@@ -31,15 +31,15 @@ export default function CancelPage() {
 
 function CancelPageShell() {
   return (
-    <div className="min-h-screen bg-[#FFFBF7]">
+    <div className="min-h-screen bg-surface-page">
       <div className="px-4 py-12">
         <div className="mx-auto w-full max-w-[480px]">
           <div className="mb-8 flex justify-center">
             <BrandLogo />
           </div>
 
-          <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
-            <p className="text-sm text-[#6B7280]">Loading booking details...</p>
+          <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 text-center shadow-sm">
+            <p className="text-sm text-ink-soft">Loading booking details...</p>
           </div>
         </div>
       </div>
@@ -171,7 +171,7 @@ function CancelPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7]">
+    <div className="min-h-screen bg-surface-page">
       <div className="px-4 py-12">
       <div className="mx-auto w-full max-w-[480px]">
         <div className="mb-8 flex justify-center">
@@ -179,24 +179,24 @@ function CancelPageContent() {
         </div>
 
         {visibleLoading && (
-          <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
-            <p className="text-sm text-[#6B7280]">Loading booking details...</p>
+          <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 text-center shadow-sm">
+            <p className="text-sm text-ink-soft">Loading booking details...</p>
           </div>
         )}
 
         {!visibleLoading && visibleError && (
-          <div className="rounded-[24px] border border-red-200 bg-white p-8 text-center shadow-sm">
-            <CalendarX className="mx-auto mb-4 size-10 text-red-400" />
+          <div className="rounded-[24px] border border-danger-border bg-surface-card p-8 text-center shadow-sm">
+            <CalendarX className="mx-auto mb-4 size-10 text-danger" />
             <h1 className="text-xl font-bold">Link not found</h1>
-            <p className="mt-2 text-sm text-[#6B7280]">{visibleError}</p>
+            <p className="mt-2 text-sm text-ink-soft">{visibleError}</p>
           </div>
         )}
 
         {!visibleLoading && !visibleError && cancelled && (
-          <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 text-center shadow-sm">
-            <CheckCircle className="mx-auto mb-4 size-10 text-[#16A34A]" />
+          <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 text-center shadow-sm">
+            <CheckCircle className="mx-auto mb-4 size-10 text-success" />
             <h1 className="text-xl font-bold">Booking cancelled</h1>
-            <p className="mt-2 text-sm text-[#6B7280]">
+            <p className="mt-2 text-sm text-ink-soft">
               Your booking has been cancelled. You and the host will both
               receive a confirmation email.
             </p>
@@ -204,18 +204,18 @@ function CancelPageContent() {
         )}
 
         {!visibleLoading && !visibleError && !cancelled && booking && (
-          <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 shadow-sm">
+          <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 shadow-sm">
             <h1 className="text-2xl font-bold">Manage your booking</h1>
-            <p className="mt-1 text-sm text-[#6B7280]">
+            <p className="mt-1 text-sm text-ink-soft">
               Reschedule or cancel your booking with {booking.hostName}.
             </p>
 
-            <div className="mt-6 space-y-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+            <div className="mt-6 space-y-3 rounded-2xl border border-line-cream bg-surface-page p-5">
               <p className="font-bold">{booking.eventTitle}</p>
-              <p className="text-sm text-[#6B7280]">
+              <p className="text-sm text-ink-soft">
                 with {booking.hostName}
               </p>
-              <div className="flex items-center gap-2 text-sm text-[#6B7280]">
+              <div className="flex items-center gap-2 text-sm text-ink-soft">
                 <Clock3 className="size-4 shrink-0" />
                 <span>
                   {new Intl.DateTimeFormat("en-US", {
@@ -228,24 +228,24 @@ function CancelPageContent() {
             </div>
 
             {rescheduled ? (
-              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div className="mt-4 rounded-xl border border-success-border bg-success-tint px-4 py-3 text-sm text-success-strong">
                 Booking rescheduled. You and the host will both receive an
                 updated calendar invitation by email.
               </div>
             ) : null}
 
             {error && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="mt-4 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
                 {error}
               </div>
             )}
 
-            <div className="mt-6 rounded-2xl border border-[#EEE7DF] bg-white p-4">
+            <div className="mt-6 rounded-2xl border border-line-cream bg-surface-card p-4">
               <div className="flex items-start gap-3">
-                <CalendarClock className="mt-0.5 size-5 shrink-0 text-[#FF5F63]" />
+                <CalendarClock className="mt-0.5 size-5 shrink-0 text-brand" />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold">Reschedule</p>
-                  <p className="mt-1 text-sm text-[#6B7280]">
+                  <p className="mt-1 text-sm text-ink-soft">
                     Choose another available time in the next 3 weeks.
                   </p>
                 </div>
@@ -254,7 +254,7 @@ function CancelPageContent() {
                 value={selectedSlot}
                 onChange={(event) => setSelectedSlot(event.target.value)}
                 disabled={slotsLoading || slots.length === 0 || rescheduling}
-                className="mt-4 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-3 text-sm outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:bg-[#F9FAFB] disabled:text-[#9CA3AF]"
+                className="mt-4 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-3 text-sm outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:bg-surface-soft disabled:text-ink-muted"
               >
                 {slotsLoading ? (
                   <option>Loading available times...</option>
@@ -294,7 +294,7 @@ function CancelPageContent() {
               </Button>
               <Button
                 type="button"
-                className="h-12 rounded-2xl bg-red-500 font-bold text-white hover:bg-red-600"
+                className="h-12 rounded-2xl bg-danger-strong font-bold text-white hover:bg-danger"
                 disabled={cancelling}
                 onClick={handleCancel}
               >

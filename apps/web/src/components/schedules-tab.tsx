@@ -59,17 +59,17 @@ export function SchedulesTab({
   return (
     <div className="p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <p className="text-[12px] text-[#6B7280]">
+        <p className="text-[12px] text-ink-soft">
           Save reusable weekly templates (Summer hours, Holiday hours…) and apply
           them to {scopeLabel}.
         </p>
       </div>
 
-      <div className="mt-4 rounded-xl border border-dashed border-[#FCC9C5] bg-[#FFF7F5] p-4">
-        <p className="text-[12px] font-bold text-[#7c2222]">
+      <div className="mt-4 rounded-xl border border-dashed border-brand-tint-300 bg-brand-tint-50 p-4">
+        <p className="text-[12px] font-bold text-danger-brown">
           Save the current weekly hours as a template
         </p>
-        <p className="mt-1 text-[11.5px] text-[#9b4a47]">
+        <p className="mt-1 text-[11.5px] text-danger-muted">
           The current weekly editor (above the tabs) becomes a new template you
           can apply later.
         </p>
@@ -79,7 +79,7 @@ export function SchedulesTab({
             onChange={(event) => setNewName(event.target.value)}
             maxLength={60}
             placeholder="e.g. Summer hours"
-            className="h-9 flex-1 min-w-[180px] rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="h-9 flex-1 min-w-[180px] rounded-lg border border-line-soft bg-surface-card px-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           />
           <button
             type="button"
@@ -94,7 +94,7 @@ export function SchedulesTab({
                 ? undefined
                 : "Save your weekly changes first, then create the template"
             }
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3 text-[12px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-coral to-brand-orange px-3 text-[12px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             <Plus className="size-3.5" /> Save template
           </button>
@@ -103,7 +103,7 @@ export function SchedulesTab({
 
       <div className="mt-5 space-y-2">
         {sorted.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-4 py-6 text-center text-[12px] text-[#9CA3AF]">
+          <p className="rounded-xl border border-dashed border-line-cream bg-surface-page px-4 py-6 text-center text-[12px] text-ink-muted">
             No saved templates yet.
           </p>
         ) : (
@@ -118,12 +118,12 @@ export function SchedulesTab({
             return (
               <div
                 key={schedule.id}
-                className="rounded-xl border border-[#EEE7DF] bg-white p-4"
+                className="rounded-xl border border-line-cream bg-surface-card p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <Layers className="size-3.5 text-[#FF5F63]" />
+                      <Layers className="size-3.5 text-brand" />
                       {isRenaming ? (
                         <input
                           autoFocus
@@ -144,7 +144,7 @@ export function SchedulesTab({
                             }
                           }}
                           maxLength={60}
-                          className="h-7 flex-1 rounded border border-[#E5E7EB] bg-white px-2 text-[13px] font-bold outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+                          className="h-7 flex-1 rounded border border-line-soft bg-surface-card px-2 text-[13px] font-bold outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
                         />
                       ) : (
                         <button
@@ -153,14 +153,14 @@ export function SchedulesTab({
                             setRenamingId(schedule.id);
                             setRenameDraft(schedule.name);
                           }}
-                          className="truncate text-[13px] font-bold text-[#0B1220] hover:underline"
+                          className="truncate text-[13px] font-bold text-ink-strong hover:underline"
                           title="Rename"
                         >
                           {schedule.name}
                         </button>
                       )}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-[#9CA3AF] tabular-nums">
+                    <p className="mt-0.5 text-[11px] text-ink-muted tabular-nums">
                       {totalHours.toFixed(1).replace(/\.0$/, "")}h per week
                     </p>
                   </div>
@@ -170,7 +170,7 @@ export function SchedulesTab({
                       type="button"
                       onClick={() => onApply(schedule.id)}
                       disabled={applyingId !== null}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3 text-[12px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-coral to-brand-orange px-3 text-[12px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
                     >
                       {applyingId === schedule.id ? (
                         "Applying…"
@@ -192,7 +192,7 @@ export function SchedulesTab({
                         }
                       }}
                       title="Delete template"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#9CA3AF] hover:border-[#FECACA] hover:bg-[#FEF2F2] hover:text-[#B91C1C]"
+                      className="inline-flex size-8 items-center justify-center rounded-lg border border-line-soft text-ink-muted hover:border-danger-border hover:bg-danger-tint hover:text-danger"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -206,8 +206,8 @@ export function SchedulesTab({
                       className={[
                         "rounded-lg border px-1.5 py-1 text-center",
                         day.blocks.length === 0
-                          ? "border-[#F1ECE5] bg-[#FAFAF8] text-[#9CA3AF]"
-                          : "border-[#EEE7DF] bg-[#FFFBF7] text-[#0B1220]",
+                          ? "border-line-cream-soft bg-surface-cream text-ink-muted"
+                          : "border-line-cream bg-surface-page text-ink-strong",
                       ].join(" ")}
                     >
                       <p className="text-[9.5px] font-bold uppercase tracking-[0.1em]">

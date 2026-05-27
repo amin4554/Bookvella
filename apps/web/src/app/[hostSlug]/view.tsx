@@ -43,19 +43,19 @@ type ServiceItem = PublicHostProfile["services"][number];
 const PALETTES = [
   {
     heroBg: "linear-gradient(135deg,#FFE0DA 0%,#FFD3A6 60%,#FFC9C2 100%)",
-    ink: "text-[#FF5F63]",
+    ink: "text-brand",
   },
   {
     heroBg: "linear-gradient(135deg,#F4EAFF 0%,#E1CFFA 60%,#D7CDF8 100%)",
-    ink: "text-[#A855F7]",
+    ink: "text-purple",
   },
   {
     heroBg: "linear-gradient(135deg,#D7F2EA 0%,#B6E4F2 60%,#CFE9E0 100%)",
-    ink: "text-[#0D9488]",
+    ink: "text-success-teal",
   },
   {
     heroBg: "linear-gradient(135deg,#FFE9C7 0%,#FFD08A 60%,#FFC9C2 100%)",
-    ink: "text-[#B45309]",
+    ink: "text-warning",
   },
 ];
 
@@ -106,9 +106,9 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] text-[#0B1220]">
+    <div className="min-h-screen bg-surface-page text-ink-strong">
       {/* slim top bar */}
-      <header className="border-b border-[#EEE7DF] bg-white">
+      <header className="border-b border-line-cream bg-surface-card">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-5">
           <Link href="/" className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,11 +121,11 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
               Bookvella
             </span>
           </Link>
-          <p className="text-[12px] text-[#9CA3AF]">
+          <p className="text-[12px] text-ink-muted">
             Powered by Bookvella ·{" "}
             <Link
               href="/register"
-              className="font-semibold text-[#0B1220] hover:underline"
+              className="font-semibold text-ink-strong hover:underline"
             >
               Create your free page
             </Link>
@@ -144,10 +144,10 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
           }}
         />
         <div className="mx-auto -mt-20 max-w-[1200px] px-5">
-          <div className="rounded-[28px] border border-[#EEE7DF] bg-white p-6 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)] md:p-8">
+          <div className="rounded-[28px] border border-line-cream bg-surface-card p-6 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)] md:p-8">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="flex items-start gap-5">
-                <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[32px] font-bold text-white shadow-[0_1px_0_rgba(17,24,39,0.04),0_28px_64px_-32px_rgba(255,95,99,0.30)] md:size-28">
+                <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[32px] font-bold text-white shadow-[0_1px_0_rgba(17,24,39,0.04),0_28px_64px_-32px_rgba(255,95,99,0.30)] md:size-28">
                   {host.profileImageUrl ? (
                     <div
                       className="size-full bg-cover bg-center"
@@ -167,25 +167,25 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                     >
                       {host.name}
                     </h1>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5F63]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-tint-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
                       Active
                     </span>
                   </div>
                   {host.headline ? (
-                    <p className="mt-2 text-[15px] text-[#374151]">
+                    <p className="mt-2 text-[15px] text-ink-body">
                       {host.headline}
                     </p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {host.businessCategory ? (
                       <Chip>
-                        <Scissors className="size-3.5 text-[#FF5F63]" />
+                        <Scissors className="size-3.5 text-brand" />
                         {host.businessCategory}
                       </Chip>
                     ) : null}
                     {host.location ? (
                       <Chip>
-                        <MapPin className="size-3.5 text-[#9CA3AF]" />
+                        <MapPin className="size-3.5 text-ink-muted" />
                         {host.location}
                       </Chip>
                     ) : null}
@@ -209,13 +209,13 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                 <button
                   type="button"
                   onClick={share}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold hover:bg-[#F9FAFB]"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold hover:bg-surface-soft"
                 >
                   <Share2 className="size-4" /> Share
                 </button>
                 <a
                   href="#services"
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
                 >
                   Book a service <ArrowDown className="size-4" />
                 </a>
@@ -240,29 +240,29 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                   >
                     About {firstName(host.name)}
                   </h2>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                     Bio
                   </span>
                 </div>
-                <p className="mt-4 max-w-[620px] text-[15px] leading-[1.7] text-[#374151]">
+                <p className="mt-4 max-w-[620px] text-[15px] leading-[1.7] text-ink-body">
                   {host.about}
                 </p>
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <StatCard
                     icon={<Clock className="size-4" />}
-                    tint="bg-[#FFF0EF] text-[#FF5F63]"
+                    tint="bg-brand-tint-100 text-brand"
                     label="Typical visit"
                     value={typicalVisit(services)}
                   />
                   <StatCard
                     icon={<BadgeCheck className="size-4" />}
-                    tint="bg-[#F4EAFF] text-[#A855F7]"
+                    tint="bg-purple-tint text-purple"
                     label="Verified host since"
                     value={verifiedMonth}
                   />
                   <StatCard
                     icon={<CalendarCheck2 className="size-4" />}
-                    tint="bg-[#E0F7EF] text-[#0D9488]"
+                    tint="bg-success-tint-soft text-success-teal"
                     label="Completed bookings"
                     value={
                       stats.completedBookings === 0
@@ -276,9 +276,9 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
 
             {/* what to expect */}
             {host.whatToExpect ? (
-              <div className="rounded-2xl border border-[#EEE7DF] bg-white p-6 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+              <div className="rounded-2xl border border-line-cream bg-surface-card p-6 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-brand-tint-100 text-brand">
                     <Sparkles className="size-4" />
                   </span>
                   <h3 className="text-base font-bold">What to expect</h3>
@@ -296,13 +296,13 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                 >
                   Services
                 </h2>
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   {services.length} active
                 </span>
               </div>
 
               {services.length === 0 ? (
-                <div className="mt-5 rounded-2xl border border-dashed border-[#EEE7DF] bg-white p-8 text-center text-sm text-[#6B7280]">
+                <div className="mt-5 rounded-2xl border border-dashed border-line-cream bg-surface-card p-8 text-center text-sm text-ink-soft">
                   No bookable services yet. Check back soon.
                 </div>
               ) : (
@@ -331,9 +331,9 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                     >
                       Reviews
                     </h2>
-                    <p className="mt-1 text-[13px] text-[#6B7280]">
+                    <p className="mt-1 text-[13px] text-ink-soft">
                       <Stars rating={reviewSummary.averageRating ?? 0} />{" "}
-                      <span className="font-bold tabular-nums text-[#0B1220]">
+                      <span className="font-bold tabular-nums text-ink-strong">
                         {reviewSummary.averageRating?.toFixed(1)}
                       </span>{" "}
                       ·{" "}
@@ -345,7 +345,7 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+                <div className="mt-5 rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
                   <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
                     <div className="flex flex-col items-center justify-center text-center">
                       <p
@@ -354,28 +354,28 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       >
                         {reviewSummary.averageRating?.toFixed(1) ?? "—"}
                       </p>
-                      <p className="text-[14px] text-amber-500">
+                      <p className="text-[14px] text-warning-amber">
                         <Stars rating={reviewSummary.averageRating ?? 0} />
                       </p>
-                      <p className="mt-1 text-[12px] tabular-nums text-[#6B7280]">
+                      <p className="mt-1 text-[12px] tabular-nums text-ink-soft">
                         {reviewSummary.reviewCount} reviews
                       </p>
                     </div>
                     <div className="space-y-1.5">
                       {([5, 4, 3, 2, 1] as const).map((star) => (
                         <div key={star} className="flex items-center gap-3">
-                          <span className="w-6 text-right text-[11px] font-bold tabular-nums text-[#9CA3AF]">
+                          <span className="w-6 text-right text-[11px] font-bold tabular-nums text-ink-muted">
                             {star}★
                           </span>
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#F3F4F6]">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-line-subtle">
                             <div
-                              className="h-full bg-amber-400"
+                              className="h-full bg-warning-amber"
                               style={{
                                 width: `${pct(dist[String(star) as keyof typeof dist] ?? 0)}%`,
                               }}
                             />
                           </div>
-                          <span className="w-10 text-right text-[11px] tabular-nums text-[#6B7280]">
+                          <span className="w-10 text-right text-[11px] tabular-nums text-ink-soft">
                             {dist[String(star) as keyof typeof dist] ?? 0}
                           </span>
                         </div>
@@ -399,14 +399,14 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
 
           {/* RIGHT: sticky booking panel */}
           <aside className="lg:sticky lg:top-6 lg:self-start">
-            <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+            <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                 Book directly
               </p>
               <h3 className="mt-2 text-[18px] font-bold">
                 Pick a service to start
               </h3>
-              <p className="mt-1 text-[13px] text-[#6B7280]">
+              <p className="mt-1 text-[13px] text-ink-soft">
                 All times shown in your local timezone.
               </p>
 
@@ -419,13 +419,13 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       onClick={() => openServiceDetail(service)}
                       className={
                         idx === 0
-                          ? "flex w-full items-center justify-between rounded-xl border border-[#FFD2CE] bg-[#FFF7F5] px-3.5 py-3 text-left hover:bg-[#FFF0EF]"
-                          : "flex w-full items-center justify-between rounded-xl border border-[#EEE7DF] bg-white px-3.5 py-3 text-left hover:bg-[#FFFBF7]"
+                          ? "flex w-full items-center justify-between rounded-xl border border-brand-tint-400 bg-brand-tint-50 px-3.5 py-3 text-left hover:bg-brand-tint-100"
+                          : "flex w-full items-center justify-between rounded-xl border border-line-cream bg-surface-card px-3.5 py-3 text-left hover:bg-surface-page"
                       }
                     >
                       <div className="leading-tight">
                         <p className="text-[13px] font-bold">{service.title}</p>
-                        <p className="text-[11px] tabular-nums text-[#6B7280]">
+                        <p className="text-[11px] tabular-nums text-ink-soft">
                           {service.durationMinutes} min
                           {formatPriceLabel(service) ? (
                             <> · {formatPriceLabel(service)}</>
@@ -435,34 +435,34 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       <ChevronRight
                         className={
                           idx === 0
-                            ? "size-4 text-[#FF5F63]"
-                            : "size-4 text-[#9CA3AF]"
+                            ? "size-4 text-brand"
+                            : "size-4 text-ink-muted"
                         }
                       />
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="mt-4 rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] px-3.5 py-4 text-center text-[12px] text-[#6B7280]">
+                <p className="mt-4 rounded-xl border border-dashed border-line-cream bg-surface-page px-3.5 py-4 text-center text-[12px] text-ink-soft">
                   No active services yet.
                 </p>
               )}
 
-              <div className="mt-4 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3.5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+              <div className="mt-4 rounded-xl border border-line-cream bg-surface-page p-3.5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                   Trust &amp; safety
                 </p>
-                <ul className="mt-2 space-y-1.5 text-[12px] leading-[1.5] text-[#374151]">
+                <ul className="mt-2 space-y-1.5 text-[12px] leading-[1.5] text-ink-body">
                   <li className="flex items-start gap-2">
-                    <ShieldCheck className="mt-0.5 size-3.5 text-[#16A34A]" />{" "}
+                    <ShieldCheck className="mt-0.5 size-3.5 text-success" />{" "}
                     Every booking is email-verified
                   </li>
                   <li className="flex items-start gap-2">
-                    <LinkIcon className="mt-0.5 size-3.5 text-[#A855F7]" />{" "}
+                    <LinkIcon className="mt-0.5 size-3.5 text-purple" />{" "}
                     Secure cancellation links in confirmations
                   </li>
                   <li className="flex items-start gap-2">
-                    <CalendarCheck2 className="mt-0.5 size-3.5 text-[#FF5F63]" />{" "}
+                    <CalendarCheck2 className="mt-0.5 size-3.5 text-brand" />{" "}
                     Add-to-calendar links after you book
                   </li>
                 </ul>
@@ -472,8 +472,8 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
             {host.instagramUrl ||
             host.websiteUrl ||
             host.location ? (
-              <div className="mt-4 rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              <div className="mt-4 rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   Find {firstName(host.name)}
                 </p>
                 <div className="mt-3 space-y-2">
@@ -482,9 +482,9 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       href={host.instagramUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-3 py-2.5 hover:bg-[#FFFBF7]"
+                      className="flex items-center gap-3 rounded-xl border border-line-cream bg-surface-card px-3 py-2.5 hover:bg-surface-page"
                     >
-                      <span className="flex size-8 items-center justify-center rounded-lg bg-[#FFF0EF] text-[#FF5F63]">
+                      <span className="flex size-8 items-center justify-center rounded-lg bg-brand-tint-100 text-brand">
                         <AtSign className="size-4" />
                       </span>
                       <span className="truncate text-[13px] font-semibold">
@@ -497,9 +497,9 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       href={host.websiteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-3 py-2.5 hover:bg-[#FFFBF7]"
+                      className="flex items-center gap-3 rounded-xl border border-line-cream bg-surface-card px-3 py-2.5 hover:bg-surface-page"
                     >
-                      <span className="flex size-8 items-center justify-center rounded-lg bg-[#F4EAFF] text-[#A855F7]">
+                      <span className="flex size-8 items-center justify-center rounded-lg bg-purple-tint text-purple">
                         <Globe className="size-4" />
                       </span>
                       <span className="truncate text-[13px] font-semibold">
@@ -508,8 +508,8 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                     </a>
                   ) : null}
                   {host.location ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-3 py-2.5">
-                      <span className="flex size-8 items-center justify-center rounded-lg bg-[#E0F7EF] text-[#0D9488]">
+                    <div className="flex items-center gap-3 rounded-xl border border-line-cream bg-surface-card px-3 py-2.5">
+                      <span className="flex size-8 items-center justify-center rounded-lg bg-success-tint-soft text-success-teal">
                         <MapPin className="size-4" />
                       </span>
                       <span className="truncate text-[13px] font-semibold">
@@ -661,22 +661,22 @@ function ServiceDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="service-detail-title"
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-[#0B1220]/55 backdrop-blur-sm md:items-center md:p-6"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-strong/55 backdrop-blur-sm md:items-center md:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         ref={dialogRef}
-        className="flex max-h-[94vh] w-full max-w-[920px] flex-col rounded-t-[24px] bg-white shadow-[0_-24px_64px_-16px_rgba(11,18,32,0.35)] md:max-h-[90vh] md:rounded-[24px]"
+        className="flex max-h-[94vh] w-full max-w-[920px] flex-col rounded-t-[24px] bg-surface-card shadow-[0_-24px_64px_-16px_rgba(11,18,32,0.35)] md:max-h-[90vh] md:rounded-[24px]"
       >
         {/* Header strip */}
-        <div className="flex items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-3.5 md:px-7">
+        <div className="flex items-center justify-between gap-3 border-b border-line-cream px-5 py-3.5 md:px-7">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5F63]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-tint-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
               Service detail
             </span>
-            <p className="hidden truncate text-[12px] tabular-nums text-[#9CA3AF] sm:block">
+            <p className="hidden truncate text-[12px] tabular-nums text-ink-muted sm:block">
               bookvella.com/{hostSlug}/{service.slug}
             </p>
           </div>
@@ -684,7 +684,7 @@ function ServiceDetailModal({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-line-soft bg-surface-card text-ink-soft hover:bg-surface-soft"
           >
             <X className="size-4" />
           </button>
@@ -702,11 +702,12 @@ function ServiceDetailModal({
               />
             ) : (
               <div
-                className="relative h-[220px] overflow-hidden rounded-[14px] bg-[linear-gradient(135deg,#FFE0DA_0%,#FFD3A6_60%,#FFC9C2_100%)] md:h-[320px]"
+                className="relative h-[220px] overflow-hidden rounded-[14px] md:h-[320px]"
+                style={{ background: PALETTES[0].heroBg }}
                 role="img"
                 aria-label={`${service.title} photo placeholder`}
               >
-                <div className="absolute inset-0 flex items-center justify-center text-[40px] font-extrabold text-[#FF5F63]">
+                <div className="absolute inset-0 flex items-center justify-center text-[40px] font-extrabold text-brand">
                   {initialFromTitle}
                 </div>
               </div>
@@ -724,9 +725,9 @@ function ServiceDetailModal({
                 >
                   {service.title}
                 </h2>
-                <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-[#374151]">
+                <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-ink-body">
                   <Chip>
-                    <Clock className="size-3.5 text-[#9CA3AF]" />
+                    <Clock className="size-3.5 text-ink-muted" />
                     {service.durationMinutes} min
                   </Chip>
                   <Chip>
@@ -756,13 +757,13 @@ function ServiceDetailModal({
               </div>
               {priceLabel ? (
                 <div className="text-right">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                     Price
                   </p>
                   <p
                     className="text-[28px] font-extrabold md:text-[32px]"
                     style={{
-                      color: "#FF5F63",
+                      color: "var(--color-brand)",
                       letterSpacing: "-0.03em",
                       lineHeight: "1",
                     }}
@@ -777,10 +778,10 @@ function ServiceDetailModal({
           {/* Description */}
           {service.description ? (
             <div className="mt-6 px-5 md:px-7">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                 About this service
               </p>
-              <p className="mt-2 text-[15px] leading-[1.7] text-[#374151]">
+              <p className="mt-2 text-[15px] leading-[1.7] text-ink-body">
                 {service.description}
               </p>
             </div>
@@ -790,17 +791,17 @@ function ServiceDetailModal({
           {(includedLines.length > 0 || service.preparationNotes) ? (
             <div className="mt-6 grid gap-4 px-5 md:grid-cols-2 md:px-7">
               {includedLines.length > 0 ? (
-                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+                <div className="rounded-2xl border border-line-cream bg-surface-page p-5">
                   <div className="flex items-center gap-2">
-                    <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[#16A34A]">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-surface-card text-success">
                       <ListChecks className="size-4" />
                     </span>
                     <p className="text-[13px] font-bold">What&apos;s included</p>
                   </div>
-                  <ul className="mt-3 space-y-2 text-[13.5px] text-[#374151]">
+                  <ul className="mt-3 space-y-2 text-[13.5px] text-ink-body">
                     {includedLines.map((line, idx) => (
                       <li key={idx} className="flex items-start gap-2">
-                        <Check className="mt-0.5 size-4 shrink-0 text-[#16A34A]" />
+                        <Check className="mt-0.5 size-4 shrink-0 text-success" />
                         <span>{line}</span>
                       </li>
                     ))}
@@ -808,14 +809,14 @@ function ServiceDetailModal({
                 </div>
               ) : null}
               {service.preparationNotes ? (
-                <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+                <div className="rounded-2xl border border-line-cream bg-surface-page p-5">
                   <div className="flex items-center gap-2">
-                    <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[#FF5F63]">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-surface-card text-brand">
                       <Sparkles className="size-4" />
                     </span>
                     <p className="text-[13px] font-bold">Before you arrive</p>
                   </div>
-                  <p className="mt-3 whitespace-pre-line text-[13.5px] leading-[1.65] text-[#374151]">
+                  <p className="mt-3 whitespace-pre-line text-[13.5px] leading-[1.65] text-ink-body">
                     {service.preparationNotes}
                   </p>
                 </div>
@@ -842,10 +843,10 @@ function ServiceDetailModal({
           {reviews.length > 0 ? (
             <div className="mt-6 px-5 md:px-7">
               <div className="flex items-end justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   Reviews for this service
                 </p>
-                <p className="text-[11px] tabular-nums text-[#9CA3AF]">
+                <p className="text-[11px] tabular-nums text-ink-muted">
                   {reviews.length}{" "}
                   {reviews.length === 1 ? "review" : "reviews"}
                 </p>
@@ -864,13 +865,13 @@ function ServiceDetailModal({
 
           {/* Next available slot teaser */}
           <div className="mb-6 mt-6 px-5 md:px-7">
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-line-cream bg-surface-page p-4">
               <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-white text-[#16A34A]">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-surface-card text-success">
                   <CalendarCheck2 className="size-4" />
                 </span>
                 <div className="leading-tight">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                     Next available
                   </p>
                   <p className="text-[14px] font-bold tabular-nums">
@@ -882,7 +883,7 @@ function ServiceDetailModal({
                   </p>
                 </div>
               </div>
-              <p className="hidden text-[11px] text-[#9CA3AF] sm:block">
+              <p className="hidden text-[11px] text-ink-muted sm:block">
                 Times shown in your timezone
               </p>
             </div>
@@ -890,9 +891,9 @@ function ServiceDetailModal({
         </div>
 
         {/* Sticky footer CTA */}
-        <div className="flex items-center justify-between gap-3 border-t border-[#EEE7DF] bg-white px-5 py-3.5 md:px-7">
+        <div className="flex items-center justify-between gap-3 border-t border-line-cream bg-surface-card px-5 py-3.5 md:px-7">
           <div className="leading-tight">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
               You&apos;re booking
             </p>
             <p className="text-[13.5px] font-bold">
@@ -902,7 +903,7 @@ function ServiceDetailModal({
           </div>
           <Link
             href={bookHref}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             Continue to book <ArrowRight className="size-4" />
           </Link>
@@ -1003,7 +1004,7 @@ function GalleryPhotoButton({
       type="button"
       aria-label={`Open ${title} photo ${index + 1}`}
       onClick={() => onOpen(index)}
-      className={`group relative overflow-hidden rounded-[14px] bg-[#F3F4F6] text-left shadow-[0_1px_0_rgba(17,24,39,0.04)] outline-none ring-offset-2 ring-offset-white transition focus-visible:ring-2 focus-visible:ring-[#FF5F63] ${
+      className={`group relative overflow-hidden rounded-[14px] bg-line-subtle text-left shadow-[0_1px_0_rgba(17,24,39,0.04)] outline-none ring-offset-2 ring-offset-white transition focus-visible:ring-2 focus-visible:ring-brand ${
         variant === "single"
           ? "h-[240px] w-full md:h-[360px]"
           : isLarge
@@ -1017,15 +1018,15 @@ function GalleryPhotoButton({
         role="img"
         aria-label={`${title} photo ${index + 1}`}
       />
-      <span className="absolute inset-0 bg-gradient-to-t from-[#0B1220]/35 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      <span className="absolute inset-0 bg-gradient-to-t from-ink-strong/35 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
       {isLarge ? (
-        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-2 text-[12px] font-bold text-[#0B1220] shadow-sm backdrop-blur">
+        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg bg-surface-card/95 px-3 py-2 text-[12px] font-bold text-ink-strong shadow-sm backdrop-blur">
           <Maximize2 className="size-3.5" />
           Open photo
         </span>
       ) : null}
       {showViewAll ? (
-        <span className="absolute inset-0 grid place-items-center bg-[#0B1220]/45 text-[12px] font-bold text-white backdrop-blur-[1px]">
+        <span className="absolute inset-0 grid place-items-center bg-ink-strong/45 text-[12px] font-bold text-white backdrop-blur-[1px]">
           View all {total} photos
         </span>
       ) : null}
@@ -1055,7 +1056,7 @@ function PhotoLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex flex-col bg-[#0B1220]/95 p-4 text-white md:p-6"
+      className="fixed inset-0 z-[80] flex flex-col bg-ink-strong/95 p-4 text-white md:p-6"
       onClick={onClose}
     >
       <div className="flex items-center justify-between gap-3">
@@ -1126,7 +1127,7 @@ function PhotoLightbox({
               onClick={() => onChange(index)}
               className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border bg-cover bg-center transition ${
                 index === activeIndex
-                  ? "border-white opacity-100"
+                  ? "border-surface-card opacity-100"
                   : "border-white/20 opacity-60 hover:opacity-90"
               }`}
               style={{ backgroundImage: `url(${url})` }}
@@ -1140,8 +1141,8 @@ function PhotoLightbox({
 
 function MetaTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#EEE7DF] bg-white p-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+    <div className="rounded-xl border border-line-cream bg-surface-card p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
         {label}
       </p>
       <p className="mt-0.5 text-[13.5px] font-bold tabular-nums">{value}</p>
@@ -1198,7 +1199,7 @@ function ServiceRow({
 }) {
   const locationIcon = locationGlyph(service.locationType);
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <article className="overflow-hidden rounded-2xl border border-line-cream bg-surface-card shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <div className="grid gap-0 sm:grid-cols-[140px_1fr_auto]">
         <div
           className="relative h-32 sm:h-auto"
@@ -1216,26 +1217,26 @@ function ServiceRow({
             </div>
           ) : null}
           {featured ? (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[#B45309] backdrop-blur">
-              <Star className="size-3 fill-[#F59E0B] text-[#F59E0B]" /> Featured
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-surface-card/90 px-2 py-1 text-[10px] font-bold text-warning backdrop-blur">
+              <Star className="size-3 fill-warning-amber text-warning-amber" /> Featured
             </span>
           ) : null}
         </div>
         <div className="p-5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[18px] font-bold">{service.title}</h3>
-            <span className="rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-bold text-[#16A34A]">
+            <span className="rounded-full bg-success-mint px-2 py-0.5 text-[10px] font-bold text-success">
               Active
             </span>
           </div>
           {service.description ? (
-            <p className="mt-1.5 line-clamp-2 text-[13px] text-[#6B7280]">
+            <p className="mt-1.5 line-clamp-2 text-[13px] text-ink-soft">
               {service.description}
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-[#374151]">
+          <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-ink-body">
             <Chip>
-              <Clock className="size-3.5 text-[#9CA3AF]" />
+              <Clock className="size-3.5 text-ink-muted" />
               {service.durationMinutes} min
             </Chip>
             <Chip>
@@ -1245,14 +1246,14 @@ function ServiceRow({
             </Chip>
             {formatPriceLabel(service) ? (
               <Chip>
-                <Banknote className="size-3.5 text-[#9CA3AF]" />
+                <Banknote className="size-3.5 text-ink-muted" />
                 {formatPriceLabel(service)}
               </Chip>
             ) : null}
           </div>
         </div>
         <div className="flex flex-col items-stretch justify-center gap-2 p-5 sm:items-end">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
             Availability
           </p>
           <p className="text-[14px] font-bold">Pick a time</p>
@@ -1261,8 +1262,8 @@ function ServiceRow({
             onClick={onOpen}
             className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-[13px] font-bold ${
               featured
-                ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white shadow-sm"
-                : "border border-[#0B1220] bg-white text-[#0B1220] hover:bg-[#0B1220] hover:text-white"
+                ? "bg-gradient-to-r from-brand-coral to-brand-orange text-white shadow-sm"
+                : "border border-ink-strong bg-surface-card text-ink-strong hover:bg-ink-strong hover:text-surface-card"
             }`}
           >
             View &amp; book <ArrowRight className="size-4" />
@@ -1282,7 +1283,7 @@ function ReviewCard({
 }) {
   const initial = (review.guestName || "?").charAt(0).toUpperCase();
   return (
-    <article className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <article className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_1px_0_rgba(17,24,39,0.04),0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <div className="flex items-center gap-3">
         <div
           className="flex size-10 items-center justify-center rounded-xl text-[12px] font-bold text-white"
@@ -1292,15 +1293,15 @@ function ReviewCard({
         </div>
         <div className="flex-1 leading-tight">
           <p className="text-[13px] font-bold">{review.guestName}</p>
-          <p className="text-[11px] tabular-nums text-[#9CA3AF]">
+          <p className="text-[11px] tabular-nums text-ink-muted">
             {review.eventTypeTitle} · {relativeTime(review.createdAt)}
           </p>
         </div>
-        <span className="text-[12px] text-amber-500">
+        <span className="text-[12px] text-warning-amber">
           <Stars rating={review.rating} />
         </span>
       </div>
-      <p className="mt-3 text-[14px] leading-[1.6] text-[#374151]">
+      <p className="mt-3 text-[14px] leading-[1.6] text-ink-body">
         &ldquo;{review.comment}&rdquo;
       </p>
     </article>
@@ -1319,13 +1320,13 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-4">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-4">
       <div
         className={`flex size-9 items-center justify-center rounded-xl ${tint}`}
       >
         {icon}
       </div>
-      <p className="mt-3 text-[12px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+      <p className="mt-3 text-[12px] font-bold uppercase tracking-wider text-ink-muted">
         {label}
       </p>
       <p className="text-[14px] font-bold">{value}</p>
@@ -1335,7 +1336,7 @@ function StatCard({
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E8DED7] bg-white px-2.5 py-1 text-[12px] font-semibold text-[#374151]">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line-warm bg-surface-card px-2.5 py-1 text-[12px] font-semibold text-ink-body">
       {children}
     </span>
   );
@@ -1348,14 +1349,14 @@ function ExpectationList({ text }: { text: string }) {
     .filter(Boolean);
   if (lines.length <= 1) {
     return (
-      <p className="mt-5 text-[14px] leading-[1.6] text-[#374151]">{text}</p>
+      <p className="mt-5 text-[14px] leading-[1.6] text-ink-body">{text}</p>
     );
   }
   return (
-    <ul className="mt-5 space-y-3 text-[14px] leading-[1.6] text-[#374151]">
+    <ul className="mt-5 space-y-3 text-[14px] leading-[1.6] text-ink-body">
       {lines.map((line, idx) => (
         <li key={idx} className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#16A34A]" />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
           <span>{line}</span>
         </li>
       ))}
@@ -1366,18 +1367,18 @@ function ExpectationList({ text }: { text: string }) {
 function Stars({ rating }: { rating: number }) {
   const filled = Math.max(0, Math.min(5, Math.round(rating)));
   return (
-    <span aria-label={`${filled} out of 5 stars`} className="text-amber-500">
+    <span aria-label={`${filled} out of 5 stars`} className="text-warning-amber">
       {"★".repeat(filled)}
-      <span className="text-[#E5E7EB]">{"★".repeat(5 - filled)}</span>
+      <span className="text-line-soft">{"★".repeat(5 - filled)}</span>
     </span>
   );
 }
 
 function locationGlyph(type: LocationType) {
-  if (type === "VIDEO") return <Video className="size-3.5 text-[#9CA3AF]" />;
+  if (type === "VIDEO") return <Video className="size-3.5 text-ink-muted" />;
   if (type === "PHONE")
-    return <PhoneIcon className="size-3.5 text-[#9CA3AF]" />;
-  return <MapPin className="size-3.5 text-[#9CA3AF]" />;
+    return <PhoneIcon className="size-3.5 text-ink-muted" />;
+  return <MapPin className="size-3.5 text-ink-muted" />;
 }
 
 function formatLocationLabel(type: LocationType) {

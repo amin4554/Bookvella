@@ -261,7 +261,7 @@ export default function ProfilePage() {
             >
               Your public profile
             </h1>
-            <p className="mt-2 text-[14px] text-[#6B7280]">
+            <p className="mt-2 text-[14px] text-ink-soft">
               This is what guests see before booking you. Edit anything — your
               live page updates as you save.
             </p>
@@ -270,14 +270,14 @@ export default function ProfilePage() {
             <Link
               href={`/${slug || user?.slug || ""}`}
               target="_blank"
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
             >
               <ExternalLink className="size-4" /> View public page
             </Link>
             <button
               type="submit"
               disabled={saving || loading}
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save changes"}
             </button>
@@ -285,21 +285,21 @@ export default function ProfilePage() {
         </div>
 
         {error ? (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-6 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
             {error}
           </div>
         ) : null}
 
         {/* profile completeness */}
-        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-[#EEE7DF] bg-white p-4 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-line-cream bg-surface-card p-4 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-brand-tint-100 text-brand">
             <UserCheck className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[14px] font-bold">Profile completeness</p>
-              <p className="text-[12px] font-semibold text-[#6B7280]">
-                <span className="tabular-nums text-[#0B1220]">
+              <p className="text-[12px] font-semibold text-ink-soft">
+                <span className="tabular-nums text-ink-strong">
                   {completeness.percent}%
                 </span>{" "}
                 ·{" "}
@@ -308,9 +308,9 @@ export default function ProfilePage() {
                   : `add ${completeness.missing[0]} to keep going`}
               </p>
             </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-line-subtle">
               <div
-                className="h-full bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]"
+                className="h-full bg-gradient-to-r from-brand-coral to-brand-orange"
                 style={{ width: `${completeness.percent}%` }}
               />
             </div>
@@ -368,7 +368,7 @@ export default function ProfilePage() {
                   label="Location or service area"
                   value={location}
                   onChange={setLocation}
-                  icon={<MapPin className="size-4 text-[#9CA3AF]" />}
+                  icon={<MapPin className="size-4 text-ink-muted" />}
                   placeholder="Shoreditch, London · United Kingdom"
                 />
 
@@ -382,20 +382,20 @@ export default function ProfilePage() {
                 />
 
                 {/* Advanced — public link handle */}
-                <details className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 open:bg-white">
+                <details className="rounded-xl border border-line-cream bg-surface-page p-4 open:bg-surface-card">
                   <summary className="flex cursor-pointer items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <SettingsIcon className="size-4 text-[#9CA3AF]" />
+                      <SettingsIcon className="size-4 text-ink-muted" />
                       <span className="text-[13px] font-bold">
                         Advanced — public link handle
                       </span>
                     </div>
-                    <ChevronDown className="size-4 text-[#9CA3AF]" />
+                    <ChevronDown className="size-4 text-ink-muted" />
                   </summary>
                   <div className="mt-4">
                     <FieldEyebrow>Your booking link</FieldEyebrow>
-                    <div className="mt-1.5 flex h-12 items-center overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white focus-within:border-[#FF5F63]">
-                      <span className="flex h-full items-center border-r border-[#E5E7EB] bg-[#F9FAFB] px-4 text-[14px] font-medium tabular-nums text-[#6B7280]">
+                    <div className="mt-1.5 flex h-12 items-center overflow-hidden rounded-2xl border border-line-soft bg-surface-card focus-within:border-brand">
+                      <span className="flex h-full items-center border-r border-line-soft bg-surface-soft px-4 text-[14px] font-medium tabular-nums text-ink-soft">
                         bookvella.com/
                       </span>
                       <input
@@ -406,7 +406,7 @@ export default function ProfilePage() {
                         className="h-full min-w-0 flex-1 bg-transparent px-4 text-[15px] font-semibold tabular-nums outline-none"
                       />
                     </div>
-                    <p className="mt-1.5 text-[11px] text-[#9CA3AF]">
+                    <p className="mt-1.5 text-[11px] text-ink-muted">
                       Changing this breaks links you&apos;ve already shared.
                     </p>
                   </div>
@@ -444,14 +444,14 @@ export default function ProfilePage() {
                   label="Website"
                   value={website}
                   onChange={setWebsite}
-                  icon={<Globe className="size-4 text-[#9CA3AF]" />}
+                  icon={<Globe className="size-4 text-ink-muted" />}
                   placeholder="https://yoursite.com"
                 />
                 <FieldText
                   label="Instagram"
                   value={instagram}
                   onChange={setInstagram}
-                  icon={<AtSign className="size-4 text-[#9CA3AF]" />}
+                  icon={<AtSign className="size-4 text-ink-muted" />}
                   placeholder="@yourhandle"
                 />
               </div>
@@ -462,10 +462,10 @@ export default function ProfilePage() {
               eyebrow="Reviews & testimonials"
               head="Choose what shows on your page"
               headRight={
-                <p className="text-[12px] text-[#6B7280]">
+                <p className="text-[12px] text-ink-soft">
                   {reviewsAverage(reviews) != null ? (
                     <>
-                      <span className="font-bold tabular-nums text-[#0B1220]">
+                      <span className="font-bold tabular-nums text-ink-strong">
                         {reviewsAverage(reviews)!.toFixed(1)}
                       </span>{" "}
                       · {reviews.length}{" "}
@@ -478,13 +478,13 @@ export default function ProfilePage() {
               }
             >
               {reviews.length === 0 ? (
-                <p className="text-[13px] leading-6 text-[#6B7280]">
+                <p className="text-[13px] leading-6 text-ink-soft">
                   Reviews will appear here after guests leave feedback from a
                   booking confirmation email. You can hide individual reviews
                   with the toggle.
                 </p>
               ) : (
-                <div className="divide-y divide-[#EEE7DF]">
+                <div className="divide-y divide-line-cream">
                   {reviews.map((review) => (
                     <ReviewListRow
                       key={review.id}
@@ -500,14 +500,14 @@ export default function ProfilePage() {
             <section
               className={`rounded-2xl border p-5 ${
                 user?.isProfileHidden
-                  ? "border-[#FCD34D] bg-[#FFFBEB]"
-                  : "border-[#FECACA] bg-[#FEF2F2]"
+                  ? "border-warning-border bg-surface-amber"
+                  : "border-danger-border bg-danger-tint"
               }`}
             >
               <div className="flex items-start gap-3">
                 <span
-                  className={`flex size-9 items-center justify-center rounded-xl bg-white ${
-                    user?.isProfileHidden ? "text-[#92400E]" : "text-[#B91C1C]"
+                  className={`flex size-9 items-center justify-center rounded-xl bg-surface-card ${
+                    user?.isProfileHidden ? "text-warning-strong" : "text-danger"
                   }`}
                 >
                   {user?.isProfileHidden ? (
@@ -519,7 +519,7 @@ export default function ProfilePage() {
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-[14px] font-bold ${
-                      user?.isProfileHidden ? "text-[#92400E]" : "text-[#7F1D1D]"
+                      user?.isProfileHidden ? "text-warning-strong" : "text-danger-deep"
                     }`}
                   >
                     {user?.isProfileHidden
@@ -529,8 +529,8 @@ export default function ProfilePage() {
                   <p
                     className={`mt-1 text-[12px] leading-[1.55] ${
                       user?.isProfileHidden
-                        ? "text-[#92400E]/80"
-                        : "text-[#7F1D1D]/80"
+                        ? "text-warning-strong/80"
+                        : "text-danger-deep/80"
                     }`}
                   >
                     {user?.isProfileHidden
@@ -544,8 +544,8 @@ export default function ProfilePage() {
                   disabled={!user || togglingHidden}
                   className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-bold disabled:opacity-60 ${
                     user?.isProfileHidden
-                      ? "border-[#FCD34D] bg-white text-[#92400E] hover:bg-[#FFFBEB]"
-                      : "border-[#FECACA] bg-white text-[#B91C1C] hover:bg-[#FEF2F2]"
+                      ? "border-warning-border bg-surface-card text-warning-strong hover:bg-surface-amber"
+                      : "border-danger-border bg-surface-card text-danger hover:bg-danger-tint"
                   }`}
                 >
                   {togglingHidden
@@ -564,12 +564,12 @@ export default function ProfilePage() {
               <p className="text-[14px] font-bold">
                 Live preview — what guests see
               </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[10px] font-bold text-[#16A34A]">
-                <span className="size-1.5 rounded-full bg-[#16A34A]" /> Live
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-success-mint px-2.5 py-1 text-[10px] font-bold text-success">
+                <span className="size-1.5 rounded-full bg-success" /> Live
               </span>
             </div>
 
-            <div className="mt-3 overflow-hidden rounded-[24px] border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+            <div className="mt-3 overflow-hidden rounded-[24px] border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
               {/* cover */}
               <div
                 className="relative h-24"
@@ -581,7 +581,7 @@ export default function ProfilePage() {
               >
                 <div className="absolute -bottom-7 left-5">
                   <div
-                    className="flex size-14 items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[16px] font-bold text-white ring-4 ring-white"
+                    className="flex size-14 items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[16px] font-bold text-white ring-4 ring-surface-card"
                     style={
                       profileImageUrl
                         ? {
@@ -602,7 +602,7 @@ export default function ProfilePage() {
                 <p className="text-[18px] font-bold leading-tight">
                   {name || "Your name"}
                 </p>
-                <p className="text-[12px] text-[#6B7280]">
+                <p className="text-[12px] text-ink-soft">
                   {headline || "Add a headline so guests get the gist."}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -620,7 +620,7 @@ export default function ProfilePage() {
                 </div>
                 {reviewsAverage(reviews) != null ? (
                   <div className="mt-3 flex items-center gap-1 text-[12px]">
-                    <span className="text-amber-500">
+                    <span className="text-warning-amber">
                       {"★".repeat(
                         Math.max(
                           0,
@@ -631,31 +631,31 @@ export default function ProfilePage() {
                     <span className="font-bold tabular-nums">
                       {reviewsAverage(reviews)!.toFixed(1)}
                     </span>
-                    <span className="tabular-nums text-[#9CA3AF]">
+                    <span className="tabular-nums text-ink-muted">
                       · {reviews.length}{" "}
                       {reviews.length === 1 ? "review" : "reviews"}
                     </span>
                   </div>
                 ) : null}
 
-                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   About
                 </p>
-                <p className="mt-1.5 text-[12px] leading-[1.6] text-[#374151]">
+                <p className="mt-1.5 text-[12px] leading-[1.6] text-ink-body">
                   {about ||
                     "Your bio will appear here. Add a short intro to help guests trust you."}
                 </p>
 
-                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   Services
                 </p>
                 <div className="mt-2 space-y-2">
                   {events.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-[#FFFBF7] p-3 text-[11px] text-[#6B7280]">
+                    <p className="rounded-lg border border-dashed border-line-cream bg-surface-page p-3 text-[11px] text-ink-soft">
                       No active services yet.{" "}
                       <Link
                         href="/dashboard/services/new"
-                        className="font-bold text-[#FF5F63] hover:underline"
+                        className="font-bold text-brand hover:underline"
                       >
                         Add one
                       </Link>
@@ -664,10 +664,10 @@ export default function ProfilePage() {
                     events.slice(0, 3).map((service) => (
                       <div
                         key={service.id}
-                        className="rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] p-2.5"
+                        className="rounded-lg border border-line-cream bg-surface-page p-2.5"
                       >
                         <p className="text-[12px] font-bold">{service.title}</p>
-                        <p className="text-[10px] tabular-nums text-[#6B7280]">
+                        <p className="text-[10px] tabular-nums text-ink-soft">
                           {service.durationMinutes} min ·{" "}
                           {service.locationDetails ?? "Location after booking"}
                         </p>
@@ -679,25 +679,25 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   disabled
-                  className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[13px] font-bold text-white shadow-sm"
+                  className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange text-[13px] font-bold text-white shadow-sm"
                 >
                   Book an appointment
                 </button>
               </div>
             </div>
 
-            <p className="mt-3 text-center text-[11px] text-[#9CA3AF]">
+            <p className="mt-3 text-center text-[11px] text-ink-muted">
               Updates immediately when you save.
             </p>
 
             {/* copy link button */}
-            <div className="mt-4 flex items-center justify-between rounded-2xl border border-[#EEE7DF] bg-white p-3.5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-              <p className="truncate text-[12px] tabular-nums text-[#6B7280]">
+            <div className="mt-4 flex items-center justify-between rounded-2xl border border-line-cream bg-surface-card p-3.5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              <p className="truncate text-[12px] tabular-nums text-ink-soft">
                 bookvella.com/{slug || user?.slug || "your-link"}
               </p>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFD2CE] bg-[#FFF0EF] px-2.5 text-[11px] font-bold text-[#FF5F63]"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-brand-tint-400 bg-brand-tint-100 px-2.5 text-[11px] font-bold text-brand"
                 onClick={() => {
                   if (!user) return;
                   const url =
@@ -753,7 +753,7 @@ function PhotoRow({
       <div className="flex flex-wrap items-center gap-5">
         <div className="relative">
           <div
-            className="flex size-20 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[24px] font-bold text-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]"
+            className="flex size-20 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[24px] font-bold text-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]"
             style={
               profileImageUrl
                 ? {
@@ -766,7 +766,7 @@ function PhotoRow({
           >
             {!profileImageUrl ? initial : null}
           </div>
-          <label className="absolute -bottom-1.5 -right-1.5 inline-flex size-7 cursor-pointer items-center justify-center rounded-full border border-[#EEE7DF] bg-white text-[#FF5F63] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <label className="absolute -bottom-1.5 -right-1.5 inline-flex size-7 cursor-pointer items-center justify-center rounded-full border border-line-cream bg-surface-card text-brand shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
             <Camera className="size-3.5" />
             <input
               type="file"
@@ -787,11 +787,11 @@ function PhotoRow({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-bold">Profile photo</p>
-          <p className="mt-1 text-[12px] text-[#6B7280]">
+          <p className="mt-1 text-[12px] text-ink-soft">
             Shown on your booking page and emails. 400×400px recommended.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#FFD2CE] bg-[#FFF0EF] px-3 text-[12px] font-bold text-[#FF5F63]">
+            <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-tint-400 bg-brand-tint-100 px-3 text-[12px] font-bold text-brand">
               <Upload className="size-3.5" />
               {uploading ? "Uploading…" : "Upload photo"}
               <input
@@ -814,7 +814,7 @@ function PhotoRow({
               <button
                 type="button"
                 onClick={onClear}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#6B7280]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-soft bg-surface-card px-3 text-[12px] font-bold text-ink-soft"
               >
                 <Trash2 className="size-3.5" /> Remove
               </button>
@@ -852,18 +852,18 @@ function CoverUpload({
           onCancel={() => setPendingSrc(null)}
         />
       ) : null}
-      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+      <div className="rounded-2xl border border-line-cream bg-surface-page p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[13px] font-bold">Cover image</p>
-            <p className="mt-0.5 text-[11px] text-[#6B7280]">
+            <p className="mt-0.5 text-[11px] text-ink-soft">
               Sits behind your name on your public page. 2:1 ratio recommended.
             </p>
           </div>
           {value ? (
             <button
               type="button"
-              className="text-[11px] font-bold text-[#FF5F63]"
+              className="text-[11px] font-bold text-brand"
               onClick={onClear}
             >
               Remove
@@ -873,15 +873,15 @@ function CoverUpload({
         <div className="mt-3 flex flex-wrap items-center gap-4">
           {value ? (
             <div
-              className="h-20 w-40 rounded-xl border border-[#E8DED7] bg-cover bg-center"
+              className="h-20 w-40 rounded-xl border border-line-warm bg-cover bg-center"
               style={{ backgroundImage: `url(${value})` }}
             />
           ) : (
-            <div className="grid h-20 w-40 place-items-center rounded-xl border border-dashed border-[#E8DED7] bg-white text-[11px] font-bold text-[#B8C0CC]">
+            <div className="grid h-20 w-40 place-items-center rounded-xl border border-dashed border-line-warm bg-surface-card text-[11px] font-bold text-ink-disabled">
               No cover yet
             </div>
           )}
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-[#FFD2CE] bg-white px-4 text-[12px] font-bold text-[#FF5F63]">
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-brand-tint-400 bg-surface-card px-4 text-[12px] font-bold text-brand">
             <Upload className="size-4" />
             {uploading ? "Uploading…" : value ? "Replace cover" : "Choose cover"}
             <input
@@ -921,34 +921,34 @@ function ReviewListRow({
   );
   return (
     <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#A855F7] to-[#7C4DFF] text-[12px] font-bold text-white">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple to-purple-strong text-[12px] font-bold text-white">
         {initial}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[14px] font-bold">{review.guestName}</p>
-          <span className="text-[12px] text-amber-500">{stars}</span>
-          <span className="text-[11px] tabular-nums text-[#9CA3AF]">
+          <span className="text-[12px] text-warning-amber">{stars}</span>
+          <span className="text-[11px] tabular-nums text-ink-muted">
             {review.eventType.title} · {relativeDate(review.createdAt)}
           </span>
           {!review.isVisible ? (
-            <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-bold text-[#6B7280]">
+            <span className="rounded-full bg-line-subtle px-2 py-0.5 text-[10px] font-bold text-ink-soft">
               Hidden
             </span>
           ) : null}
         </div>
         <p
-          className={`mt-1.5 text-[13px] leading-[1.6] ${review.isVisible ? "text-[#374151]" : "text-[#6B7280]"}`}
+          className={`mt-1.5 text-[13px] leading-[1.6] ${review.isVisible ? "text-ink-body" : "text-ink-soft"}`}
         >
           &ldquo;{review.comment}&rdquo;
         </p>
       </div>
-      <label className="flex items-center gap-2 text-[12px] font-semibold text-[#374151]">
+      <label className="flex items-center gap-2 text-[12px] font-semibold text-ink-body">
         <input
           type="checkbox"
           checked={review.isVisible}
           onChange={onToggle}
-          className="size-4 rounded border-[#D1D5DB] text-[#FF5F63] focus:ring-[#FF5F63]"
+          className="size-4 rounded border-line-strong text-brand focus:ring-brand"
         />
         Visible
       </label>
@@ -968,10 +968,10 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[18px] border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-4">
+    <section className="rounded-[18px] border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-cream px-5 py-4">
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9CA3AF]">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ink-muted">
             {eyebrow}
           </p>
           <h2 className="mt-1 text-[16px] font-extrabold">{head}</h2>
@@ -985,7 +985,7 @@ function Card({
 
 function FieldEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[12px] font-bold uppercase tracking-[0.10em] text-[#6B7280]">
+    <span className="text-[12px] font-bold uppercase tracking-[0.10em] text-ink-soft">
       {children}
     </span>
   );
@@ -1019,11 +1019,11 @@ function FieldText({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className={`h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${icon ? "pl-10" : ""}`}
+          className={`h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-sm font-medium outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${icon ? "pl-10" : ""}`}
         />
       </div>
       {help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1052,10 +1052,10 @@ function FieldTextarea({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 py-3 text-sm leading-[1.55] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        className="mt-1.5 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 py-3 text-sm leading-[1.55] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
       />
       {help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1080,7 +1080,7 @@ function FieldSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        className="mt-1.5 h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3 text-sm font-medium outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
       >
         {value ? null : <option value="">{placeholder ?? "Select…"}</option>}
         {options.map((option) => (
@@ -1095,7 +1095,7 @@ function FieldSelect({
 
 function PreviewChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#E8DED7] bg-white px-2 py-1 text-[11px] font-semibold text-[#374151]">
+    <span className="inline-flex items-center gap-1 rounded-full border border-line-warm bg-surface-card px-2 py-1 text-[11px] font-semibold text-ink-body">
       {children}
     </span>
   );
@@ -1291,7 +1291,7 @@ function CropModal({
               y: Math.max(hh, Math.min(height - hh, p.y)),
             }));
           }}
-          className="flex-1 accent-[#FF5F63]"
+          className="flex-1 accent-brand"
         />
         <ZoomIn className="size-4 shrink-0 text-white/60" />
       </div>
@@ -1299,7 +1299,7 @@ function CropModal({
       <button
         type="button"
         onClick={handleCrop}
-        className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-10 font-bold text-white hover:brightness-105"
+        className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-brand-coral to-brand-orange px-10 font-bold text-white hover:brightness-105"
       >
         Apply crop
       </button>

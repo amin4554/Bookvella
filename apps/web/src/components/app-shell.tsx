@@ -156,8 +156,8 @@ export function AppShell({
 
   if (checkingSession || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FFFBF7] px-6 text-center text-[#6B7280]">
-        <div className="rounded-2xl border border-[#EEE7DF] bg-white px-6 py-5 shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-surface-page px-6 text-center text-ink-soft">
+        <div className="rounded-2xl border border-line-cream bg-surface-card px-6 py-5 shadow-sm">
           Checking your session…
         </div>
       </div>
@@ -171,7 +171,7 @@ export function AppShell({
 
   return (
     <>
-      <div className="min-h-screen bg-[#FFFBF7] pb-20 text-[#0B1220] lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
+      <div className="min-h-screen bg-surface-page pb-20 text-ink-strong lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
         <DesktopSidebar
           active={active}
           bookingCount={bookingCount}
@@ -184,7 +184,7 @@ export function AppShell({
         />
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#EEE7DF] bg-white px-5 lg:hidden">
+          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-line-cream bg-surface-card px-5 lg:hidden">
             <div className="lg:hidden">
               <BrandLogo />
             </div>
@@ -253,8 +253,8 @@ function DesktopSidebar({
   }, []);
 
   return (
-    <aside className="sticky top-0 z-30 hidden h-screen flex-col self-start border-r border-[#EEE7DF] bg-white lg:flex">
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-[#EEE7DF] px-5">
+    <aside className="sticky top-0 z-30 hidden h-screen flex-col self-start border-r border-line-cream bg-surface-card lg:flex">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-line-cream px-5">
         <BrandLogo />
       </div>
 
@@ -269,20 +269,20 @@ function DesktopSidebar({
                 // Dot-led nav row per design (services.html / profile.html).
                 "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition",
                 selected
-                  ? "bg-[#FFEDEA] text-[#FF5F63]"
-                  : "text-[#374151] hover:bg-[#FFF6F0] hover:text-[#0B1220]",
+                  ? "bg-brand-tint-200 text-brand"
+                  : "text-ink-body hover:bg-surface-blush hover:text-ink-strong",
               )}
             >
               <span
                 aria-hidden
                 className={cn(
                   "size-1.5 shrink-0 rounded-full",
-                  selected ? "bg-[#FF5F63]" : "bg-[#D1D5DB]",
+                  selected ? "bg-brand" : "bg-ink-faint",
                 )}
               />
               <span className="flex-1">{item.label}</span>
               {item.label === "Bookings" && bookingCount && bookingCount > 0 ? (
-                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF5F63] px-1.5 text-[10px] font-bold text-white">
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
                   {bookingCount}
                 </span>
               ) : null}
@@ -294,12 +294,12 @@ function DesktopSidebar({
       <div className="relative m-3" ref={menuRef}>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3 text-left hover:bg-white"
+          className="flex w-full items-center gap-3 rounded-xl border border-line-cream bg-surface-page p-3 text-left hover:bg-surface-card"
           aria-haspopup="true"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((value) => !value)}
         >
-          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[13px] font-bold text-white">
+          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[13px] font-bold text-white">
             {userProfileImage ? (
               <div
                 className="size-full bg-cover bg-center"
@@ -311,13 +311,13 @@ function DesktopSidebar({
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-[13px] font-bold">{userName}</p>
-            <p className="truncate text-[11px] text-[#6B7280]">
+            <p className="truncate text-[11px] text-ink-soft">
               bookvella.com/{userSlug}
             </p>
           </div>
           <ChevronUp
             className={cn(
-              "size-4 text-[#9CA3AF] transition",
+              "size-4 text-ink-muted transition",
               menuOpen ? "" : "rotate-180",
             )}
           />
@@ -379,7 +379,7 @@ function MobileUserMenuButton({
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="Open account menu"
-        className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white"
+        className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-sm font-bold text-white"
       >
         {userProfileImage ? (
           <div
@@ -426,7 +426,7 @@ function UserMenuItems({
   // first time the menu opens so the dropdown stays cheap on routes that
   // never need it.
   const [services, setServices] = useState<EventType[] | null>(null);
-  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState<string | null>(null);
 
   // Tailwind 4 themes via `:root.dark`, set via the `dark` class on <html>.
@@ -447,8 +447,6 @@ function UserMenuItems({
   // closed.
   useEffect(() => {
     let alive = true;
-    setServicesLoading(true);
-    setServicesError(null);
     authedApiRequest<EventType[]>("/event-types")
       .then((next) => {
         if (!alive) return;
@@ -533,7 +531,7 @@ function UserMenuItems({
       <div
         role="menu"
         className={cn(
-          "absolute z-40 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
+          "absolute z-40 rounded-xl border border-line-cream bg-surface-card p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
           positionClass,
         )}
       >
@@ -542,20 +540,20 @@ function UserMenuItems({
             type="button"
             onClick={() => setView("main")}
             aria-label="Back to account menu"
-            className="inline-flex size-7 items-center justify-center rounded-md text-[#6B7280] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-soft transition hover:bg-surface-page hover:text-ink-strong"
           >
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
               Copy booking link
             </p>
-            <p className="truncate text-[12px] font-bold text-[#0B1220]">
+            <p className="truncate text-[12px] font-bold text-ink-strong">
               Pick a service
             </p>
           </div>
         </div>
-        <div className="my-1 h-px bg-[#EEE7DF]" />
+        <div className="my-1 h-px bg-line-cream" />
         <div className="max-h-[260px] overflow-y-auto py-0.5">
           {bookableServices.map((service) => (
             <MenuRow
@@ -564,7 +562,7 @@ function UserMenuItems({
               type="button"
               onClick={() => copyServiceLink(service)}
               icon={
-                <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+                <Copy className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
               }
             >
               <span className="block min-w-0 flex-1 truncate">
@@ -574,7 +572,7 @@ function UserMenuItems({
           ))}
         </div>
         {copied ? (
-          <p className="mt-1 px-3 pb-1 text-[11px] font-bold text-[#16A34A]">
+          <p className="mt-1 px-3 pb-1 text-[11px] font-bold text-success">
             Link copied to clipboard
           </p>
         ) : null}
@@ -586,7 +584,7 @@ function UserMenuItems({
     <div
       role="menu"
       className={cn(
-        "absolute z-40 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
+        "absolute z-40 rounded-xl border border-line-cream bg-surface-card p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
         positionClass,
       )}
     >
@@ -597,7 +595,7 @@ function UserMenuItems({
         rel="noreferrer"
         onClick={onClose}
         icon={
-          <ExternalLink className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <ExternalLink className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         }
       >
         View public page
@@ -608,9 +606,9 @@ function UserMenuItems({
         onClick={handleCopyClicked}
         icon={
           copied ? (
-            <Check className="size-4 shrink-0 text-[#16A34A]" />
+            <Check className="size-4 shrink-0 text-success" />
           ) : (
-            <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+            <Copy className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
           )
         }
       >
@@ -621,7 +619,7 @@ function UserMenuItems({
         href="/dashboard/profile"
         onClick={onClose}
         icon={
-          <UserCircle2 className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <UserCircle2 className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         }
       >
         Edit profile
@@ -631,34 +629,34 @@ function UserMenuItems({
         href="/dashboard/settings"
         onClick={onClose}
         icon={
-          <Settings className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <Settings className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         }
       >
         Settings
       </MenuRow>
-      <div className="my-1 h-px bg-[#EEE7DF]" />
+      <div className="my-1 h-px bg-line-cream" />
       <button
         type="button"
         role="menuitemcheckbox"
         aria-checked={dark}
         onClick={toggleTheme}
-        className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-[#374151] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+        className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-ink-body transition hover:bg-surface-page hover:text-ink-strong"
       >
         {dark ? (
-          <Sun className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <Sun className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         ) : (
-          <Moon className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <Moon className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         )}
         <span className="flex-1">Dark mode</span>
         <span
           className={cn(
             "relative h-4 w-7 rounded-full transition",
-            dark ? "bg-[#FF5F63]" : "bg-[#E5E7EB]",
+            dark ? "bg-brand" : "bg-line-soft",
           )}
         >
           <span
             className={cn(
-              "absolute top-[2px] size-3 rounded-full bg-white shadow transition",
+              "absolute top-[2px] size-3 rounded-full bg-surface-card shadow transition",
               dark ? "left-[14px]" : "left-[2px]",
             )}
           />
@@ -669,12 +667,12 @@ function UserMenuItems({
         href="/legal/contact"
         onClick={onClose}
         icon={
-          <LifeBuoy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+          <LifeBuoy className="size-4 shrink-0 text-ink-muted group-hover:text-brand" />
         }
       >
         Help &amp; support
       </MenuRow>
-      <div className="my-1 h-px bg-[#EEE7DF]" />
+      <div className="my-1 h-px bg-line-cream" />
       <MenuRow
         as="button"
         type="button"
@@ -683,14 +681,14 @@ function UserMenuItems({
           onLogout();
         }}
         danger
-        icon={<LogOut className="size-4 shrink-0 text-[#DC2626]" />}
+        icon={<LogOut className="size-4 shrink-0 text-danger-strong" />}
       >
         Sign out
       </MenuRow>
       {servicesError ? (
         <p
           role="alert"
-          className="mt-1 px-3 pb-1 text-[10.5px] text-[#B91C1C]"
+          className="mt-1 px-3 pb-1 text-[10.5px] text-danger"
         >
           Couldn&apos;t load your services for the booking link picker.
         </p>
@@ -723,8 +721,8 @@ function MenuRow({
       className={cn(
         "group flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-semibold transition",
         danger
-          ? "text-[#B91C1C] hover:bg-[#FEF2F2]"
-          : "text-[#374151] hover:bg-[#FFFBF7] hover:text-[#0B1220]",
+          ? "text-danger hover:bg-danger-tint"
+          : "text-ink-body hover:bg-surface-page hover:text-ink-strong",
       )}
     >
       {icon}
@@ -741,7 +739,7 @@ function MobileNav({
   bookingCount?: number;
 }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-[#EEE7DF] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line-cream bg-surface-card/95 px-2 py-2 backdrop-blur lg:hidden">
       {MOBILE_NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         const selected = item.label === active;
@@ -751,13 +749,13 @@ function MobileNav({
             href={item.href}
             className={cn(
               "relative flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-bold",
-              selected ? "bg-[#FFF0EF] text-[#FF5F63]" : "text-[#9CA3AF]",
+              selected ? "bg-brand-tint-100 text-brand" : "text-ink-muted",
             )}
           >
             <Icon className="size-4" />
             {item.label}
             {item.label === "Bookings" && bookingCount && bookingCount > 0 ? (
-              <span className="absolute right-2 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF5F63] px-1 text-[9px] font-bold text-white">
+              <span className="absolute right-2 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white">
                 {bookingCount}
               </span>
             ) : null}
@@ -784,8 +782,8 @@ export function EmptyPage({
 }) {
   return (
     <AppShell active={active} title={title}>
-      <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 shadow-sm">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+      <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 shadow-sm">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-brand-tint-100 text-brand">
           <LayoutGrid className="size-5" />
         </div>
         {children}

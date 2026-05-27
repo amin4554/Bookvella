@@ -229,7 +229,7 @@ export default function BookingsPage() {
           >
             Bookings
           </h1>
-          <p className="mt-2 text-sm text-[#6B7280]">
+          <p className="mt-2 text-sm text-ink-soft">
             All appointments across your services.
           </p>
         </div>
@@ -238,7 +238,7 @@ export default function BookingsPage() {
             type="button"
             onClick={exportBookings}
             disabled={exporting || bookings.length === 0}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
           >
             {exporting ? (
               <Loader2 className="size-4 animate-spin" />
@@ -254,7 +254,7 @@ export default function BookingsPage() {
                 current === "calendar" ? "list" : "calendar",
               )
             }
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
           >
             {viewMode === "calendar" ? (
               <List className="size-4" />
@@ -281,29 +281,29 @@ export default function BookingsPage() {
               label="Total bookings"
               value={String(totalBookings)}
               sub="All-time, all services"
-              accent="text-[#0B1220]"
+              accent="text-ink-strong"
             />
             <StatTile
               label="This month"
               value={String(thisMonth)}
               sub="Confirmed in the current month"
-              accent="text-[#A855F7]"
+              accent="text-purple"
             />
             <StatTile
               label="Upcoming"
               value={String(counts.upcoming)}
               sub="Next 7 days"
-              accent="text-[#FF5F63]"
+              accent="text-brand"
             />
             <StatTile
               label="Completed"
               value={String(counts.past)}
               sub="Past appointments"
-              accent="text-[#16A34A]"
+              accent="text-success"
             />
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-white p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-cream bg-surface-card p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
             <div className="flex flex-wrap items-center gap-1.5 p-1">
               <TabButton
                 active={tab === "upcoming"}
@@ -329,12 +329,12 @@ export default function BookingsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2 px-2">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#9CA3AF]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search by guest, email, service…"
-                  className="h-10 w-[260px] rounded-xl border border-[#E5E7EB] bg-white pl-9 pr-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+                  className="h-10 w-[260px] rounded-xl border border-line-soft bg-surface-card pl-9 pr-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
                 />
               </div>
               <ServiceFilterDropdown
@@ -359,8 +359,8 @@ export default function BookingsPage() {
           ) : filtered.length === 0 ? (
             <EmptyState tab={tab} search={search} user={user} />
           ) : (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-              <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-3">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              <div className="flex items-center justify-between border-b border-line-cream px-5 py-3">
                 <p className="text-[13px] font-bold">
                   {filtered.length}{" "}
                   {tab === "upcoming"
@@ -372,7 +372,7 @@ export default function BookingsPage() {
                 </p>
               </div>
               <table className="w-full text-left text-[13px]">
-                <thead className="border-b border-[#EEE7DF] bg-[#FFFBF7] text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                <thead className="border-b border-line-cream bg-surface-page text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
                   <tr>
                     <th className="px-5 py-3">Guest</th>
                     <th className="px-3">Service</th>
@@ -382,7 +382,7 @@ export default function BookingsPage() {
                     <th className="px-5 text-right" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#EEE7DF]">
+                <tbody className="divide-y divide-line-cream">
                   {filtered.map((booking) => (
                     <BookingRow
                       key={booking.id}
@@ -401,26 +401,26 @@ export default function BookingsPage() {
                   ))}
                 </tbody>
               </table>
-              <div className="flex items-center justify-between border-t border-[#EEE7DF] px-5 py-3 text-[11px] text-[#6B7280]">
+              <div className="flex items-center justify-between border-t border-line-cream px-5 py-3 text-[11px] text-ink-soft">
                 <p>
                   Showing{" "}
-                  <span className="font-bold text-[#0B1220]">
+                  <span className="font-bold text-ink-strong">
                     1–{filtered.length}
                   </span>{" "}
-                  of <span className="font-bold text-[#0B1220]">{filtered.length}</span>
+                  of <span className="font-bold text-ink-strong">{filtered.length}</span>
                 </p>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     disabled
-                    className="rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-[#9CA3AF]"
+                    className="rounded-md border border-line-soft bg-surface-card px-2 py-1 text-ink-muted"
                   >
                     <ChevronLeft className="size-3.5" />
                   </button>
                   <button
                     type="button"
                     disabled
-                    className="rounded-md border border-[#E5E7EB] bg-white px-2 py-1 text-[#9CA3AF]"
+                    className="rounded-md border border-line-soft bg-surface-card px-2 py-1 text-ink-muted"
                   >
                     <ChevronRight className="size-3.5" />
                   </button>
@@ -506,8 +506,8 @@ function ServiceFilterDropdown({
         disabled={services.length === 0}
         className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
           hasFilter
-            ? "border-[#FCC9C5] bg-[#FFF0EF] text-[#FF5F63] hover:bg-[#FFE2DF]"
-            : "border-[#E5E7EB] bg-white text-[#0B1220] hover:bg-[#F9FAFB]"
+            ? "border-brand-tint-300 bg-brand-tint-100 text-brand hover:bg-brand-tint-hover"
+            : "border-line-soft bg-surface-card text-ink-strong hover:bg-surface-soft"
         }`}
         aria-haspopup="true"
         aria-expanded={open}
@@ -515,7 +515,7 @@ function ServiceFilterDropdown({
         <Filter className="size-4" />
         Filters
         {hasFilter ? (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF5F63] px-1.5 text-[10px] font-bold text-white">
+          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
             {count}
           </span>
         ) : null}
@@ -524,17 +524,17 @@ function ServiceFilterDropdown({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+6px)] z-20 w-[280px] rounded-xl border border-[#EEE7DF] bg-white p-2 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]"
+          className="absolute right-0 top-[calc(100%+6px)] z-20 w-[280px] rounded-xl border border-line-cream bg-surface-card p-2 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]"
         >
           <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted">
               Services
             </p>
             {hasFilter ? (
               <button
                 type="button"
                 onClick={() => onChange(new Set())}
-                className="text-[11px] font-bold text-[#FF5F63] hover:underline"
+                className="text-[11px] font-bold text-brand hover:underline"
               >
                 Clear all
               </button>
@@ -542,7 +542,7 @@ function ServiceFilterDropdown({
           </div>
           <div className="max-h-[320px] overflow-y-auto">
             {services.length === 0 ? (
-              <p className="px-3 py-4 text-center text-[12px] text-[#9CA3AF]">
+              <p className="px-3 py-4 text-center text-[12px] text-ink-muted">
                 No services found in your bookings.
               </p>
             ) : (
@@ -555,13 +555,13 @@ function ServiceFilterDropdown({
                     role="menuitemcheckbox"
                     aria-checked={checked}
                     onClick={() => toggleService(service.id)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-[#0B1220] hover:bg-[#FFFBF7]"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-ink-strong hover:bg-surface-page"
                   >
                     <span
                       className={`flex size-4 shrink-0 items-center justify-center rounded-[4px] border ${
                         checked
-                          ? "border-[#FF5F63] bg-[#FF5F63] text-white"
-                          : "border-[#D1D5DB] bg-white"
+                          ? "border-brand bg-brand text-white"
+                          : "border-line-strong bg-surface-card"
                       }`}
                     >
                       {checked ? <Check className="size-3" /> : null}
@@ -590,14 +590,14 @@ function StatTile({
   accent: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
         {label}
       </p>
       <p className={`mt-3 text-[28px] font-bold tabular-nums ${accent}`}>
         {value}
       </p>
-      <p className="text-[11px] text-[#6B7280]">{sub}</p>
+      <p className="text-[11px] text-ink-soft">{sub}</p>
     </div>
   );
 }
@@ -619,16 +619,16 @@ function TabButton({
       onClick={onClick}
       className={
         active
-          ? "inline-flex h-10 items-center gap-2 rounded-xl bg-[#0B1220] px-3.5 text-[13px] font-bold text-white"
-          : "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+          ? "inline-flex h-10 items-center gap-2 rounded-xl bg-ink-strong px-3.5 text-[13px] font-bold text-surface-card"
+          : "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-[13px] font-bold text-ink-soft hover:text-ink-strong"
       }
     >
       {children}
       <span
         className={
           active
-            ? "rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] tabular-nums"
-            : "rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] tabular-nums text-[#6B7280]"
+            ? "rounded-full bg-surface-card/20 px-1.5 py-0.5 text-[10px] tabular-nums"
+            : "rounded-full bg-line-subtle px-1.5 py-0.5 text-[10px] tabular-nums text-ink-soft"
         }
       >
         {count}
@@ -670,11 +670,11 @@ function BookingsCalendarView({
   }, [bookings, timeZone]);
 
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-4">
+    <div className="mt-4 overflow-hidden rounded-2xl border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-cream px-5 py-4">
         <div>
           <p className="text-[13px] font-bold">Calendar view</p>
-          <p className="text-[11px] text-[#6B7280]">
+          <p className="text-[11px] text-ink-soft">
             {bookings.length} booking{bookings.length === 1 ? "" : "s"} in the
             current filters
           </p>
@@ -683,7 +683,7 @@ function BookingsCalendarView({
           <button
             type="button"
             onClick={() => onMonthChange(addMonths(month, -1))}
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-line-soft bg-surface-card text-ink-soft hover:bg-surface-soft"
             aria-label="Previous month"
           >
             <ChevronLeft className="size-4" />
@@ -691,14 +691,14 @@ function BookingsCalendarView({
           <button
             type="button"
             onClick={() => onMonthChange(new Date())}
-            className="inline-flex h-9 items-center rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-9 items-center rounded-lg border border-line-soft bg-surface-card px-3 text-[12px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             Today
           </button>
           <button
             type="button"
             onClick={() => onMonthChange(addMonths(month, 1))}
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-[#F9FAFB]"
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-line-soft bg-surface-card text-ink-soft hover:bg-surface-soft"
             aria-label="Next month"
           >
             <ChevronRight className="size-4" />
@@ -706,11 +706,11 @@ function BookingsCalendarView({
         </div>
       </div>
 
-      <div className="border-b border-[#EEE7DF] bg-[#FFFBF7] px-5 py-4">
+      <div className="border-b border-line-cream bg-surface-page px-5 py-4">
         <h2 className="text-xl font-bold">{monthLabel(month)}</h2>
       </div>
 
-      <div className="grid grid-cols-7 border-b border-[#EEE7DF] bg-[#F9FAFB] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+      <div className="grid grid-cols-7 border-b border-line-cream bg-surface-soft text-center text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
           <div key={day} className="py-2">
             {day}
@@ -726,8 +726,8 @@ function BookingsCalendarView({
           return (
             <div
               key={key}
-              className={`min-h-[132px] border-b border-r border-[#EEE7DF] p-2.5 ${
-                muted ? "bg-[#F9FAFB] text-[#9CA3AF]" : "bg-white"
+              className={`min-h-[132px] border-b border-r border-line-cream p-2.5 ${
+                muted ? "bg-surface-soft text-ink-muted" : "bg-surface-card"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -735,7 +735,7 @@ function BookingsCalendarView({
                   {day.getDate()}
                 </span>
                 {dayBookings.length > 0 ? (
-                  <span className="rounded-full bg-[#FFF0EF] px-1.5 py-0.5 text-[10px] font-bold text-[#FF5F63]">
+                  <span className="rounded-full bg-brand-tint-100 px-1.5 py-0.5 text-[10px] font-bold text-brand">
                     {dayBookings.length}
                   </span>
                 ) : null}
@@ -748,20 +748,20 @@ function BookingsCalendarView({
                     onClick={() => onOpenBooking(booking)}
                     className={`w-full rounded-lg border px-2 py-1.5 text-left text-[11px] leading-tight ${
                       booking.status === "CANCELLED"
-                        ? "border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]"
-                        : "border-[#FFD2CE] bg-[#FFF7F5] text-[#0B1220] hover:bg-[#FFF0EF]"
+                        ? "border-line-soft bg-line-subtle text-ink-soft"
+                        : "border-brand-tint-400 bg-brand-tint-50 text-ink-strong hover:bg-brand-tint-100"
                     }`}
                   >
                     <span className="block font-bold tabular-nums">
                       {formatTime(booking.startTimeUtc, timeZone)}
                     </span>
-                    <span className="block truncate text-[#6B7280]">
+                    <span className="block truncate text-ink-soft">
                       {booking.guestName}
                     </span>
                   </button>
                 ))}
                 {dayBookings.length > 3 ? (
-                  <p className="px-1 text-[10px] font-bold text-[#9CA3AF]">
+                  <p className="px-1 text-[10px] font-bold text-ink-muted">
                     +{dayBookings.length - 3} more
                   </p>
                 ) : null}
@@ -772,7 +772,7 @@ function BookingsCalendarView({
       </div>
 
       {bookings.length === 0 ? (
-        <div className="px-5 py-10 text-center text-sm text-[#6B7280]">
+        <div className="px-5 py-10 text-center text-sm text-ink-soft">
           No bookings match the current filters.
         </div>
       ) : null}
@@ -805,7 +805,7 @@ function BookingRow({
   return (
     <>
       <tr
-        className="cursor-pointer hover:bg-[#FFFBF7]"
+        className="cursor-pointer hover:bg-surface-page"
         onClick={onToggle}
       >
         <td className="px-5 py-3.5">
@@ -813,7 +813,7 @@ function BookingRow({
             <Avatar name={booking.guestName} />
             <div className="leading-tight">
               <p className="font-bold">{booking.guestName}</p>
-              <p className="text-[11px] text-[#9CA3AF]">{booking.guestEmail}</p>
+              <p className="text-[11px] text-ink-muted">{booking.guestEmail}</p>
             </div>
           </div>
         </td>
@@ -821,8 +821,8 @@ function BookingRow({
           <span
             className={
               cancelled
-                ? "inline-flex rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[11px] font-bold text-[#9CA3AF]"
-                : "inline-flex rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold text-[#FF5F63]"
+                ? "inline-flex rounded-full bg-line-subtle px-2.5 py-1 text-[11px] font-bold text-ink-muted"
+                : "inline-flex rounded-full bg-brand-tint-100 px-2.5 py-1 text-[11px] font-bold text-brand"
             }
           >
             {booking.eventType.title}
@@ -832,22 +832,22 @@ function BookingRow({
           <p className="font-semibold">
             {formatDateTime(booking.startTimeUtc, timeZone)}
           </p>
-          <p className="text-[11px] text-[#9CA3AF]">
+          <p className="text-[11px] text-ink-muted">
             {booking.eventType.durationMinutes} min
           </p>
         </td>
         <td className="px-3">
           {cancelled ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEE2E2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C]">
-              <span className="size-1.5 rounded-full bg-[#DC2626]" /> Cancelled
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-tint-strong px-2.5 py-1 text-[11px] font-bold text-danger">
+              <span className="size-1.5 rounded-full bg-danger-strong" /> Cancelled
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[11px] font-bold text-[#16A34A]">
-              <span className="size-1.5 rounded-full bg-[#16A34A]" /> Confirmed
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-mint px-2.5 py-1 text-[11px] font-bold text-success">
+              <span className="size-1.5 rounded-full bg-success" /> Confirmed
             </span>
           )}
         </td>
-        <td className="px-3 text-[12px] text-[#374151]">
+        <td className="px-3 text-[12px] text-ink-body">
           {location.split("·")[0].trim()}
         </td>
         <td className="px-5 text-right">
@@ -858,7 +858,7 @@ function BookingRow({
                 event.stopPropagation();
                 onCancel();
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#FECACA] bg-white px-3 py-1.5 text-[12px] font-bold text-[#B91C1C] hover:bg-[#FEF2F2]"
+              className="inline-flex items-center gap-1 rounded-lg border border-danger-border bg-surface-card px-3 py-1.5 text-[12px] font-bold text-danger hover:bg-danger-tint"
             >
               Cancel
             </button>
@@ -867,22 +867,22 @@ function BookingRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={6} className="bg-[#FFFBF7] px-5 py-5">
+          <td colSpan={6} className="bg-surface-page px-5 py-5">
             <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
               <div className="grid gap-3 sm:grid-cols-2">
                 <DetailBlock label="Guest">
                   <p className="text-[13px] font-bold">{booking.guestName}</p>
-                  <p className="text-[12px] text-[#6B7280]">
+                  <p className="text-[12px] text-ink-soft">
                     {booking.guestEmail}
                   </p>
                   {booking.guestPhone ? (
-                    <p className="text-[12px] text-[#6B7280] tabular-nums">
+                    <p className="text-[12px] text-ink-soft tabular-nums">
                       {booking.guestPhone}
                     </p>
                   ) : null}
-                  <p className="mt-1 text-[11px] text-[#9CA3AF]">
+                  <p className="mt-1 text-[11px] text-ink-muted">
                     Guest timezone:{" "}
-                    <span className="font-semibold text-[#0B1220]">
+                    <span className="font-semibold text-ink-strong">
                       {booking.guestTimezone}
                     </span>
                   </p>
@@ -891,28 +891,28 @@ function BookingRow({
                   <p className="text-[13px] font-bold">
                     {booking.eventType.title}
                   </p>
-                  <p className="text-[12px] text-[#6B7280] tabular-nums">
+                  <p className="text-[12px] text-ink-soft tabular-nums">
                     {formatDateTime(booking.startTimeUtc, timeZone)} ·{" "}
                     {booking.eventType.durationMinutes} min
                   </p>
-                  <p className="text-[12px] text-[#6B7280]">{location}</p>
+                  <p className="text-[12px] text-ink-soft">{location}</p>
                 </DetailBlock>
                 {booking.guestNote ? (
                   <div className="sm:col-span-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                       Guest note
                     </p>
-                    <p className="mt-1 rounded-xl border border-[#EEE7DF] bg-white p-3 text-[13px] leading-[1.6] text-[#374151]">
+                    <p className="mt-1 rounded-xl border border-line-cream bg-surface-card p-3 text-[13px] leading-[1.6] text-ink-body">
                       {booking.guestNote}
                     </p>
                   </div>
                 ) : null}
                 {booking.cancellationReason ? (
                   <div className="sm:col-span-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                       Cancellation reason
                     </p>
-                    <p className="mt-1 rounded-xl border border-[#EEE7DF] bg-white p-3 text-[13px] leading-[1.6] text-[#374151]">
+                    <p className="mt-1 rounded-xl border border-line-cream bg-surface-card p-3 text-[13px] leading-[1.6] text-ink-body">
                       {booking.cancellationReason}
                     </p>
                   </div>
@@ -933,7 +933,7 @@ function BookingRow({
                 />
                 <a
                   href={`mailto:${booking.guestEmail}`}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
                 >
                   <Mail className="size-4" /> Email guest
                 </a>
@@ -952,7 +952,7 @@ function BookingRow({
                   <button
                     type="button"
                     onClick={onCancel}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#DC2626] px-4 text-[13px] font-bold text-white hover:bg-[#B91C1C]"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-danger-strong px-4 text-[13px] font-bold text-white hover:bg-danger"
                   >
                     <X className="size-4" /> Cancel booking
                   </button>
@@ -975,7 +975,7 @@ function DetailBlock({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
         {label}
       </p>
       <div className="mt-1 space-y-0.5">{children}</div>
@@ -1001,11 +1001,11 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-70"
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-70"
     >
       <Icon className="size-4" /> {label}
       {hint ? (
-        <span className="rounded-full bg-[#F3F4F6] px-1.5 text-[10px] text-[#6B7280]">
+        <span className="rounded-full bg-line-subtle px-1.5 text-[10px] text-ink-soft">
           {hint}
         </span>
       ) : null}
@@ -1016,11 +1016,11 @@ function ActionButton({
 function Avatar({ name }: { name: string }) {
   const initial = name?.[0]?.toUpperCase() ?? "?";
   const palettes = [
-    "from-[#A855F7] to-[#7C4DFF]",
-    "from-[#10B981] to-[#0D9488]",
-    "from-[#F97316] to-[#EA580C]",
-    "from-[#EC4899] to-[#A855F7]",
-    "from-[#3B82F6] to-[#0EA5E9]",
+    "from-purple to-purple-strong",
+    "from-success-bright to-success-teal",
+    "from-orange-500 to-orange-600",
+    "from-pink-500 to-purple",
+    "from-info-bright to-info-cyan",
   ];
   const palette = palettes[(initial.charCodeAt(0) || 0) % palettes.length];
   return (
@@ -1048,19 +1048,19 @@ function CancelModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1220]/45 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/45 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-[460px] rounded-2xl bg-white shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
+      <div className="w-full max-w-[460px] rounded-2xl bg-surface-card shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
         <div className="flex items-start gap-4 p-6">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#FEE2E2] text-[#B91C1C]">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-danger-tint-strong text-danger">
             <X className="size-5" />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-bold">Cancel this booking?</h3>
-            <p className="mt-1 text-[13px] text-[#6B7280]">
+            <p className="mt-1 text-[13px] text-ink-soft">
               The guest will be notified by email. Cancellations can&apos;t be
               undone — the slot reopens for someone else.
             </p>
@@ -1069,15 +1069,15 @@ function CancelModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-[#F9FAFB]"
+            className="ml-auto rounded-md p-1.5 text-ink-muted hover:bg-surface-soft"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="mx-6 mb-4 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <div className="mx-6 mb-4 rounded-xl border border-line-cream bg-surface-page p-4">
           <p className="text-sm font-bold">{booking.eventType.title}</p>
-          <p className="mt-0.5 text-xs text-[#6B7280] tabular-nums">
+          <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
             {booking.guestName} ·{" "}
             {formatDateTime(booking.startTimeUtc, timeZone)} ·{" "}
             {booking.eventType.durationMinutes} min
@@ -1086,9 +1086,9 @@ function CancelModal({
 
         <div className="px-6 pb-2">
           <label className="block">
-            <span className="text-xs font-bold text-[#374151]">
+            <span className="text-xs font-bold text-ink-body">
               Reason{" "}
-              <span className="font-normal text-[#9CA3AF]">
+              <span className="font-normal text-ink-muted">
                 (optional, only you see this)
               </span>
             </span>
@@ -1097,16 +1097,16 @@ function CancelModal({
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="e.g. Sick day, double-booking, guest requested change…"
-              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-white p-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+              className="mt-1.5 w-full rounded-xl border border-line-soft bg-surface-card p-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
             />
           </label>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[#EEE7DF] p-4">
+        <div className="flex items-center justify-end gap-2 border-t border-line-cream p-4">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             Keep booking
           </button>
@@ -1121,7 +1121,7 @@ function CancelModal({
                 setBusy(false);
               }
             }}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#DC2626] px-4 text-[13px] font-bold text-white hover:bg-[#B91C1C] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-danger-strong px-4 text-[13px] font-bold text-white hover:bg-danger disabled:opacity-60"
           >
             <X className="size-4" /> {busy ? "Cancelling..." : "Yes, cancel it"}
           </button>
@@ -1185,19 +1185,19 @@ function RescheduleModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1220]/45 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/45 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-[500px] rounded-2xl bg-white shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
+      <div className="w-full max-w-[500px] rounded-2xl bg-surface-card shadow-[0_24px_48px_-20px_rgba(17,24,39,0.30)]">
         <div className="flex items-start gap-4 p-6">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF0EF] text-[#FF5F63]">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint-100 text-brand">
             <Repeat className="size-5" />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-bold">Reschedule booking</h3>
-            <p className="mt-1 text-[13px] text-[#6B7280]">
+            <p className="mt-1 text-[13px] text-ink-soft">
               Choose a new available slot. The guest will receive an updated
               confirmation email and calendar file.
             </p>
@@ -1206,29 +1206,29 @@ function RescheduleModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="ml-auto rounded-md p-1.5 text-[#9CA3AF] hover:bg-[#F9FAFB]"
+            className="ml-auto rounded-md p-1.5 text-ink-muted hover:bg-surface-soft"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="mx-6 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <div className="mx-6 rounded-xl border border-line-cream bg-surface-page p-4">
           <p className="text-sm font-bold">{booking.eventType.title}</p>
-          <p className="mt-0.5 text-xs text-[#6B7280] tabular-nums">
+          <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
             {booking.guestName} - {formatDateTime(booking.startTimeUtc, timeZone)}
           </p>
         </div>
 
         <div className="px-6 py-5">
           <label className="block">
-            <span className="text-xs font-bold text-[#374151]">
+            <span className="text-xs font-bold text-ink-body">
               New time
             </span>
             <select
               value={selectedSlot}
               onChange={(event) => setSelectedSlot(event.target.value)}
               disabled={loading || busy || slots.length === 0}
-              className="mt-1.5 h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:bg-[#F9FAFB] disabled:text-[#9CA3AF]"
+              className="mt-1.5 h-12 w-full rounded-xl border border-line-soft bg-surface-card px-3 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:bg-surface-soft disabled:text-ink-muted"
             >
               {loading ? (
                 <option>Loading available times...</option>
@@ -1248,17 +1248,17 @@ function RescheduleModal({
             </select>
           </label>
           {error ? (
-            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            <p className="mt-3 rounded-xl border border-danger-border bg-danger-tint px-3 py-2 text-[12px] text-danger">
               {error}
             </p>
           ) : null}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[#EEE7DF] p-4">
+        <div className="flex items-center justify-end gap-2 border-t border-line-cream p-4">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             Keep current time
           </button>
@@ -1279,7 +1279,7 @@ function RescheduleModal({
                 setBusy(false);
               }
             }}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white hover:brightness-105 disabled:opacity-60"
           >
             <Repeat className="size-4" />{" "}
             {busy ? "Rescheduling..." : "Reschedule"}
@@ -1301,7 +1301,7 @@ function EmptyState({
 }) {
   if (search) {
     return (
-      <div className="mt-4 rounded-2xl border border-[#EEE7DF] bg-white px-6 py-12 text-center text-sm text-[#6B7280] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="mt-4 rounded-2xl border border-line-cream bg-surface-card px-6 py-12 text-center text-sm text-ink-soft shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
         No bookings match &ldquo;{search}&rdquo;.
       </div>
     );
@@ -1309,23 +1309,23 @@ function EmptyState({
 
   if (tab !== "upcoming") {
     return (
-      <div className="mt-4 rounded-2xl border border-[#EEE7DF] bg-white px-6 py-12 text-center text-sm text-[#6B7280] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="mt-4 rounded-2xl border border-line-cream bg-surface-card px-6 py-12 text-center text-sm text-ink-soft shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
         No {tab} bookings yet.
       </div>
     );
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+    <div className="mt-4 overflow-hidden rounded-2xl border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
       <div className="flex flex-col items-center px-6 py-14 text-center">
         <div className="relative">
-          <div className="absolute inset-0 -m-3 rounded-[26px] bg-[#FFF0EF]" />
-          <div className="relative flex size-20 items-center justify-center rounded-[20px] border border-[#FFD2CE] bg-white text-[#FF5F63] shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <div className="absolute inset-0 -m-3 rounded-[26px] bg-brand-tint-100" />
+          <div className="relative flex size-20 items-center justify-center rounded-[20px] border border-brand-tint-400 bg-surface-card text-brand shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
             <CalendarCheck2 className="size-9" />
           </div>
         </div>
         <h3 className="mt-7 text-[22px] font-bold">No bookings yet</h3>
-        <p className="mt-2 max-w-[420px] text-sm leading-[1.6] text-[#6B7280]">
+        <p className="mt-2 max-w-[420px] text-sm leading-[1.6] text-ink-soft">
           Once guests start booking you, their appointments will appear here.
           Share your link to get your first booking.
         </p>
@@ -1342,13 +1342,13 @@ function EmptyState({
                 // ignored
               }
             }}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             <Copy className="size-4" /> Copy booking link
           </button>
           <Link
             href="/dashboard/services"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             <Plus className="size-4" /> Manage services
           </Link>
@@ -1357,22 +1357,22 @@ function EmptyState({
         <div className="mt-10 grid w-full max-w-[720px] gap-3 text-left sm:grid-cols-3">
           <TipCard
             icon={Share2}
-            iconColor="text-[#FF5F63]"
-            iconBorder="border-[#FFD2CE]"
+            iconColor="text-brand"
+            iconBorder="border-brand-tint-400"
             title="Share on Instagram"
             text="Add your link to your bio so DMs become bookings."
           />
           <TipCard
             icon={MessageCircle}
-            iconColor="text-[#A855F7]"
-            iconBorder="border-[#E1CFFA]"
+            iconColor="text-purple"
+            iconBorder="border-purple-border"
             title="Drop it in WhatsApp"
             text="Send it to existing clients next time they ask for a slot."
           />
           <TipCard
             icon={QrCode}
-            iconColor="text-[#0D9488]"
-            iconBorder="border-[#B6E4F2]"
+            iconColor="text-success-teal"
+            iconBorder="border-info-sky-soft"
             title="Print a QR card"
             text="Hand one to walk-ins so they can book from the chair."
           />
@@ -1396,23 +1396,23 @@ function TipCard({
   text: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+    <div className="rounded-2xl border border-line-cream bg-surface-page p-4">
       <span
-        className={`flex size-9 items-center justify-center rounded-xl bg-white ${iconColor} border ${iconBorder}`}
+        className={`flex size-9 items-center justify-center rounded-xl bg-surface-card ${iconColor} border ${iconBorder}`}
       >
         <Icon className="size-4" />
       </span>
       <p className="mt-3 text-[13px] font-bold">{title}</p>
-      <p className="mt-1 text-[11px] leading-[1.5] text-[#6B7280]">{text}</p>
+      <p className="mt-1 text-[11px] leading-[1.5] text-ink-soft">{text}</p>
     </div>
   );
 }
 
 function InlineState({ title, text }: { title: string; text: string }) {
   return (
-    <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
+    <div className="mt-6 rounded-xl border border-line-cream bg-surface-card p-6 shadow-sm">
       <h3 className="font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-[#6B7280]">{text}</p>
+      <p className="mt-1 text-sm text-ink-soft">{text}</p>
     </div>
   );
 }

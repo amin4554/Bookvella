@@ -28,20 +28,20 @@ export function Stepper({ step }: { step: BookingStep }) {
               className={cn(
                 "flex items-center gap-2.5 text-[13px] font-bold",
                 state === "active"
-                  ? "text-[#FF5F63]"
+                  ? "text-brand"
                   : state === "done"
-                    ? "text-[#15803D]"
-                    : "text-[#9CA3AF]",
+                    ? "text-success-strong"
+                    : "text-ink-muted",
               )}
             >
               <span
                 className={cn(
                   "grid size-7 shrink-0 place-items-center rounded-full text-[12px] font-extrabold",
                   state === "active"
-                    ? "bg-gradient-to-br from-[#FF6267] to-[#FF8A4C] text-white shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+                    ? "bg-gradient-to-br from-brand-coral to-brand-orange text-white shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
                     : state === "done"
-                      ? "bg-[#16A34A] text-white"
-                      : "bg-[#F3F4F6] text-[#9CA3AF]",
+                      ? "bg-success text-white"
+                      : "bg-line-subtle text-ink-muted",
                 )}
               >
                 {state === "done" ? <Check className="size-4" /> : idx + 1}
@@ -53,10 +53,10 @@ export function Stepper({ step }: { step: BookingStep }) {
                 className={cn(
                   "mx-1.5 h-0.5 flex-1 rounded-full",
                   state === "done"
-                    ? "bg-[#16A34A]"
+                    ? "bg-success"
                     : state === "active"
-                      ? "bg-gradient-to-r from-[#16A34A] to-[#FF5F63]"
-                      : "bg-[#EEE7DF]",
+                      ? "bg-gradient-to-r from-success to-brand"
+                      : "bg-line-cream",
                 )}
               />
             ) : null}

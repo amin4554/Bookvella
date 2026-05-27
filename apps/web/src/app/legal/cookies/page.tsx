@@ -95,7 +95,7 @@ export default function CookiesPage() {
 
       <CookiePreferences />
 
-      <p className="mt-10 text-[12px] text-[#9CA3AF]">
+      <p className="mt-10 text-[12px] text-ink-muted">
         Last updated May 26, 2026.
       </p>
     </LegalPage>

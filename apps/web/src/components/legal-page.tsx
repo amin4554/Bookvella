@@ -19,15 +19,15 @@ export function LegalPage({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#FFFBF7] text-[#0B1220]">
-      <header className="border-b border-[#EEE7DF] bg-white">
+    <div className="min-h-screen bg-surface-page text-ink-strong">
+      <header className="border-b border-line-cream bg-surface-card">
         <div className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo />
           </Link>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[12px] font-bold text-[#9CA3AF] hover:text-[#0B1220]"
+            className="inline-flex items-center gap-2 text-[12px] font-bold text-ink-muted hover:text-ink-strong"
           >
             <ArrowLeft className="size-3.5" /> Back to site
           </Link>
@@ -35,7 +35,7 @@ export function LegalPage({
       </header>
 
       <main className={cn("mx-auto px-6 py-14", maxWidth)}>
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9CA3AF]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-muted">
           {eyebrow}
         </p>
         <h1
@@ -44,7 +44,7 @@ export function LegalPage({
         >
           {title}
         </h1>
-        <p className="mt-4 text-[14px] leading-[1.65] text-[#6B7280]">
+        <p className="mt-4 text-[14px] leading-[1.65] text-ink-soft">
           {intro}
         </p>
 
@@ -70,16 +70,16 @@ export function Toc({
   items: Array<{ href: string; label: string }>;
 }) {
   return (
-    <nav className="mt-8 rounded-2xl border border-[#EEE7DF] bg-white p-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+    <nav className="mt-8 rounded-2xl border border-line-cream bg-surface-card p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
         On this page
       </p>
-      <ol className="mt-3 grid list-decimal gap-1.5 pl-5 marker:text-[#9CA3AF] sm:grid-cols-2">
+      <ol className="mt-3 grid list-decimal gap-1.5 pl-5 marker:text-ink-muted sm:grid-cols-2">
         {items.map((item) => (
           <li key={item.href}>
             <a
               href={item.href}
-              className="text-[13px] font-bold text-[#374151] hover:text-[#FF5F63]"
+              className="text-[13px] font-bold text-ink-body hover:text-brand"
             >
               {item.label}
             </a>
@@ -98,14 +98,14 @@ export function LegalTable({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-2xl border border-[#EEE7DF] bg-white">
+    <div className="mt-4 overflow-x-auto rounded-2xl border border-line-cream bg-surface-card">
       <table className="w-full border-collapse text-[13.5px]">
         <thead>
           <tr>
             {headers.map((header) => (
               <th
                 key={header}
-                className="border-b border-[#EEE7DF] bg-[#FFFBF7] px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]"
+                className="border-b border-line-cream bg-surface-page px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-muted"
               >
                 {header}
               </th>
@@ -118,7 +118,7 @@ export function LegalTable({
               {row.map((cell, cellIndex) => (
                 <td
                   key={cellIndex}
-                  className="border-b border-[#EEE7DF] px-3 py-3 align-top text-[#374151] last:border-b-0"
+                  className="border-b border-line-cream px-3 py-3 align-top text-ink-body last:border-b-0"
                 >
                   {cell}
                 </td>

@@ -73,7 +73,7 @@ export function StepDetails({
       >
         Your details
       </h1>
-      <p className="mt-2 text-[14px] text-[#6B7280]">
+      <p className="mt-2 text-[14px] text-ink-soft">
         Tell {firstName} a little about yourself so they can prepare for your
         visit.
       </p>
@@ -110,7 +110,7 @@ export function StepDetails({
               defaultValue={guest.note}
               rows={4}
               placeholder="Anything they should know before the appointment?"
-              className="mt-1.5 w-full resize-none rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3.5 text-[15px] outline-none placeholder:text-[#9CA3AF] focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+              className="mt-1.5 w-full resize-none rounded-2xl border border-line-soft bg-surface-card px-4 py-3.5 text-[15px] outline-none placeholder:text-ink-muted focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
             />
           </label>
 
@@ -122,8 +122,8 @@ export function StepDetails({
               }}
               className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md transition ${
                 agreed
-                  ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]"
-                  : "border border-[#D1D5DB] bg-white"
+                  ? "bg-gradient-to-r from-brand-coral to-brand-orange"
+                  : "border border-line-strong bg-surface-card"
               }`}
               role="checkbox"
               aria-checked={agreed}
@@ -133,11 +133,11 @@ export function StepDetails({
             </span>
             <span className="leading-snug">
               I agree to Bookvella&apos;s{" "}
-              <Link className="font-bold text-[#FF5F63] hover:underline" href="/legal/terms">
+              <Link className="font-bold text-brand hover:underline" href="/legal/terms">
                 terms
               </Link>{" "}
               and acknowledge the{" "}
-              <Link className="font-bold text-[#FF5F63] hover:underline" href="/legal/privacy">
+              <Link className="font-bold text-brand hover:underline" href="/legal/privacy">
                 Privacy Policy
               </Link>{" "}
               for booking confirmation and reminder emails.
@@ -147,23 +147,23 @@ export function StepDetails({
           <button
             type="submit"
             disabled={submitting || !agreed}
-            className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] transition hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] transition hover:brightness-105 disabled:opacity-60"
           >
             {submitting ? "Sending code…" : "Send verification code →"}
           </button>
-          <p className="text-center text-[12px] text-[#6B7280]">
+          <p className="text-center text-[12px] text-ink-soft">
             Your details are only shared with {firstName}.
           </p>
         </form>
 
         {/* sticky summary */}
-        <aside className="self-start rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+        <aside className="self-start rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
             Your appointment
           </p>
           <div className="mt-3 flex items-center gap-3">
             <div
-              className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-[14px] font-bold text-white"
+              className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-[14px] font-bold text-white"
               style={
                 data.host.profileImageUrl
                   ? {
@@ -180,43 +180,43 @@ export function StepDetails({
             </div>
             <div>
               <p className="text-[14px] font-bold">{data.host.name}</p>
-              <p className="text-[12px] text-[#6B7280]">
+              <p className="text-[12px] text-ink-soft">
                 {data.host.headline ??
                   data.host.businessCategory ??
                   "Bookvella host"}
               </p>
             </div>
           </div>
-          <div className="my-4 h-px bg-[#EEE7DF]" />
+          <div className="my-4 h-px bg-line-cream" />
           <p className="text-[14px] font-bold">{data.eventType.title}</p>
           <ul className="mt-3 space-y-2 text-[13px]">
             <li className="flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[#FF5F63]" />
+              <span className="size-1.5 rounded-full bg-brand" />
               {data.eventType.durationMinutes} minutes
             </li>
             <li className="flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[#A855F7]" />
+              <span className="size-1.5 rounded-full bg-purple" />
               {data.eventType.locationDetails ??
                 formatLocationLabel(data.eventType.locationType)}
             </li>
             {priceLabel ? (
               <li className="flex items-center gap-2">
-                <span className="size-1.5 rounded-full bg-[#10B981]" />
+                <span className="size-1.5 rounded-full bg-success-bright" />
                 {priceLabel}
               </li>
             ) : null}
           </ul>
-          <div className="my-4 h-px bg-[#EEE7DF]" />
+          <div className="my-4 h-px bg-line-cream" />
           <p className="text-[17px] font-bold">
             {formatFullDateKey(selectedDateKey)} — {startLabel}
           </p>
-          <p className="mt-0.5 text-[12px] text-[#6B7280]">
+          <p className="mt-0.5 text-[12px] text-ink-soft">
             Ends at {endLabel} · {timezone}
           </p>
           <button
             type="button"
             onClick={onBack}
-            className="mt-3 text-[12.5px] font-bold text-[#FF5F63]"
+            className="mt-3 text-[12.5px] font-bold text-brand"
           >
             ← Change time
           </button>
@@ -254,10 +254,10 @@ function Field({
         placeholder={placeholder}
         defaultValue={defaultValue}
         required={required}
-        className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-medium outline-none placeholder:text-[#9CA3AF] focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+        className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-[15px] font-medium outline-none placeholder:text-ink-muted focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
       />
       {help ? (
-        <p className="mt-1.5 text-[12px] text-[#6B7280]">{help}</p>
+        <p className="mt-1.5 text-[12px] text-ink-soft">{help}</p>
       ) : null}
     </div>
   );
@@ -265,10 +265,10 @@ function Field({
 
 function FieldLabel({ label, optional }: { label: string; optional?: boolean }) {
   return (
-    <span className="block text-[13px] font-bold text-[#0B1220]">
+    <span className="block text-[13px] font-bold text-ink-strong">
       {label}
       {optional ? (
-        <span className="ml-1 font-normal text-[#9CA3AF]">optional</span>
+        <span className="ml-1 font-normal text-ink-muted">optional</span>
       ) : null}
     </span>
   );

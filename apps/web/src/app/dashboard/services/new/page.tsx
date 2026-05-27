@@ -26,7 +26,7 @@ export default function NewServicePage() {
       userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
     >
       {error ? (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-4 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
           {error}
         </div>
       ) : null}

@@ -80,10 +80,10 @@ export function ContactReportForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-2xl border border-[#EEE7DF] bg-white p-6 shadow-sm md:p-7"
+      className="rounded-2xl border border-line-cream bg-surface-card p-6 shadow-sm md:p-7"
       noValidate
     >
-      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#9CA3AF]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-ink-muted">
         Send us a message
       </p>
       <h2
@@ -104,7 +104,7 @@ export function ContactReportForm() {
 
       <fieldset className="mt-6">
         <legend className="text-[13px] font-bold">What is this about?</legend>
-        <div className="mt-2 flex flex-wrap gap-1.5 rounded-2xl border border-[#EEE7DF] bg-white p-1.5">
+        <div className="mt-2 flex flex-wrap gap-1.5 rounded-2xl border border-line-cream bg-surface-card p-1.5">
           {TOPICS.map((item) => (
             <button
               key={item.value}
@@ -112,8 +112,8 @@ export function ContactReportForm() {
               onClick={() => setTopic(item.value)}
               className={`h-9 rounded-xl px-3.5 text-[12px] font-bold transition ${
                 topic === item.value
-                  ? "bg-[#FFF0EF] text-[#FF5F63]"
-                  : "text-[#4B5563] hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+                  ? "bg-brand-tint-100 text-brand"
+                  : "text-gray-600 hover:bg-surface-page hover:text-ink-strong"
               }`}
             >
               {item.label}
@@ -143,7 +143,7 @@ export function ContactReportForm() {
         label={
           <>
             Link to the content / page{" "}
-            <span className="font-medium text-[#9CA3AF]">if reporting</span>
+            <span className="font-medium text-ink-muted">if reporting</span>
           </>
         }
         name="contentUrl"
@@ -158,12 +158,12 @@ export function ContactReportForm() {
           name="message"
           rows={6}
           placeholder="Tell us what's going on. If reporting content, please describe what is illegal or against our rules, and why."
-          className={`mt-2 w-full resize-y rounded-2xl border bg-white px-4 py-3.5 text-[14px] leading-[1.6] outline-none placeholder:text-[#9CA3AF] focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] ${
-            errors.message ? "border-[#FF5F63]" : "border-[#E5E7EB]"
+          className={`mt-2 w-full resize-y rounded-2xl border bg-surface-card px-4 py-3.5 text-[14px] leading-[1.6] outline-none placeholder:text-ink-muted focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] ${
+            errors.message ? "border-brand" : "border-line-soft"
           }`}
         />
         {errors.message ? (
-          <span className="mt-1 block text-[12px] font-semibold text-[#FF5F63]">
+          <span className="mt-1 block text-[12px] font-semibold text-brand">
             {errors.message}
           </span>
         ) : null}
@@ -186,8 +186,8 @@ export function ContactReportForm() {
           }}
           className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md ${
             agreed
-              ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white"
-              : "border border-[#D1D5DB] bg-white"
+              ? "bg-gradient-to-r from-brand-coral to-brand-orange text-white"
+              : "border border-line-strong bg-surface-card"
           }`}
         >
           {agreed ? <Check className="size-3.5" /> : null}
@@ -196,13 +196,13 @@ export function ContactReportForm() {
           I understand my details will be processed under Bookvella&apos;s{" "}
           <Link
             href="/legal/privacy"
-            className="font-bold text-[#FF5F63] hover:underline"
+            className="font-bold text-brand hover:underline"
           >
             Privacy Policy
           </Link>{" "}
           solely to handle this request.
           {errors.consent ? (
-            <span className="mt-1 block font-semibold text-[#FF5F63]">
+            <span className="mt-1 block font-semibold text-brand">
               {errors.consent}
             </span>
           ) : null}
@@ -210,13 +210,13 @@ export function ContactReportForm() {
       </label>
 
       {errors.form ? (
-        <p className="mt-4 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[13px] font-semibold text-[#B91C1C]">
+        <p className="mt-4 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-[13px] font-semibold text-danger">
           {errors.form}
         </p>
       ) : null}
 
       {sent ? (
-        <p className="mt-4 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[13px] font-semibold text-[#15803D]">
+        <p className="mt-4 rounded-xl border border-success-border bg-success-tint px-4 py-3 text-[13px] font-semibold text-success-strong">
           Message sent. We&apos;ll review it at support.bookvella@gmail.com.
         </p>
       ) : null}
@@ -224,7 +224,7 @@ export function ContactReportForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13.5px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+        className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13.5px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
       >
         {submitting ? "Sending..." : "Send message"}
         <Send className="size-4" />
@@ -255,12 +255,12 @@ function Field({
         name={name}
         type={type}
         placeholder={placeholder}
-        className={`mt-2 h-11 w-full rounded-2xl border bg-white px-4 text-[14px] outline-none placeholder:text-[#9CA3AF] focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] ${
-          error ? "border-[#FF5F63]" : "border-[#E5E7EB]"
+        className={`mt-2 h-11 w-full rounded-2xl border bg-surface-card px-4 text-[14px] outline-none placeholder:text-ink-muted focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] ${
+          error ? "border-brand" : "border-line-soft"
         }`}
       />
       {error ? (
-        <span className="mt-1 block text-[12px] font-semibold text-[#FF5F63]">
+        <span className="mt-1 block text-[12px] font-semibold text-brand">
           {error}
         </span>
       ) : null}

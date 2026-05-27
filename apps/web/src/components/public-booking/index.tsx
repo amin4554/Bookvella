@@ -278,9 +278,9 @@ export function PublicBooking({
   const selectedEndUtc = selectedSlot?.endTimeUtc ?? "";
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7] text-[#0B1220]">
+    <div className="min-h-screen bg-surface-page text-ink-strong">
       {/* slim top bar */}
-      <header className="border-b border-[#EEE7DF] bg-white">
+      <header className="border-b border-line-cream bg-surface-card">
         <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -289,7 +289,7 @@ export function PublicBooking({
               Bookvella
             </span>
           </Link>
-          <p className="hidden text-[12px] text-[#6B7280] sm:block">
+          <p className="hidden text-[12px] text-ink-soft sm:block">
             Powered by Bookvella — free booking platform
           </p>
         </div>
@@ -302,7 +302,7 @@ export function PublicBooking({
           <Stepper step={step} />
 
           {error ? (
-            <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-5 rounded-2xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
               {error}
             </div>
           ) : null}
@@ -404,8 +404,8 @@ export function PublicBooking({
 
 function PublicState({ title, text }: { title: string; text: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#FFFBF7] px-4">
-      <div className="w-full max-w-[440px] rounded-2xl border border-[#EEE7DF] bg-white p-8 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+    <main className="flex min-h-screen items-center justify-center bg-surface-page px-4">
+      <div className="w-full max-w-[440px] rounded-2xl border border-line-cream bg-surface-card p-8 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo/icon.svg" alt="" className="size-7 rounded-md" />
@@ -414,7 +414,7 @@ function PublicState({ title, text }: { title: string; text: string }) {
           </span>
         </div>
         <h1 className="mt-8 text-xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm text-[#6B7280]">{text}</p>
+        <p className="mt-2 text-sm text-ink-soft">{text}</p>
       </div>
     </main>
   );

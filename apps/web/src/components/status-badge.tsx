@@ -12,10 +12,10 @@ export function StatusBadge({
       className={cn(
         "inline-flex h-7 min-w-20 items-center justify-center rounded-full px-4 text-xs font-bold",
         status === "confirmed" || status === "active"
-          ? "bg-[#DDFBE7] text-[#126C36]"
+          ? "bg-badge-success-bg text-badge-success-fg"
           : status === "cancelled"
-            ? "bg-[#FFE6E6] text-[#D9232E]"
-            : "bg-[#F0ECE7] text-[#9CA3AF]",
+            ? "bg-badge-danger-bg text-badge-danger-fg"
+            : "bg-badge-neutral-bg text-ink-muted",
       )}
     >
       {children}

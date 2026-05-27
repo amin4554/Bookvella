@@ -17,6 +17,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import { LegalInlineLinks } from "@/components/legal-footer";
 import { OtpStep } from "@/components/otp-step";
+import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { TimezoneCombobox } from "@/components/timezone-combobox";
 import {
   type ApiError,
@@ -309,11 +310,11 @@ export function AuthCard({
       >
         Create your free page
       </h1>
-      <p className="mt-4 text-sm text-[#6B7280]">
+      <p className="mt-4 text-sm text-ink-soft">
         Already have an account?{" "}
         <Link
           href="/login"
-          className="font-semibold text-[#FF5F63] hover:underline"
+          className="font-semibold text-brand hover:underline"
         >
           Sign in here
         </Link>
@@ -327,7 +328,7 @@ export function AuthCard({
       >
         Welcome back
       </h1>
-      <p className="mt-4 text-sm text-[#6B7280]">
+      <p className="mt-4 text-sm text-ink-soft">
         Sign in to your Bookvella account
       </p>
     </>
@@ -337,15 +338,15 @@ export function AuthCard({
     !isRegister && !pendingTotp ? (
       <div className="mt-8">
         <div className="flex items-center gap-3">
-          <span className="h-px flex-1 bg-[#EEE7DF]" />
-          <span className="text-xs font-semibold text-[#9CA3AF]">
+          <span className="h-px flex-1 bg-line-cream" />
+          <span className="text-xs font-semibold text-ink-muted">
             New to Bookvella?
           </span>
-          <span className="h-px flex-1 bg-[#EEE7DF]" />
+          <span className="h-px flex-1 bg-line-cream" />
         </div>
         <Link
           href="/register"
-          className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl border border-line-soft bg-surface-card text-sm font-bold text-ink-strong hover:bg-surface-soft dark:bg-surface-soft dark:hover:bg-surface-blush"
         >
           Create your free booking page &rarr;
         </Link>
@@ -353,7 +354,7 @@ export function AuthCard({
     ) : null;
 
   const formColumn = (
-    <div className="relative flex flex-col bg-white px-6 py-10 sm:px-10 lg:px-16 lg:py-14">
+    <div className="relative flex flex-col bg-surface-card px-6 py-10 sm:px-10 lg:px-16 lg:py-14 dark:bg-surface-page">
       <Link
         href="/"
         className="inline-flex items-center gap-2.5 self-start lg:hidden"
@@ -378,7 +379,7 @@ export function AuthCard({
           ) : (
             <button
               type="button"
-              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-[#E5E7EB] bg-white text-sm font-semibold text-[#111827] hover:bg-[#F9FAFB]"
+              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-line-soft bg-surface-card text-sm font-semibold text-ink-deep hover:bg-surface-soft dark:bg-surface-soft dark:hover:bg-surface-blush"
               onClick={() =>
                 setError(
                   "Add NEXT_PUBLIC_GOOGLE_CLIENT_ID in the web app and GOOGLE_CLIENT_ID in the API to enable Google sign-in.",
@@ -392,18 +393,18 @@ export function AuthCard({
         </div>
 
         <div className="my-7 flex items-center gap-3">
-          <span className="h-px flex-1 bg-[#EEE7DF]" />
-          <span className="text-xs font-semibold text-[#9CA3AF]">
+          <span className="h-px flex-1 bg-line-cream" />
+          <span className="text-xs font-semibold text-ink-muted">
             or with email
           </span>
-          <span className="h-px flex-1 bg-[#EEE7DF]" />
+          <span className="h-px flex-1 bg-line-cream" />
         </div>
 
         {formNode}
         {loginSignupCta}
       </div>
 
-      <p className="mt-14 text-center text-[11px] text-[#9CA3AF] lg:mt-auto lg:pt-14 lg:text-left">
+      <p className="mt-14 text-center text-[11px] text-ink-muted lg:mt-auto lg:pt-14 lg:text-left">
         Copyright 2026 Bookvella. Made for independent pros.
       </p>
       <LegalInlineLinks className="mt-2 justify-center lg:justify-start" />
@@ -417,16 +418,19 @@ export function AuthCard({
   );
 
   return (
-    <main
-      className={`grid min-h-screen ${
-        isRegister
-          ? "lg:grid-cols-[1.1fr_1fr]"
-          : "lg:grid-cols-[1fr_1.05fr]"
-      }`}
-    >
-      {isRegister ? formColumn : gradientColumn}
-      {isRegister ? gradientColumn : formColumn}
-    </main>
+    <>
+      <ThemeToggleButton className="fixed right-[18px] top-[18px] z-50 size-10 rounded-[14px] bg-surface-card shadow-sm dark:border-line-soft dark:bg-surface-card/95 dark:hover:bg-surface-soft" />
+      <main
+        className={`grid min-h-screen ${
+          isRegister
+            ? "lg:grid-cols-[1.1fr_1fr]"
+            : "lg:grid-cols-[1fr_1.05fr]"
+        }`}
+      >
+        {isRegister ? formColumn : gradientColumn}
+        {isRegister ? gradientColumn : formColumn}
+      </main>
+    </>
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -610,8 +614,8 @@ function TotpStep({
 }) {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
-      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-[13px] text-[#374151]">
-        <p className="font-bold text-[#0B1220]">
+      <div className="rounded-2xl border border-line-cream bg-surface-page p-4 text-[13px] text-ink-body">
+        <p className="font-bold text-ink-strong">
           Two-factor authentication
         </p>
         <p className="mt-1">
@@ -620,7 +624,7 @@ function TotpStep({
         </p>
       </div>
       <label className="block">
-        <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+        <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
           Code
         </span>
         <input
@@ -630,26 +634,26 @@ function TotpStep({
           autoComplete="one-time-code"
           autoFocus
           placeholder="123456"
-          className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+          className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] dark:bg-surface-card"
         />
       </label>
       {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
+        <div className="flex items-start gap-3 rounded-2xl border border-danger-border bg-danger-tint p-3.5 text-[13px] text-danger-deep">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
           <p>{error}</p>
         </div>
       ) : null}
       <button
         type="submit"
         disabled={submitting}
-        className="h-14 w-full rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
+        className="h-14 w-full rounded-2xl bg-gradient-to-r from-brand-coral to-brand-orange text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
       >
         {submitting ? "Verifying..." : "Verify and sign in →"}
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="block w-full text-center text-[13px] font-semibold text-[#6B7280] hover:text-[#0B1220]"
+        className="block w-full text-center text-[13px] font-semibold text-ink-soft hover:text-ink-strong"
       >
         ← Use a different account
       </button>
@@ -681,14 +685,14 @@ function LoginForm({
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
       {sessionExpired ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-900">
-          <Info className="mt-0.5 size-4 shrink-0 text-amber-600" />
+        <div className="flex items-start gap-3 rounded-2xl border border-warning-border bg-warning-tint p-3.5 text-[13px] text-warning-strong">
+          <Info className="mt-0.5 size-4 shrink-0 text-warning" />
           <p className="flex-1">
             Your session expired. Sign in again to pick up where you left off.
           </p>
           <button
             type="button"
-            className="text-amber-700 hover:text-amber-900"
+            className="text-warning hover:text-warning-strong"
             onClick={onDismissSessionExpired}
             aria-label="Dismiss"
           >
@@ -703,18 +707,18 @@ function LoginForm({
           type="email"
           autoComplete="email"
           placeholder="marcus@barbershop.co.uk"
-          className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-medium outline-none ring-0 focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+          className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-[15px] font-medium outline-none ring-0 focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] dark:bg-surface-card"
         />
       </FieldLabel>
 
       <div>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
             Password
           </span>
           <Link
             href="/forgot-password"
-            className="text-xs font-semibold text-[#FF5F63] hover:underline"
+            className="text-xs font-semibold text-brand hover:underline"
           >
             Forgot password?
           </Link>
@@ -725,13 +729,13 @@ function LoginForm({
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             placeholder="Your password"
-            className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 pr-12 text-[15px] font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+            className="h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 pr-12 text-[15px] font-medium outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] dark:bg-surface-card"
           />
           <button
             type="button"
             onClick={onTogglePassword}
             aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[#9CA3AF] hover:text-[#111827]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-ink-muted hover:text-ink-deep"
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
@@ -739,8 +743,8 @@ function LoginForm({
       </div>
 
       {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
+        <div className="flex items-start gap-3 rounded-2xl border border-danger-border bg-danger-tint p-3.5 text-[13px] text-danger-deep">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
           <p>
             <strong className="font-semibold">That didn&apos;t work.</strong>{" "}
             {error}
@@ -748,13 +752,13 @@ function LoginForm({
         </div>
       ) : null}
 
-      <label className="flex items-center gap-2 text-[13px] text-[#374151]">
+      <label className="flex items-center gap-2 text-[13px] text-ink-body">
         <input
           type="checkbox"
           name="rememberMe"
           checked={rememberMe}
           onChange={(event) => onRememberMeChange(event.target.checked)}
-          className="size-4 rounded border-[#D1D5DB] text-[#FF5F63] focus:ring-[#FF5F63]"
+          className="size-4 rounded border-line-strong text-brand accent-brand focus:ring-brand"
         />
         Keep me signed in
       </label>
@@ -762,7 +766,7 @@ function LoginForm({
       <button
         type="submit"
         disabled={submitting}
-        className="h-14 w-full rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
+        className="h-14 w-full rounded-2xl bg-gradient-to-r from-brand-coral to-brand-orange text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
       >
         {submitting ? "Signing in..." : "Sign in to Bookvella →"}
       </button>
@@ -876,7 +880,7 @@ function RegisterForm({
             placeholder="Marcus"
             value={firstName}
             onChange={(event) => setFirstName(event.target.value)}
-            className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-medium outline-none focus:border-[#14B8A6] focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
+            className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-[15px] font-medium outline-none focus:border-success-teal-bright focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)] dark:bg-surface-card"
           />
         </FieldLabel>
         <FieldLabel label="Last name">
@@ -887,7 +891,7 @@ function RegisterForm({
             placeholder="Williams"
             value={lastName}
             onChange={(event) => setLastName(event.target.value)}
-            className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-medium outline-none focus:border-[#14B8A6] focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
+            className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-[15px] font-medium outline-none focus:border-success-teal-bright focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)] dark:bg-surface-card"
           />
         </FieldLabel>
       </div>
@@ -898,7 +902,7 @@ function RegisterForm({
           type="email"
           autoComplete="email"
           placeholder="you@studio.com"
-          className="mt-1.5 h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 text-[15px] font-medium outline-none focus:border-[#14B8A6] focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
+          className="mt-1.5 h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 text-[15px] font-medium outline-none focus:border-success-teal-bright focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)] dark:bg-surface-card"
         />
       </FieldLabel>
 
@@ -910,28 +914,28 @@ function RegisterForm({
             autoComplete="new-password"
             placeholder="At least 8 characters"
             minLength={8}
-            className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white px-4 pr-12 text-[15px] font-medium outline-none focus:border-[#14B8A6] focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
+            className="h-12 w-full rounded-2xl border border-line-soft bg-surface-card px-4 pr-12 text-[15px] font-medium outline-none focus:border-success-teal-bright focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)] dark:bg-surface-card"
           />
           <button
             type="button"
             onClick={onTogglePassword}
             aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[#9CA3AF] hover:text-[#111827]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-ink-muted hover:text-ink-deep"
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">
+        <p className="mt-1.5 text-[11px] text-ink-muted">
           8+ characters. Mix letters and numbers.
         </p>
       </FieldLabel>
 
       <div>
-        <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+        <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
           Your booking link
         </span>
-        <div className="mt-1.5 flex h-12 items-center overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white focus-within:border-[#14B8A6] focus-within:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]">
-          <span className="flex h-full items-center border-r border-[#E5E7EB] bg-[#F9FAFB] px-4 text-sm font-medium text-[#6B7280] tabular-nums">
+        <div className="mt-1.5 flex h-12 items-center overflow-hidden rounded-2xl border border-line-soft bg-surface-card focus-within:border-success-teal-bright focus-within:shadow-[0_0_0_4px_rgba(20,184,166,0.18)] dark:bg-surface-card">
+          <span className="flex h-full items-center border-r border-line-soft bg-surface-soft px-4 text-sm font-medium text-ink-soft tabular-nums">
             bookvella.com/
           </span>
           <input
@@ -948,7 +952,7 @@ function RegisterForm({
           />
         </div>
         <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-[#9CA3AF]">
+          <p className="text-[11px] text-ink-muted">
             Auto-filled from your name. Lowercase letters, numbers and dashes.
           </p>
           <SlugStatusChip status={slugStatus} />
@@ -959,7 +963,7 @@ function RegisterForm({
 
       {editingTimezone ? (
         <div>
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
             Your timezone
           </span>
           <div className="mt-1.5">
@@ -978,20 +982,20 @@ function RegisterForm({
               setTimezone(detectedTimezone);
               setEditingTimezone(false);
             }}
-            className="mt-2 text-[11px] font-semibold text-[#6B7280] underline-offset-2 hover:underline"
+            className="mt-2 text-[11px] font-semibold text-ink-soft underline-offset-2 hover:underline"
           >
             Use my browser timezone instead
           </button>
         </div>
       ) : (
-        <p className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FFFBF7] px-3 py-2.5 text-[12px] text-[#6B7280]">
-          <Globe className="size-3.5 text-[#9CA3AF]" />
+        <p className="flex items-center gap-2 rounded-xl border border-line-soft bg-surface-page px-3 py-2.5 text-[12px] text-ink-soft">
+          <Globe className="size-3.5 text-ink-muted" />
           <span className="flex-1">
             Times will use{" "}
-            <span className="font-semibold text-[#0B1220]">
+            <span className="font-semibold text-ink-strong">
               {timezoneCity(timezone)}
             </span>{" "}
-            <span className="tabular-nums text-[#0B1220]">
+            <span className="tabular-nums text-ink-strong">
               ({formatOffset(timezone)})
             </span>
             .
@@ -999,7 +1003,7 @@ function RegisterForm({
           <button
             type="button"
             onClick={() => setEditingTimezone(true)}
-            className="font-semibold text-[#FF5F63] hover:underline"
+            className="font-semibold text-brand hover:underline"
           >
             Change
           </button>
@@ -1007,8 +1011,8 @@ function RegisterForm({
       )}
 
       {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
+        <div className="flex items-start gap-3 rounded-2xl border border-danger-border bg-danger-tint p-3.5 text-[13px] text-danger-deep">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
           <p>{error}</p>
         </div>
       ) : null}
@@ -1016,18 +1020,18 @@ function RegisterForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-2 h-14 w-full rounded-2xl bg-gradient-to-r from-[#14B8A6] via-[#7C4DFF] to-[#C026D3] text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
+        className="auth-register-cta mt-2 h-14 w-full rounded-2xl text-[15px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-70"
       >
         {submitting ? "Creating page..." : "Create my free Bookvella page →"}
       </button>
 
-      <p className="text-center text-[12px] leading-relaxed text-[#9CA3AF]">
+      <p className="text-center text-[12px] leading-relaxed text-ink-muted">
         By signing up you agree to our{" "}
-        <Link href="/legal/terms" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
+        <Link href="/legal/terms" className="font-semibold text-ink-strong underline decoration-line-soft underline-offset-2 hover:decoration-ink-strong">
           Terms of Service
         </Link>{" "}
         and{" "}
-        <Link href="/legal/privacy" className="font-semibold text-[#0B1220] underline decoration-[#E5E7EB] underline-offset-2 hover:decoration-[#0B1220]">
+        <Link href="/legal/privacy" className="font-semibold text-ink-strong underline decoration-line-soft underline-offset-2 hover:decoration-ink-strong">
           Privacy Policy
         </Link>
         .
@@ -1043,27 +1047,27 @@ function SlugStatusChip({
 }) {
   if (status.kind === "ok") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#E6F4EA] px-2 py-1 text-[10px] font-bold text-[#16A34A]">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-mint px-2 py-1 text-[10px] font-bold text-success">
         <Check className="size-3" /> {status.label}
       </span>
     );
   }
   if (status.kind === "bad") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#FEE2E2] px-2 py-1 text-[10px] font-bold text-[#B91C1C]">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-tint-strong px-2 py-1 text-[10px] font-bold text-danger">
         <X className="size-3" /> {status.label}
       </span>
     );
   }
   if (status.kind === "checking") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-[10px] font-bold text-[#6B7280]">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-line-subtle px-2 py-1 text-[10px] font-bold text-ink-soft">
         <Loader2 className="size-3 animate-spin" /> {status.label}
       </span>
     );
   }
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-[10px] font-bold text-[#6B7280]">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-line-subtle px-2 py-1 text-[10px] font-bold text-ink-soft">
       <Circle className="size-3" /> {status.label}
     </span>
   );
@@ -1093,7 +1097,7 @@ function FieldLabel({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+      <span className="text-xs font-bold uppercase tracking-[0.12em] text-ink-soft">
         {label}
       </span>
       {children}
@@ -1107,22 +1111,19 @@ function LoginGradientPanel() {
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "radial-gradient(45% 40% at 15% 15%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 60%), radial-gradient(60% 50% at 95% 90%, rgba(255,201,124,0.55) 0%, rgba(255,201,124,0) 60%), linear-gradient(160deg,#FF6267 0%,#FF7A59 25%,#E54FB3 60%,#A855F7 90%)",
+          background: "var(--auth-login-side-grad)",
         }}
       />
       <div
         className="pointer-events-none absolute -left-20 top-12 h-[420px] w-[420px] rounded-full opacity-30"
         style={{
-          background:
-            "radial-gradient(closest-side,#FFFFFF 0%,rgba(255,255,255,0) 70%)",
+          background: "var(--auth-login-glow-1)",
         }}
       />
       <div
         className="pointer-events-none absolute -bottom-24 -right-24 h-[440px] w-[440px] rounded-full opacity-30"
         style={{
-          background:
-            "radial-gradient(closest-side,#FFD1B8 0%,rgba(255,255,255,0) 70%)",
+          background: "var(--auth-login-glow-2)",
         }}
       />
 
@@ -1158,7 +1159,7 @@ function LoginGradientPanel() {
             within the first hour. It just works.&rdquo;
           </blockquote>
           <figcaption className="mt-4 flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-sm font-bold text-white">
               M
             </div>
             <div className="leading-tight">
@@ -1178,22 +1179,19 @@ function RegisterGradientPanel() {
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "radial-gradient(60% 50% at 15% 12%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 60%), radial-gradient(60% 50% at 92% 90%, rgba(255,170,200,0.45) 0%, rgba(255,170,200,0) 60%), linear-gradient(150deg,#14B8A6 0%,#3B82F6 28%,#7C4DFF 56%,#C026D3 82%,#FF6F91 100%)",
+          background: "var(--auth-register-side-grad)",
         }}
       />
       <div
         className="pointer-events-none absolute -left-24 top-12 h-[420px] w-[420px] rounded-full opacity-30"
         style={{
-          background:
-            "radial-gradient(closest-side,#FFFFFF 0%,rgba(255,255,255,0) 70%)",
+          background: "var(--auth-register-glow-1)",
         }}
       />
       <div
         className="pointer-events-none absolute -bottom-24 -right-20 h-[440px] w-[440px] rounded-full opacity-30"
         style={{
-          background:
-            "radial-gradient(closest-side,#FFC0E6 0%,rgba(255,255,255,0) 70%)",
+          background: "var(--auth-register-glow-2)",
         }}
       />
 
@@ -1226,7 +1224,7 @@ function RegisterGradientPanel() {
 
         <div className="mt-10 max-w-[420px] rounded-2xl border border-white/20 bg-white/15 p-4 backdrop-blur">
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6267] via-[#C661E0] to-[#7C4DFF] text-sm font-bold text-white">
+            <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-coral via-purple-vivid to-purple-strong text-sm font-bold text-white">
               M
             </div>
             <div className="leading-tight">

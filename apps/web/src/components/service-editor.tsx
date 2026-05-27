@@ -79,21 +79,21 @@ const LOCATION_TILES: {
     label: "In person",
     hint: "At your studio or shop",
     icon: MapPin,
-    iconColor: "text-[#FF5F63]",
+    iconColor: "text-brand",
   },
   {
     value: "VIDEO",
     label: "Video call",
     hint: "Zoom / Meet / Whereby",
     icon: Video,
-    iconColor: "text-[#A855F7]",
+    iconColor: "text-purple",
   },
   {
     value: "PHONE",
     label: "Phone call",
     hint: "Old-school, still works",
     icon: Phone,
-    iconColor: "text-[#0D9488]",
+    iconColor: "text-success-teal",
   },
   // No fourth backend location type yet — surface as "In person" + travel hint.
   // Kept for design parity; persists as IN_PERSON.
@@ -102,7 +102,7 @@ const LOCATION_TILES: {
     label: "I travel to guest",
     hint: "House calls / mobile",
     icon: Car,
-    iconColor: "text-[#D97706]",
+    iconColor: "text-warning",
   },
 ];
 
@@ -440,15 +440,15 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
         {/* breadcrumb + title row */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[12px] text-[#9CA3AF]">
+            <p className="text-[12px] text-ink-muted">
               <Link
                 href="/dashboard/services"
-                className="hover:text-[#0B1220]"
+                className="hover:text-ink-strong"
               >
                 Services
               </Link>{" "}
               /{" "}
-              <span className="font-bold text-[#FF5F63]">
+              <span className="font-bold text-brand">
                 {isEdit ? "Edit service" : "New service"}
               </span>
             </p>
@@ -458,14 +458,14 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
             >
               {isEdit ? `Edit "${initial?.title ?? "service"}"` : "Create a service"}
             </h1>
-            <p className="mt-2 text-[14px] text-[#6B7280]">
+            <p className="mt-2 text-[14px] text-ink-soft">
               Tell guests what you offer so they know exactly what to expect.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/dashboard/services"
-              className="inline-flex h-11 items-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              className="inline-flex h-11 items-center rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
             >
               Cancel
             </Link>
@@ -473,7 +473,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
               type="button"
               disabled={saving}
               onClick={saveDraftWithValidation}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
             >
               <Save className="size-4" /> Save draft
             </button>
@@ -481,7 +481,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
               type="button"
               disabled={saving}
               onClick={publishWithValidation}
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               <Check className="size-4" /> Publish service
             </button>
@@ -489,7 +489,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
         </div>
 
         {/* step indicator */}
-        <ol className="mt-7 grid grid-cols-2 gap-2 rounded-2xl border border-[#EEE7DF] bg-white p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)] md:grid-cols-4">
+        <ol className="mt-7 grid grid-cols-2 gap-2 rounded-2xl border border-line-cream bg-surface-card p-2 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)] md:grid-cols-4">
           <StepPill n={1} current={step} title="Basics" sub="Name, what & where" onClick={() => goToStep(1)} />
           <StepPill n={2} current={step} title="Guest experience" sub="Photo, what's included" onClick={() => goToStep(2)} />
           <StepPill n={3} current={step} title="Booking rules" sub="Buffer, notice, price" onClick={() => goToStep(3)} />
@@ -497,7 +497,7 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
         </ol>
 
         {error ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
             {error}
           </div>
         ) : null}
@@ -639,16 +639,16 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
               imageUrl={imageUrl}
             />
 
-            <div className="rounded-2xl border border-[#E1CFFA] bg-[#F8F1FF] p-5">
+            <div className="rounded-2xl border border-purple-border bg-purple-wash p-5">
               <div className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[#A855F7]">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-surface-card text-purple">
                   <Lightbulb className="size-4" />
                 </span>
-                <p className="text-[14px] font-bold text-[#5B21B6]">
+                <p className="text-[14px] font-bold text-purple-strong">
                   Tips for a great listing
                 </p>
               </div>
-              <ul className="mt-4 space-y-2.5 text-[13px] leading-[1.55] text-[#374151]">
+              <ul className="mt-4 space-y-2.5 text-[13px] leading-[1.55] text-ink-body">
                 <TipLine text="Use a clear, guest-friendly service name" />
                 <TipLine text="Describe what's included so guests know what to expect" />
                 <TipLine text="Add cleanup time to avoid back-to-back stress" />
@@ -656,19 +656,19 @@ export function ServiceEditor({ user, initial }: ServiceEditorProps) {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+            <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                 Your service link
               </p>
               <p className="mt-2 text-[13px] tabular-nums">
-                <span className="text-[#9CA3AF]">
+                <span className="text-ink-muted">
                   bookvella.com/{user.slug}/
                 </span>
-                <span className="font-bold text-[#0B1220]">
+                <span className="font-bold text-ink-strong">
                   {effectiveSlug || "new-service"}
                 </span>
               </p>
-              <p className="mt-2 text-[11px] text-[#9CA3AF]">
+              <p className="mt-2 text-[11px] text-ink-muted">
                 Auto-generated from the name. Customize it in Step 4 — Visibility.
               </p>
             </div>
@@ -695,16 +695,16 @@ function StepPill({
   const state = n === current ? "on" : n < current ? "done" : "todo";
   const dotClass =
     state === "on"
-      ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white"
+      ? "bg-gradient-to-r from-brand-coral to-brand-orange text-white"
       : state === "done"
-        ? "bg-[#10B981] text-white"
-        : "bg-[#F3F4F6] text-[#9CA3AF]";
+        ? "bg-success-bright text-white"
+        : "bg-line-subtle text-ink-muted";
   const labelClass =
     state === "on"
-      ? "text-[#FF5F63]"
+      ? "text-brand"
       : state === "done"
-        ? "text-[#10B981]"
-        : "text-[#9CA3AF]";
+        ? "text-success-bright"
+        : "text-ink-muted";
   return (
     <li>
       <button
@@ -719,7 +719,7 @@ function StepPill({
         </span>
         <span className="min-w-0 leading-tight">
           <span className={`text-[12px] font-bold ${labelClass}`}>{title}</span>
-          <span className="block text-[11px] text-[#9CA3AF]">{sub}</span>
+          <span className="block text-[11px] text-ink-muted">{sub}</span>
         </span>
       </button>
     </li>
@@ -774,8 +774,8 @@ function Step1(props: {
                   onClick={() => props.onCategory(cat)}
                   className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-bold ${
                     props.category === cat
-                      ? "border-[#FCC9C5] bg-[#FFF0EF] text-[#FF5F63]"
-                      : "border-[#E5E7EB] bg-white text-[#374151] hover:bg-[#FFFBF7]"
+                      ? "border-brand-tint-300 bg-brand-tint-100 text-brand"
+                      : "border-line-soft bg-surface-card text-ink-body hover:bg-surface-page"
                   }`}
                 >
                   {cat}
@@ -798,7 +798,7 @@ function Step1(props: {
             <div className="mt-2 space-y-2">
               {props.included.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#E6F4EA] text-[#16A34A]">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-success-mint text-success">
                     <Check className="size-4" />
                   </span>
                   <input
@@ -808,7 +808,7 @@ function Step1(props: {
                       next[idx] = event.target.value;
                       props.onIncluded(next);
                     }}
-                    className="h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+                    className="h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-sm font-medium outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
                     placeholder="e.g. Full cut, fade and detail work"
                   />
                   <button
@@ -819,7 +819,7 @@ function Step1(props: {
                       )
                     }
                     aria-label="Remove"
-                    className="rounded-md p-2 text-[#9CA3AF] hover:text-[#B91C1C]"
+                    className="rounded-md p-2 text-ink-muted hover:text-danger"
                   >
                     <X className="size-4" />
                   </button>
@@ -829,7 +829,7 @@ function Step1(props: {
             <button
               type="button"
               onClick={() => props.onIncluded([...props.included, ""])}
-              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#FF5F63]"
+              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-brand"
             >
               <Plus className="size-3.5" /> Add another item
             </button>
@@ -902,15 +902,15 @@ function Step1(props: {
                     }}
                     className={`rounded-2xl border p-3 text-left transition ${
                       selected
-                        ? "border-[#FCC9C5] bg-[#FFF0EF]"
-                        : "border-[#E5E7EB] bg-white hover:border-[#FCC9C5] hover:bg-[#FFF9F8]"
+                        ? "border-brand-tint-300 bg-brand-tint-100"
+                        : "border-line-soft bg-surface-card hover:border-brand-tint-300 hover:bg-brand-tint-soft"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <TileIcon className={`size-4 ${tile.iconColor}`} />
                       <p className="text-[13px] font-bold">{tile.label}</p>
                     </div>
-                    <p className="mt-1 text-[11px] text-[#9CA3AF]">
+                    <p className="mt-1 text-[11px] text-ink-muted">
                       {tile.hint}
                     </p>
                   </button>
@@ -982,7 +982,7 @@ function Step2(props: {
           >
             {!props.imageUrl ? (
               <div className="absolute inset-0 grid place-items-center">
-                <span className="flex size-14 items-center justify-center rounded-2xl bg-white/70 text-[#FF5F63] backdrop-blur">
+                <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-card/70 text-brand backdrop-blur">
                   <ImageIcon className="size-6" />
                 </span>
               </div>
@@ -991,14 +991,14 @@ function Step2(props: {
               <button
                 type="button"
                 onClick={props.onClearImage}
-                className="absolute right-2 top-2 inline-flex h-7 items-center gap-1 rounded-md bg-white/90 px-2 text-[11px] font-bold text-[#B91C1C]"
+                className="absolute right-2 top-2 inline-flex h-7 items-center gap-1 rounded-md bg-surface-card/90 px-2 text-[11px] font-bold text-danger"
               >
                 <X className="size-3.5" /> Remove
               </button>
             ) : null}
           </div>
           <div>
-            <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm">
+            <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm">
               <Upload className="size-4" />
               {props.uploading ? "Uploading…" : "Upload main photo"}
               <input
@@ -1013,20 +1013,20 @@ function Step2(props: {
                 }}
               />
             </label>
-            <p className="mt-3 text-[12.5px] leading-relaxed text-[#6B7280]">
+            <p className="mt-3 text-[12.5px] leading-relaxed text-ink-soft">
               Aim for a horizontal photo, 1200×800 or larger.
             </p>
-            <ul className="mt-3 space-y-1 text-[11.5px] text-[#9CA3AF]">
+            <ul className="mt-3 space-y-1 text-[11.5px] text-ink-muted">
               <li className="flex items-center gap-1.5">
-                <Check className="size-3 text-[#16A34A]" /> JPG or PNG, up to 10
+                <Check className="size-3 text-success" /> JPG or PNG, up to 10
                 MB
               </li>
               <li className="flex items-center gap-1.5">
-                <Check className="size-3 text-[#16A34A]" /> Avoid logos or text
+                <Check className="size-3 text-success" /> Avoid logos or text
                 over the photo
               </li>
               <li className="flex items-center gap-1.5">
-                <Check className="size-3 text-[#16A34A]" /> Real work, not stock
+                <Check className="size-3 text-success" /> Real work, not stock
                 imagery
               </li>
             </ul>
@@ -1038,8 +1038,8 @@ function Step2(props: {
         eyebrow="More photos"
         head={`Add up to 5 more`}
         headRight={
-          <p className="text-[11px] text-[#9CA3AF]">
-            <span className="font-bold tabular-nums text-[#0B1220]">
+          <p className="text-[11px] text-ink-muted">
+            <span className="font-bold tabular-nums text-ink-strong">
               {props.gallery.length}
             </span>{" "}
             / 5 added
@@ -1057,14 +1057,14 @@ function Step2(props: {
                 type="button"
                 onClick={() => props.onRemoveFromGallery(idx)}
                 aria-label="Remove"
-                className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md bg-white/90 text-[#B91C1C] shadow"
+                className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md bg-surface-card/90 text-danger shadow"
               >
                 <X className="size-3.5" />
               </button>
             </div>
           ))}
           {props.gallery.length < 5 ? (
-            <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border-2 border-dashed border-[#FCC9C5] bg-[#FFF7F5] text-[#FF5F63] hover:bg-[#FFF0EF]">
+            <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border-2 border-dashed border-brand-tint-300 bg-brand-tint-50 text-brand hover:bg-brand-tint-100">
               <div className="text-center">
                 <Plus className="mx-auto size-5" />
                 <p className="mt-1 text-[11px] font-bold">
@@ -1088,12 +1088,12 @@ function Step2(props: {
             (_, slotIdx) => (
               <div
                 key={`slot-${slotIdx}`}
-                className="aspect-square rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7]"
+                className="aspect-square rounded-xl border border-dashed border-line-cream bg-surface-page"
               />
             ),
           )}
         </div>
-        <p className="mt-4 text-[12px] text-[#6B7280]">
+        <p className="mt-4 text-[12px] text-ink-soft">
           Show your space, your work, and what guests can expect. The first
           photo is the main one used in listings and emails.
         </p>
@@ -1153,7 +1153,7 @@ function Step3(props: {
                   align="left"
                 >
                   <p className="text-[13px] font-bold">{option.label}</p>
-                  <p className="mt-1 text-[11px] text-[#9CA3AF]">
+                  <p className="mt-1 text-[11px] text-ink-muted">
                     {option.hint}
                   </p>
                 </Tile>
@@ -1213,7 +1213,7 @@ function Step3(props: {
                   error={props.priceUpperError}
                 />
               </div>
-              <p className="mt-2 text-[11px] text-[#9CA3AF]">
+              <p className="mt-2 text-[11px] text-ink-muted">
                 Guests see &ldquo;{symbol}
                 {props.priceLowerDollars || "—"} – {symbol}
                 {props.priceUpperDollars || "—"}&rdquo;.
@@ -1222,18 +1222,18 @@ function Step3(props: {
           ) : null}
 
           {props.priceType === "FREE" ? (
-            <div className="flex items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
-              <Info className="mt-0.5 size-4 text-[#9CA3AF]" />
-              <p className="text-[12px] leading-snug text-[#6B7280]">
+            <div className="flex items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-3">
+              <Info className="mt-0.5 size-4 text-ink-muted" />
+              <p className="text-[12px] leading-snug text-ink-soft">
                 No price will be shown publicly. Use this for free consultations
                 or services where the price is agreed directly with each guest.
               </p>
             </div>
           ) : null}
 
-          <div className="flex items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
-            <Info className="mt-0.5 size-4 text-[#9CA3AF]" />
-            <p className="text-[12px] leading-snug text-[#6B7280]">
+          <div className="flex items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-3">
+            <Info className="mt-0.5 size-4 text-ink-muted" />
+            <p className="text-[12px] leading-snug text-ink-soft">
               Payment happens directly with you — Bookvella never takes a cut
               and doesn&apos;t process payments.
             </p>
@@ -1241,21 +1241,21 @@ function Step3(props: {
         </div>
       </Card>
 
-      <div className="rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-5">
+      <div className="rounded-2xl border border-line-cream bg-surface-page p-5">
         <div className="flex items-start gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#FF5F63]">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-surface-card text-brand">
             <Clock className="size-4" />
           </span>
           <div className="flex-1">
             <p className="text-[13.5px] font-bold">
               Notice, horizon, and slot spacing live in Availability
             </p>
-            <p className="mt-1 text-[12.5px] leading-snug text-[#6B7280]">
+            <p className="mt-1 text-[12.5px] leading-snug text-ink-soft">
               Minimum notice, how far ahead guests can book, slot increments,
               and daily limits apply to every service.{" "}
               <Link
                 href="/dashboard/availability"
-                className="font-bold text-[#FF5F63] hover:underline"
+                className="font-bold text-brand hover:underline"
               >
                 Manage in Availability →
               </Link>
@@ -1310,10 +1310,10 @@ function Step4(props: {
           <div>
             <FieldEyebrow>
               Service URL
-              <span className="ml-1 text-[#FF5F63]">*</span>
+              <span className="ml-1 text-brand">*</span>
             </FieldEyebrow>
             <div className="mt-1.5 flex items-center gap-2">
-              <span className="flex h-11 items-center whitespace-nowrap rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] px-3 text-[13px] tabular-nums text-[#9CA3AF]">
+              <span className="flex h-11 items-center whitespace-nowrap rounded-xl border border-line-cream bg-surface-page px-3 text-[13px] tabular-nums text-ink-muted">
                 bookvella.com/{props.hostSlug}/
               </span>
               <input
@@ -1321,10 +1321,10 @@ function Step4(props: {
                 onChange={(event) =>
                   props.onSlug(event.target.value.toLowerCase())
                 }
-                className={`h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium tabular-nums outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+                className={`h-11 w-full rounded-xl border bg-surface-card px-3.5 text-sm font-medium tabular-nums outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
                   props.slugError
-                    ? "border-red-400 focus:border-red-500"
-                    : "border-[#E5E7EB] focus:border-[#FF5F63]"
+                    ? "border-danger-strong focus:border-danger-strong"
+                    : "border-line-soft focus:border-brand"
                 }`}
               />
               <button
@@ -1339,28 +1339,28 @@ function Step4(props: {
                     toast.error("Copy failed");
                   }
                 }}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-3 text-[#9CA3AF] hover:text-[#FF5F63]"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-line-soft bg-surface-card px-3 text-ink-muted hover:text-brand"
                 aria-label="Copy link"
               >
                 <Copy className="size-4" />
               </button>
             </div>
             {props.slugError ? (
-              <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">
+              <p className="mt-1.5 text-[11.5px] font-semibold text-danger">
                 {props.slugError}
               </p>
             ) : null}
           </div>
 
           {props.isEdit ? (
-            <div className="rounded-xl border border-[#FCC9C5] bg-[#FFF5F4] p-4">
+            <div className="rounded-xl border border-brand-tint-300 bg-danger-warm-tint p-4">
               <div className="flex items-start gap-3">
-                <TriangleAlert className="mt-0.5 size-4 text-[#DC2626]" />
+                <TriangleAlert className="mt-0.5 size-4 text-danger-strong" />
                 <div>
-                  <p className="text-[12.5px] font-bold text-[#B91C1C]">
+                  <p className="text-[12.5px] font-bold text-danger">
                     Changing the URL breaks existing shared links
                   </p>
-                  <p className="mt-1 text-[12px] text-[#7c2222]">
+                  <p className="mt-1 text-[12px] text-danger-brown">
                     If anyone has already shared this booking page, the old URL
                     will 404.
                   </p>
@@ -1372,7 +1372,7 @@ function Step4(props: {
       </Card>
 
       <Card eyebrow="Listing visibility" head="Where this service appears">
-        <div className="divide-y divide-[#EEE7DF]">
+        <div className="divide-y divide-line-cream">
           <ToggleRow
             title="Show on my public profile"
             sub={`Listed at bookvella.com/${props.hostSlug} alongside other services.`}
@@ -1405,14 +1405,14 @@ function Step4(props: {
       <section
         className={`rounded-2xl border p-6 ${
           allReady
-            ? "border-[#A7F3D0] bg-[#ECFDF5]"
-            : "border-[#FDE68A] bg-[#FFFBEB]"
+            ? "border-success-border bg-success-tint"
+            : "border-warning-border bg-surface-amber"
         }`}
       >
         <div className="flex items-center gap-3">
           <span
-            className={`flex size-10 items-center justify-center rounded-xl bg-white ${
-              allReady ? "text-[#16A34A]" : "text-[#D97706]"
+            className={`flex size-10 items-center justify-center rounded-xl bg-surface-card ${
+              allReady ? "text-success" : "text-warning"
             }`}
           >
             <CheckCheck className="size-5" />
@@ -1420,14 +1420,14 @@ function Step4(props: {
           <div>
             <p
               className={`text-[15px] font-bold ${
-                allReady ? "text-[#065F46]" : "text-[#92400E]"
+                allReady ? "text-success-deep" : "text-warning-strong"
               }`}
             >
               {allReady ? "Ready to publish" : "Almost there"}
             </p>
             <p
               className={`text-[12.5px] ${
-                allReady ? "text-[#047857]" : "text-[#92400E]"
+                allReady ? "text-success-strong" : "text-warning-strong"
               }`}
             >
               {allReady
@@ -1438,7 +1438,7 @@ function Step4(props: {
         </div>
         <ul
           className={`mt-4 grid gap-2 text-[12.5px] sm:grid-cols-2 ${
-            allReady ? "text-[#065F46]" : "text-[#92400E]"
+            allReady ? "text-success-deep" : "text-warning-strong"
           }`}
         >
           <ReadyLine ok={props.readinessChecklist.hasTitle} label="Name & description set" />
@@ -1448,21 +1448,21 @@ function Step4(props: {
         </ul>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-white p-3 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-cream bg-surface-card p-3 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
         <button
           type="button"
           onClick={props.onBack}
-          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-ink-soft hover:text-ink-strong"
         >
           <ArrowLeft className="size-4" /> Back
         </button>
         <div className="flex items-center gap-2">
-          <p className="text-[11px] text-[#9CA3AF]">Step 4 of 4</p>
+          <p className="text-[11px] text-ink-muted">Step 4 of 4</p>
           <button
             type="button"
             disabled={props.saving}
             onClick={props.onPublish}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             <Rocket className="size-4" /> Publish service
           </button>
@@ -1500,15 +1500,15 @@ function PreviewCard({
   imageUrl: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-      <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-3">
+    <div className="rounded-2xl border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex items-center justify-between border-b border-line-cream px-5 py-3">
         <p className="text-[13px] font-bold">Guest preview</p>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-bold text-[#16A34A]">
-          <span className="size-1.5 rounded-full bg-[#16A34A]" /> Live
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-success-mint px-2 py-0.5 text-[10px] font-bold text-success">
+          <span className="size-1.5 rounded-full bg-success" /> Live
         </span>
       </div>
       <div className="p-5">
-        <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+        <div className="rounded-xl border border-line-cream bg-surface-page p-4">
           <div className="flex items-center gap-3">
             <span
               className="flex size-10 items-center justify-center overflow-hidden rounded-xl text-white"
@@ -1522,29 +1522,29 @@ function PreviewCard({
             </span>
             <div className="min-w-0 leading-tight">
               <p className="truncate text-[14px] font-bold">{title}</p>
-              <p className="text-[11px] text-[#6B7280] tabular-nums">
+              <p className="text-[11px] text-ink-soft tabular-nums">
                 {duration} min · {locationLabel}
                 {priceLabel ? ` · ${priceLabel}` : ""}
               </p>
             </div>
           </div>
           {description ? (
-            <p className="mt-3 line-clamp-3 text-[12px] leading-[1.6] text-[#374151]">
+            <p className="mt-3 line-clamp-3 text-[12px] leading-[1.6] text-ink-body">
               {description}
             </p>
           ) : null}
           {included.filter((v) => v.trim().length > 0).length > 0 ? (
-            <div className="mt-3 border-t border-[#EEE7DF] pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+            <div className="mt-3 border-t border-line-cream pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
                 What&apos;s included
               </p>
-              <ul className="mt-1.5 space-y-1 text-[11px] text-[#374151]">
+              <ul className="mt-1.5 space-y-1 text-[11px] text-ink-body">
                 {included
                   .filter((v) => v.trim().length > 0)
                   .slice(0, 5)
                   .map((item, idx) => (
                     <li key={idx} className="flex items-start gap-1.5">
-                      <Check className="mt-0.5 size-3 text-[#16A34A]" /> {item}
+                      <Check className="mt-0.5 size-3 text-success" /> {item}
                     </li>
                   ))}
               </ul>
@@ -1553,12 +1553,12 @@ function PreviewCard({
           <button
             type="button"
             disabled
-            className="mt-4 h-10 w-full rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-[12px] font-bold text-white shadow-sm opacity-90"
+            className="mt-4 h-10 w-full rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange text-[12px] font-bold text-white shadow-sm opacity-90"
           >
             Book this service
           </button>
         </div>
-        <p className="mt-3 text-center text-[11px] text-[#9CA3AF]">
+        <p className="mt-3 text-center text-[11px] text-ink-muted">
           Updates as you edit.
         </p>
       </div>
@@ -1580,10 +1580,10 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[18px] border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE7DF] px-5 py-4">
+    <section className="rounded-[18px] border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-cream px-5 py-4">
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9CA3AF]">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ink-muted">
             {eyebrow}
           </p>
           <h2 className="mt-1 text-[16px] font-extrabold">{head}</h2>
@@ -1597,7 +1597,7 @@ function Card({
 
 function FieldEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[12px] font-bold uppercase tracking-[0.10em] text-[#6B7280]">
+    <span className="text-[12px] font-bold uppercase tracking-[0.10em] text-ink-soft">
       {children}
     </span>
   );
@@ -1625,7 +1625,7 @@ function FieldText({
       <FieldEyebrow>
         {label}
         {required ? (
-          <span className="ml-1 text-[#FF5F63]">*</span>
+          <span className="ml-1 text-brand">*</span>
         ) : null}
       </FieldEyebrow>
       <input
@@ -1633,16 +1633,16 @@ function FieldText({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
-        className={`mt-1.5 h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+        className={`mt-1.5 h-11 w-full rounded-xl border bg-surface-card px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
           error
-            ? "border-red-400 focus:border-red-500"
-            : "border-[#E5E7EB] focus:border-[#FF5F63]"
+            ? "border-danger-strong focus:border-danger-strong"
+            : "border-line-soft focus:border-brand"
         }`}
       />
       {error ? (
-        <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">{error}</p>
+        <p className="mt-1.5 text-[11.5px] font-semibold text-danger">{error}</p>
       ) : help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1670,7 +1670,7 @@ function FieldTextArea({
       <FieldEyebrow>
         {label}
         {optional ? (
-          <span className="ml-1 font-normal normal-case tracking-normal text-[#9CA3AF]">
+          <span className="ml-1 font-normal normal-case tracking-normal text-ink-muted">
             optional
           </span>
         ) : null}
@@ -1680,10 +1680,10 @@ function FieldTextArea({
         onChange={(event) => onChange(event.target.value)}
         rows={rows}
         placeholder={placeholder}
-        className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 py-3 text-sm leading-[1.55] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        className="mt-1.5 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 py-3 text-sm leading-[1.55] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
       />
       {help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1709,7 +1709,7 @@ function FieldSelectNumber({
       <FieldEyebrow>
         {label}
         {optional ? (
-          <span className="ml-1 font-normal normal-case tracking-normal text-[#9CA3AF]">
+          <span className="ml-1 font-normal normal-case tracking-normal text-ink-muted">
             optional
           </span>
         ) : null}
@@ -1717,7 +1717,7 @@ function FieldSelectNumber({
       <select
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-medium outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
+        className="mt-1.5 h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3 text-sm font-medium outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -1726,7 +1726,7 @@ function FieldSelectNumber({
         ))}
       </select>
       {help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1755,8 +1755,8 @@ function Tile({
         align === "left" ? "text-left" : "text-center"
       } ${
         selected
-          ? "border-[#FCC9C5] bg-[#FFF0EF]"
-          : "border-[#E5E7EB] bg-white hover:border-[#FCC9C5] hover:bg-[#FFF9F8]"
+          ? "border-brand-tint-300 bg-brand-tint-100"
+          : "border-line-soft bg-surface-card hover:border-brand-tint-300 hover:bg-brand-tint-soft"
       }`}
     >
       {children ? (
@@ -1764,11 +1764,11 @@ function Tile({
       ) : (
         <>
           <p
-            className={`text-[18px] font-extrabold ${selected ? "text-[#FF5F63]" : "text-[#0B1220]"}`}
+            className={`text-[18px] font-extrabold ${selected ? "text-brand" : "text-ink-strong"}`}
           >
             {main}
           </p>
-          <p className="mt-0.5 text-[11px] font-semibold text-[#9CA3AF]">
+          <p className="mt-0.5 text-[11px] font-semibold text-ink-muted">
             {sub}
           </p>
         </>
@@ -1792,7 +1792,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-3 p-5">
       <div>
         <p className="text-[13px] font-bold">{title}</p>
-        <p className="text-[12px] text-[#6B7280]">{sub}</p>
+        <p className="text-[12px] text-ink-soft">{sub}</p>
       </div>
       <button
         type="button"
@@ -1800,11 +1800,11 @@ function ToggleRow({
         aria-checked={on}
         onClick={() => onChange(!on)}
         className={`relative h-5 w-9 rounded-full transition ${
-          on ? "bg-[#FF5F63]" : "bg-[#E5E7EB]"
+          on ? "bg-brand" : "bg-line-soft"
         }`}
       >
         <span
-          className={`absolute top-[3px] size-3.5 rounded-full bg-white shadow transition ${
+          className={`absolute top-[3px] size-3.5 rounded-full bg-surface-card shadow transition ${
             on ? "left-[19px]" : "left-[3px]"
           }`}
         />
@@ -1836,16 +1836,16 @@ function CurrencyInput({
   required?: boolean;
   error?: string;
 }) {
-  const borderColor = error ? "border-red-400" : "border-[#E5E7EB]";
+  const borderColor = error ? "border-danger-strong" : "border-line-soft";
   return (
     <label className="block">
       <FieldEyebrow>
         {label}
-        {required ? <span className="ml-1 text-[#FF5F63]">*</span> : null}
+        {required ? <span className="ml-1 text-brand">*</span> : null}
       </FieldEyebrow>
       <div className="mt-1.5 flex">
         <span
-          className={`flex h-11 items-center rounded-l-xl border border-r-0 ${borderColor} bg-[#FFFBF7] px-3 text-[14px] font-bold text-[#6B7280]`}
+          className={`flex h-11 items-center rounded-l-xl border border-r-0 ${borderColor} bg-surface-page px-3 text-[14px] font-bold text-ink-soft`}
         >
           {prefix ?? symbol}
         </span>
@@ -1857,14 +1857,14 @@ function CurrencyInput({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           aria-invalid={error ? true : undefined}
-          className={`h-11 min-w-0 flex-1 border-y ${borderColor} bg-white px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
-            error ? "focus:border-red-500" : "focus:border-[#FF5F63]"
+          className={`h-11 min-w-0 flex-1 border-y ${borderColor} bg-surface-card px-3.5 text-sm font-medium outline-none focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)] ${
+            error ? "focus:border-danger-strong" : "focus:border-brand"
           }`}
         />
         <select
           value={currency}
           onChange={(event) => onCurrency(event.target.value)}
-          className={`h-11 rounded-r-xl border border-l-0 ${borderColor} bg-[#FFFBF7] px-3 text-sm font-medium outline-none`}
+          className={`h-11 rounded-r-xl border border-l-0 ${borderColor} bg-surface-page px-3 text-sm font-medium outline-none`}
         >
           {["USD", "EUR", "GBP", "CAD", "AUD"].map((c) => (
             <option key={c} value={c}>
@@ -1874,9 +1874,9 @@ function CurrencyInput({
         </select>
       </div>
       {error ? (
-        <p className="mt-1.5 text-[11.5px] font-semibold text-red-600">{error}</p>
+        <p className="mt-1.5 text-[11.5px] font-semibold text-danger">{error}</p>
       ) : help ? (
-        <p className="mt-1.5 text-[11px] text-[#9CA3AF]">{help}</p>
+        <p className="mt-1.5 text-[11px] text-ink-muted">{help}</p>
       ) : null}
     </label>
   );
@@ -1885,7 +1885,7 @@ function CurrencyInput({
 function TipLine({ text }: { text: string }) {
   return (
     <li className="flex items-start gap-2">
-      <Check className="mt-1 size-3.5 text-[#7C3AED]" /> {text}
+      <Check className="mt-1 size-3.5 text-purple-strong" /> {text}
     </li>
   );
 }
@@ -1902,30 +1902,30 @@ function StepFooter({
   nextLabel: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-white p-3 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-cream bg-surface-card p-3 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
       {onBack ? (
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-ink-soft hover:text-ink-strong"
         >
           <ArrowLeft className="size-4" /> Back
         </button>
       ) : (
         <Link
           href="/dashboard/services"
-          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-bold text-ink-soft hover:text-ink-strong"
         >
           <ArrowLeft className="size-4" /> Back to services
         </Link>
       )}
       <div className="flex items-center gap-2">
-        <p className="text-[11px] text-[#9CA3AF]">Step {step} of 4</p>
+        <p className="text-[11px] text-ink-muted">Step {step} of 4</p>
         {onNext ? (
           <button
             type="button"
             onClick={onNext}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             {nextLabel} <ArrowRight className="size-4" />
           </button>

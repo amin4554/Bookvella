@@ -187,7 +187,7 @@ function ActiveDashboard({
           >
             {timeGreeting(hostFirstName)} <span aria-hidden>👋</span>
           </h1>
-          <p className="mt-2 text-sm text-[#6B7280]">
+          <p className="mt-2 text-sm text-ink-soft">
             {formatLongDate(loadedAt)} — here&apos;s your day at a glance.
           </p>
         </div>
@@ -196,13 +196,13 @@ function ActiveDashboard({
             href={publicProfileLink}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             <ExternalLink className="size-4" /> View public page
           </a>
           <Link
             href="/dashboard/services"
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             <Plus className="size-4" /> New service
           </Link>
@@ -220,28 +220,28 @@ function ActiveDashboard({
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           icon={CalendarCheck2}
-          iconBg="bg-[#FFF0EF] text-[#FF5F63]"
+          iconBg="bg-brand-tint-100 text-brand"
           value={String(thisWeekCount)}
           label="Bookings this week"
           delta={{ tone: "good", text: "+12%" }}
         />
         <Stat
           icon={Star}
-          iconBg="bg-[#F4EAFF] text-[#A855F7]"
+          iconBg="bg-purple-tint text-purple"
           value="4.9"
           label="Average rating"
           delta={{ tone: "good", text: "+3%" }}
         />
         <Stat
           icon={Layers}
-          iconBg="bg-[#E0F7EF] text-[#0D9488]"
+          iconBg="bg-success-tint-soft text-success-teal"
           value={String(activeEventsCount)}
           label="Services"
           delta={{ tone: "neutral", text: "Active" }}
         />
         <Stat
           icon={MessageSquareQuote}
-          iconBg="bg-[#FEF3C7] text-[#B45309]"
+          iconBg="bg-warning-tint text-warning"
           value={String(upcoming.length)}
           label="Upcoming bookings"
           delta={{ tone: "neutral", text: "Confirmed" }}
@@ -356,12 +356,12 @@ function Stat({
 }) {
   const deltaClass =
     delta?.tone === "good"
-      ? "bg-[#E6F4EA] text-[#16A34A]"
+      ? "bg-success-mint text-success"
       : delta?.tone === "bad"
-        ? "bg-[#FEE2E2] text-[#B91C1C]"
-        : "bg-[#F3F4F6] text-[#6B7280]";
+        ? "bg-danger-tint-strong text-danger"
+        : "bg-line-subtle text-ink-soft";
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <div className="flex items-start justify-between">
         <div className={`flex size-9 items-center justify-center rounded-xl ${iconBg}`}>
           <Icon className="size-4" />
@@ -373,7 +373,7 @@ function Stat({
         ) : null}
       </div>
       <p className="mt-4 text-[28px] font-bold tabular-nums">{value}</p>
-      <p className="text-xs text-[#6B7280]">{label}</p>
+      <p className="text-xs text-ink-soft">{label}</p>
     </div>
   );
 }
@@ -386,23 +386,23 @@ function UpcomingTable({
   timezone: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#EEE7DF] bg-white shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
-      <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-4">
+    <div className="overflow-hidden rounded-2xl border border-line-cream bg-surface-card shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+      <div className="flex items-center justify-between border-b border-line-cream px-5 py-4">
         <div>
           <p className="text-[15px] font-bold">Upcoming bookings</p>
-          <p className="text-[11px] text-[#9CA3AF]">
+          <p className="text-[11px] text-ink-muted">
             Next 7 days · all services
           </p>
         </div>
         <Link
           href="/dashboard/bookings"
-          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#FF5F63]"
+          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand"
         >
           View all <ArrowRight className="size-3.5" />
         </Link>
       </div>
       <table className="w-full text-left text-[13px]">
-        <thead className="border-b border-[#EEE7DF] bg-[#FFFBF7] text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+        <thead className="border-b border-line-cream bg-surface-page text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
           <tr>
             <th className="px-5 py-2.5">Guest</th>
             <th className="px-3 py-2.5">Service</th>
@@ -411,22 +411,22 @@ function UpcomingTable({
             <th className="px-5 py-2.5" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#EEE7DF]">
+        <tbody className="divide-y divide-line-cream">
           {bookings.map((booking) => (
-            <tr key={booking.id} className="hover:bg-[#FFFBF7]">
+            <tr key={booking.id} className="hover:bg-surface-page">
               <td className="px-5 py-3">
                 <div className="flex items-center gap-3">
                   <Avatar name={booking.guestName} />
                   <div className="leading-tight">
                     <p className="font-bold">{booking.guestName}</p>
-                    <p className="text-[11px] text-[#9CA3AF]">
+                    <p className="text-[11px] text-ink-muted">
                       {booking.guestEmail}
                     </p>
                   </div>
                 </div>
               </td>
               <td className="px-3">
-                <span className="inline-flex rounded-full bg-[#FFF0EF] px-2.5 py-1 text-[11px] font-bold text-[#FF5F63]">
+                <span className="inline-flex rounded-full bg-brand-tint-100 px-2.5 py-1 text-[11px] font-bold text-brand">
                   {booking.eventType.title}
                 </span>
               </td>
@@ -434,20 +434,20 @@ function UpcomingTable({
                 <p className="font-semibold">
                   {formatDateTime(booking.startTimeUtc, timezone)}
                 </p>
-                <p className="text-[11px] text-[#9CA3AF]">
+                <p className="text-[11px] text-ink-muted">
                   {booking.eventType.durationMinutes} min
                 </p>
               </td>
               <td className="px-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[11px] font-bold text-[#16A34A]">
-                  <span className="size-1.5 rounded-full bg-[#16A34A]" />{" "}
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-success-mint px-2.5 py-1 text-[11px] font-bold text-success">
+                  <span className="size-1.5 rounded-full bg-success" />{" "}
                   Confirmed
                 </span>
               </td>
               <td className="px-5 text-right">
                 <Link
                   href="/dashboard/bookings"
-                  className="rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-[12px] font-bold hover:bg-[#F9FAFB]"
+                  className="rounded-lg border border-line-soft px-3 py-1.5 text-[12px] font-bold hover:bg-surface-soft"
                 >
                   Manage
                 </Link>
@@ -456,7 +456,7 @@ function UpcomingTable({
           ))}
           {bookings.length === 0 ? (
             <tr>
-              <td colSpan={5} className="px-5 py-8 text-sm text-[#6B7280]">
+              <td colSpan={5} className="px-5 py-8 text-sm text-ink-soft">
                 No upcoming bookings yet.
               </td>
             </tr>
@@ -470,11 +470,11 @@ function UpcomingTable({
 function Avatar({ name }: { name: string }) {
   const initial = name?.[0]?.toUpperCase() ?? "?";
   const palettes = [
-    "from-[#A855F7] to-[#7C4DFF]",
-    "from-[#10B981] to-[#0D9488]",
-    "from-[#F97316] to-[#EA580C]",
-    "from-[#EC4899] to-[#A855F7]",
-    "from-[#3B82F6] to-[#0EA5E9]",
+    "from-purple to-purple-strong",
+    "from-success-bright to-success-teal",
+    "from-orange-500 to-orange-600",
+    "from-pink-500 to-purple",
+    "from-info-bright to-info-cyan",
   ];
   const palette = palettes[(initial.charCodeAt(0) || 0) % palettes.length];
   return (
@@ -494,15 +494,15 @@ function TodaySchedule({
   timezone: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <p className="text-[15px] font-bold">Today&apos;s schedule</p>
-      <p className="text-[11px] text-[#9CA3AF]">
+      <p className="text-[11px] text-ink-muted">
         {bookings.length} appointment{bookings.length === 1 ? "" : "s"}
       </p>
 
       <div className="mt-4 space-y-3">
         {bookings.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] p-4 text-center text-xs text-[#9CA3AF]">
+          <p className="rounded-xl border border-dashed border-line-cream bg-surface-page p-4 text-center text-xs text-ink-muted">
             No bookings today.
           </p>
         ) : null}
@@ -511,20 +511,23 @@ function TodaySchedule({
             key={booking.id}
             className={
               idx === 0
-                ? "flex items-center gap-3 rounded-xl border border-[#FFD2CE] bg-[#FFF7F5] p-3"
-                : "flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3"
+                ? "flex items-center gap-3 rounded-xl border border-brand-tint-400 bg-brand-tint-50 p-3"
+                : "flex items-center gap-3 rounded-xl border border-line-cream bg-surface-page p-3"
             }
           >
-            <TimeBadge value={formatTime(booking.startTimeUtc, timezone)} accent={idx === 0 ? "#FF5F63" : "#A855F7"} />
+            <TimeBadge
+              value={formatTime(booking.startTimeUtc, timezone)}
+              accent={idx === 0 ? "var(--color-brand)" : "var(--color-purple)"}
+            />
             <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-[13px] font-bold">
                 {booking.guestName}
               </p>
-              <p className="truncate text-[11px] text-[#6B7280]">
+              <p className="truncate text-[11px] text-ink-soft">
                 {booking.eventType.title} · {booking.eventType.durationMinutes} min
               </p>
             </div>
-            <span className="size-2 rounded-full bg-[#16A34A]" />
+            <span className="size-2 rounded-full bg-success" />
           </div>
         ))}
       </div>
@@ -536,7 +539,7 @@ function TimeBadge({ value, accent }: { value: string; accent: string }) {
   const [time, period] = value.split(/\s+/);
   return (
     <div
-      className="flex h-11 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-white"
+      className="flex h-11 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-surface-card"
       style={{ color: accent }}
     >
       <span className="text-[11px] font-bold leading-none tabular-nums">
@@ -553,41 +556,41 @@ function TimeBadge({ value, accent }: { value: string; accent: string }) {
 
 function CalendarSyncCard() {
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <div className="flex items-start gap-3">
-        <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#F3F4F6] text-[#9CA3AF]">
+        <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-line-subtle text-ink-muted">
           <CalendarCheck2 className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-[13px] font-bold">Calendar sync</p>
-            <span className="rounded-full bg-[#ECFDF5] px-1.5 py-0.5 text-[10px] font-bold text-[#047857]">
+            <span className="rounded-full bg-success-tint px-1.5 py-0.5 text-[10px] font-bold text-success-strong">
               Ready
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-[#6B7280]">
+          <p className="mt-0.5 text-[11px] text-ink-soft">
             Connect Google or Outlook so Bookvella checks conflicts and writes
             new bookings automatically.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-[#374151]">
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#EEE7DF] bg-white px-2 py-0.5">
-              <Eye className="size-3 text-[#9CA3AF]" /> Check conflicts
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-body">
+            <span className="inline-flex items-center gap-1 rounded-full border border-line-cream bg-surface-card px-2 py-0.5">
+              <Eye className="size-3 text-ink-muted" /> Check conflicts
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#EEE7DF] bg-white px-2 py-0.5">
-              <CalendarPlus className="size-3 text-[#9CA3AF]" /> Add new bookings
+            <span className="inline-flex items-center gap-1 rounded-full border border-line-cream bg-surface-card px-2 py-0.5">
+              <CalendarPlus className="size-3 text-ink-muted" /> Add new bookings
             </span>
           </div>
         </div>
         <Link
           href="/dashboard/settings#calendar"
-          className="shrink-0 rounded-md p-1.5 text-[#9CA3AF] hover:text-[#0B1220]"
+          className="shrink-0 rounded-md p-1.5 text-ink-muted hover:text-ink-strong"
           aria-label="Open calendar settings"
         >
           <ChevronRight className="size-4" />
         </Link>
       </div>
-      <p className="mt-3 border-t border-[#EEE7DF] pt-3 text-[11px] text-[#9CA3AF]">
-        <ShieldCheck className="inline size-3 align-[-2px] text-[#16A34A]" />{" "}
+      <p className="mt-3 border-t border-line-cream pt-3 text-[11px] text-ink-muted">
+        <ShieldCheck className="inline size-3 align-[-2px] text-success" />{" "}
         Guests never see your private events — only that a time is busy.
       </p>
     </div>
@@ -615,33 +618,33 @@ function QuickActions({
   }
 
   return (
-    <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+    <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
       <p className="text-[15px] font-bold">Quick actions</p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={copyLink}
-          className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
+          className="flex flex-col items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-4 text-left transition hover:border-brand/40"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange text-white">
             <Copy className="size-4" />
           </span>
           <span className="text-[13px] font-bold">Copy booking link</span>
         </button>
         <Link
           href="/dashboard/services"
-          className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
+          className="flex flex-col items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-4 text-left transition hover:border-brand/40"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#A855F7] to-[#7C4DFF] text-white">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple to-purple-strong text-white">
             <Plus className="size-4" />
           </span>
           <span className="text-[13px] font-bold">New service</span>
         </Link>
         <Link
           href="/dashboard/availability"
-          className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
+          className="flex flex-col items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-4 text-left transition hover:border-brand/40"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#10B981] to-[#0D9488] text-white">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-success-bright to-success-teal text-white">
             <CalendarClock className="size-4" />
           </span>
           <span className="text-[13px] font-bold">Edit availability</span>
@@ -650,9 +653,9 @@ function QuickActions({
           href={publicProfileLink}
           target="_blank"
           rel="noreferrer"
-          className="flex flex-col items-start gap-3 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-left transition hover:border-[#FF5F63]/40"
+          className="flex flex-col items-start gap-3 rounded-xl border border-line-cream bg-surface-page p-4 text-left transition hover:border-brand/40"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#EA580C] text-white">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-warning-amber to-orange-600 text-white">
             <ExternalLink className="size-4" />
           </span>
           <span className="text-[13px] font-bold">View public page</span>
@@ -687,7 +690,7 @@ function SetupDashboard({
           >
             Welcome to Bookvella, {hostFirstName}!
           </h1>
-          <p className="mt-2 text-sm text-[#6B7280]">
+          <p className="mt-2 text-sm text-ink-soft">
             You&apos;re a few steps away from sharing your booking link with the
             world.
           </p>
@@ -696,7 +699,7 @@ function SetupDashboard({
           href={publicProfileLink}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
         >
           <ExternalLink className="size-4" /> Preview public page
         </a>
@@ -715,7 +718,7 @@ function SetupDashboard({
         />
         <div className="relative">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold text-white backdrop-blur">
-            <span className="size-1.5 rounded-full bg-emerald-300" /> Getting
+            <span className="size-1.5 rounded-full bg-success-bright" /> Getting
             started
           </span>
           <h2
@@ -731,24 +734,24 @@ function SetupDashboard({
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[#EEE7DF] bg-white p-6 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
+      <div className="mt-6 rounded-2xl border border-line-cream bg-surface-card p-6 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.10)]">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[16px] font-bold">Set up your profile</p>
-            <p className="text-xs text-[#6B7280]">
+            <p className="text-xs text-ink-soft">
               Complete these steps before sharing your link.
             </p>
           </div>
           <div className="min-w-[180px]">
-            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-ink-muted">
               <span>Progress</span>
               <span>
                 {completed} of 4 complete
               </span>
             </div>
-            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-line-subtle">
               <div
-                className="h-full bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]"
+                className="h-full bg-gradient-to-r from-brand-coral to-brand-orange"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -787,7 +790,7 @@ function SetupDashboard({
                   : "/dashboard/availability"
                 : "/dashboard/services"
             }
-            className="inline-flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-sm font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-sm font-bold text-white shadow-sm hover:brightness-105"
           >
             Continue setup <ArrowRight className="size-4" />
           </Link>
@@ -795,7 +798,7 @@ function SetupDashboard({
             href={publicProfileLink}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-12 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-5 text-sm font-bold text-ink-strong hover:bg-surface-soft"
           >
             <ExternalLink className="size-4" /> Preview public page
           </a>
@@ -803,16 +806,16 @@ function SetupDashboard({
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-5">
+        <div className="rounded-2xl border border-warning-border bg-surface-amber p-5">
           <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning-tint text-warning">
               <Lightbulb className="size-4" />
             </span>
             <div>
               <p className="text-sm font-bold">
                 Tip — write your services like a menu
               </p>
-              <p className="mt-1.5 text-[12px] leading-[1.55] text-[#92400E]/80">
+              <p className="mt-1.5 text-[12px] leading-[1.55] text-warning-strong/80">
                 Use a name guests will immediately understand. &ldquo;60-min
                 massage&rdquo; or &ldquo;1-on-1 coaching call&rdquo; reads better
                 than internal codes.
@@ -820,14 +823,14 @@ function SetupDashboard({
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-[#E1CFFA] bg-[#F8F1FF] p-5">
+        <div className="rounded-2xl border border-purple-border bg-purple-wash p-5">
           <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#EDE0FF] text-[#7C4DFF]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-wash-strong text-purple-strong">
               <ShieldCheck className="size-4" />
             </span>
             <div>
               <p className="text-sm font-bold">Every booking is email-verified</p>
-              <p className="mt-1.5 text-[12px] leading-[1.55] text-[#6B7280]">
+              <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-soft">
                 Guests confirm with a 6-digit code before a slot is held. No
                 bots, no fake bookings, no ghost calendar.
               </p>
@@ -850,17 +853,17 @@ function StepCard({
 }) {
   if (state === "done") {
     return (
-      <div className="relative rounded-[18px] border border-[#A7F3D0] bg-[#ECFDF5] p-5">
+      <div className="relative rounded-[18px] border border-success-border bg-success-tint p-5">
         <div className="flex items-start justify-between">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-[#16A34A] text-white">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-success text-white">
             <Check className="size-4" />
           </span>
-          <span className="rounded-full bg-[#D1FAE5] px-2 py-1 text-[10px] font-bold text-[#065F46]">
+          <span className="rounded-full bg-success-tint-strong px-2 py-1 text-[10px] font-bold text-success-deep">
             Done
           </span>
         </div>
-        <p className="mt-5 text-sm font-bold text-[#065F46]">{label}</p>
-        <p className="mt-1.5 text-[12px] leading-[1.55] text-[#047857]/80">
+        <p className="mt-5 text-sm font-bold text-success-deep">{label}</p>
+        <p className="mt-1.5 text-[12px] leading-[1.55] text-success-strong/80">
           {text}
         </p>
       </div>
@@ -868,27 +871,27 @@ function StepCard({
   }
   if (state === "up-next") {
     return (
-      <div className="relative rounded-[18px] border border-[#FCC9C5] bg-[#FFF5F4] p-5">
+      <div className="relative rounded-[18px] border border-brand-tint-300 bg-danger-warm-tint p-5">
         <div className="flex items-start justify-between">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-xs font-bold text-white">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange text-xs font-bold text-white">
             →
           </span>
-          <span className="rounded-full border border-[#FCC9C5] bg-white px-2 py-1 text-[10px] font-bold text-[#FF5F63]">
+          <span className="rounded-full border border-brand-tint-300 bg-surface-card px-2 py-1 text-[10px] font-bold text-brand">
             Up next
           </span>
         </div>
-        <p className="mt-5 text-sm font-bold text-[#FF5F63]">{label}</p>
-        <p className="mt-1.5 text-[12px] leading-[1.55] text-[#6B7280]">{text}</p>
+        <p className="mt-5 text-sm font-bold text-brand">{label}</p>
+        <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-soft">{text}</p>
       </div>
     );
   }
   return (
-    <div className="relative rounded-[18px] border border-[#EEE7DF] bg-[#FFFBF7] p-5 text-[#6B7280]">
+    <div className="relative rounded-[18px] border border-line-cream bg-surface-page p-5 text-ink-soft">
       <div className="flex items-start justify-between">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-[#F3F4F6] text-xs font-bold text-[#9CA3AF]">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-line-subtle text-xs font-bold text-ink-muted">
           •
         </span>
-        <span className="rounded-full bg-[#F3F4F6] px-2 py-1 text-[10px] font-bold text-[#9CA3AF]">
+        <span className="rounded-full bg-line-subtle px-2 py-1 text-[10px] font-bold text-ink-muted">
           Soon
         </span>
       </div>
@@ -900,9 +903,9 @@ function StepCard({
 
 function ErrorBlock({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-[24px] border border-[#EEE7DF] bg-white p-8 shadow-sm">
+    <div className="rounded-[24px] border border-line-cream bg-surface-card p-8 shadow-sm">
       <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mt-2 text-sm text-[#6B7280]">{text}</p>
+      <p className="mt-2 text-sm text-ink-soft">{text}</p>
     </div>
   );
 }

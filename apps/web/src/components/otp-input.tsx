@@ -159,8 +159,8 @@ export const OtpInput = forwardRef<OtpInputHandle, OtpInputProps>(function OtpIn
 
   const cellFocusClass =
     accent === "register"
-      ? "focus:border-[#14B8A6] focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
-      : "focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]";
+      ? "focus:border-success-teal-bright focus:shadow-[0_0_0_4px_rgba(20,184,166,0.18)]"
+      : "focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.18)]";
 
   return (
     <div
@@ -188,10 +188,10 @@ export const OtpInput = forwardRef<OtpInputHandle, OtpInputProps>(function OtpIn
           onKeyDown={(event) => handleKeyDown(index, event)}
           onPaste={(event) => handlePaste(index, event)}
           onFocus={(event) => event.currentTarget.select()}
-          className={`h-14 w-full min-w-0 flex-1 rounded-2xl border bg-white text-center text-[22px] font-bold tabular-nums outline-none transition ${
+          className={`h-14 w-full min-w-0 flex-1 rounded-2xl border bg-surface-card text-center text-[22px] font-bold tabular-nums outline-none transition ${
             digit
-              ? "border-[#0B1220] text-[#0B1220]"
-              : "border-[#E5E7EB] text-[#0B1220]"
+              ? "border-ink-strong text-ink-strong"
+              : "border-line-soft text-ink-strong"
           } ${cellFocusClass} disabled:cursor-not-allowed disabled:opacity-60`}
         />
       ))}

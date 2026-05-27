@@ -117,8 +117,8 @@ export function StepOtp({
 
   return (
     <section className="mx-auto max-w-[520px] py-6 text-center">
-      <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#F4EAFF]">
-        <Mail className="size-7 text-[#7C3AED]" />
+      <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-purple-tint">
+        <Mail className="size-7 text-purple-strong" />
       </div>
       <h1
         className="mt-5 text-[36px] font-extrabold md:text-[44px]"
@@ -126,16 +126,16 @@ export function StepOtp({
       >
         Check your email
       </h1>
-      <p className="mt-2 text-[14px] text-[#6B7280]">
+      <p className="mt-2 text-[14px] text-ink-soft">
         We sent a 6-digit code to{" "}
-        <strong className="text-[#0B1220]">{email}</strong>
+        <strong className="text-ink-strong">{email}</strong>
       </p>
-      <p className="mt-1 text-[12px] text-[#9CA3AF]">
+      <p className="mt-1 text-[12px] text-ink-muted">
         Didn&apos;t get it? Check your spam folder or resend below.
       </p>
 
       {devCode ? (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-800">
+        <div className="mt-4 rounded-lg border border-warning-border bg-warning-tint px-4 py-2.5 text-[12px] text-warning-strong">
           Development code: <strong className="tabular-nums">{devCode}</strong>
         </div>
       ) : null}
@@ -158,9 +158,9 @@ export function StepOtp({
             className={cn(
               "grid size-[62px] place-items-center rounded-2xl border-2 text-center text-[32px] font-extrabold outline-none transition sm:size-[64px]",
               digit
-                ? "border-[#FF5F63] bg-[#FFF0EF] text-[#FF5F63]"
-                : "border-[#EEE7DF] bg-white text-[#D1D5DB]",
-              "focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]",
+                ? "border-brand bg-brand-tint-100 text-brand"
+                : "border-line-cream bg-surface-card text-ink-faint",
+              "focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]",
             )}
           />
         ))}
@@ -170,12 +170,12 @@ export function StepOtp({
         type="button"
         onClick={() => onSubmit(code)}
         disabled={!complete || submitting}
-        className="mt-7 inline-flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] hover:brightness-105 disabled:opacity-60"
+        className="mt-7 inline-flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 py-3.5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] hover:brightness-105 disabled:opacity-60"
       >
         {submitting ? "Confirming…" : "Verify & confirm booking →"}
       </button>
 
-      <p className="mt-4 text-[12.5px] text-[#6B7280]">
+      <p className="mt-4 text-[12.5px] text-ink-soft">
         Didn&apos;t receive it?{" "}
         <button
           type="button"
@@ -184,23 +184,23 @@ export function StepOtp({
           className={cn(
             "font-bold",
             canResend
-              ? "text-[#FF5F63] hover:underline"
-              : "cursor-not-allowed text-[#9CA3AF]",
+              ? "text-brand hover:underline"
+              : "cursor-not-allowed text-ink-muted",
           )}
         >
           {resendLabel}
         </button>
       </p>
 
-      <div className="mt-8 rounded-2xl border border-[#EEE7DF] bg-white p-4 text-left">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+      <div className="mt-8 rounded-2xl border border-line-cream bg-surface-card p-4 text-left">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
           Your appointment
         </p>
         <p className="mt-1 text-[14px] font-bold">
           {formatFullDateKey(selectedDateKey)} —{" "}
           {formatGuestTime(selectedStartUtc, timezone)}
         </p>
-        <p className="text-[12px] text-[#6B7280]">
+        <p className="text-[12px] text-ink-soft">
           {data.eventType.title} · {data.eventType.durationMinutes} minutes ·{" "}
           {data.eventType.locationDetails ??
             formatLocationLabel(data.eventType.locationType)}
@@ -210,7 +210,7 @@ export function StepOtp({
       <button
         type="button"
         onClick={onChangeEmail}
-        className="mt-5 text-[12.5px] font-bold text-[#9CA3AF] hover:text-[#0B1220]"
+        className="mt-5 text-[12.5px] font-bold text-ink-muted hover:text-ink-strong"
       >
         ← Use a different email
       </button>

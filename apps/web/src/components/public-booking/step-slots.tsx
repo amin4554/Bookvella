@@ -109,23 +109,23 @@ export function StepSlots({
       >
         Select a date &amp; time
       </h1>
-      <p className="mt-2 text-[14px] text-[#6B7280]">
+      <p className="mt-2 text-[14px] text-ink-soft">
         All times shown in your local timezone.
       </p>
 
       {/* timezone strip */}
       <div className="mt-6 space-y-3">
-        <div className="flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-4 py-3">
-          <span className="size-2 rounded-full bg-[#10B981]" />
+        <div className="flex items-center gap-3 rounded-xl border border-line-cream bg-surface-card px-4 py-3">
+          <span className="size-2 rounded-full bg-success-bright" />
           <p className="text-[13px] font-semibold">
             Timezone: {timezoneCity(timezone)}{" "}
-            <span className="tabular-nums text-[#6B7280]">
+            <span className="tabular-nums text-ink-soft">
               ({formatOffset(timezone)})
             </span>
           </p>
           <button
             type="button"
-            className="ml-auto inline-flex items-center gap-1 text-[12px] font-bold text-[#FF5F63]"
+            className="ml-auto inline-flex items-center gap-1 text-[12px] font-bold text-brand"
             onClick={() => setEditingTimezone((value) => !value)}
           >
             {editingTimezone ? "Done" : "Change"}
@@ -147,15 +147,15 @@ export function StepSlots({
       </div>
 
       {slotGoneWarning ? (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-[#FCC9C5] bg-[#FFF5F4] p-4">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#DC2626]">
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-brand-tint-300 bg-danger-warm-tint p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-card text-danger-strong">
             <AlertTriangle className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-bold text-[#B91C1C]">
+            <p className="text-[13.5px] font-bold text-danger">
               That time is no longer available
             </p>
-            <p className="mt-0.5 text-[12.5px] text-[#7c2222]">
+            <p className="mt-0.5 text-[12.5px] text-danger-brown">
               Someone just booked it. Please choose another time below.
             </p>
           </div>
@@ -163,7 +163,7 @@ export function StepSlots({
             type="button"
             onClick={onDismissSlotGoneWarning}
             aria-label="Dismiss"
-            className="text-[#9CA3AF] hover:text-[#0B1220]"
+            className="text-ink-muted hover:text-ink-strong"
           >
             <X className="size-4" />
           </button>
@@ -171,29 +171,29 @@ export function StepSlots({
       ) : null}
 
       {loading ? (
-        <div className="mt-10 flex items-center gap-3 text-sm text-[#6B7280]">
-          <span className="inline-block size-4 animate-spin rounded-full border-2 border-[#FF5F63] border-t-transparent" />
+        <div className="mt-10 flex items-center gap-3 text-sm text-ink-soft">
+          <span className="inline-block size-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
           Checking availability…
         </div>
       ) : availableDates.length === 0 ? (
-        <div className="mt-10 max-w-[520px] rounded-2xl border border-[#EEE7DF] bg-white p-8 text-center shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-          <p className="text-[16px] font-bold text-[#111827]">
+        <div className="mt-10 max-w-[520px] rounded-2xl border border-line-cream bg-surface-card p-8 text-center shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <p className="text-[16px] font-bold text-ink-deep">
             No availability in the next 3 weeks
           </p>
-          <p className="mt-2 text-[13px] text-[#6B7280]">
+          <p className="mt-2 text-[13px] text-ink-soft">
             The host hasn&apos;t set open slots yet. Try checking back soon.
           </p>
         </div>
       ) : (
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.25fr]">
           {/* calendar */}
-          <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+          <div className="rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
                 aria-label="Previous month"
-                className="grid size-9 place-items-center rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB]"
+                className="grid size-9 place-items-center rounded-lg border border-line-soft bg-surface-card hover:bg-surface-soft"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -207,7 +207,7 @@ export function StepSlots({
                 type="button"
                 onClick={() => shiftMonth(1)}
                 aria-label="Next month"
-                className="grid size-9 place-items-center rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB]"
+                className="grid size-9 place-items-center rounded-lg border border-line-soft bg-surface-card hover:bg-surface-soft"
               >
                 <ChevronRight className="size-4" />
               </button>
@@ -217,7 +217,7 @@ export function StepSlots({
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((label) => (
                 <div
                   key={label}
-                  className="py-1.5 text-center text-[11px] font-bold text-[#9CA3AF]"
+                  className="py-1.5 text-center text-[11px] font-bold text-ink-muted"
                 >
                   {label}
                 </div>
@@ -242,12 +242,12 @@ export function StepSlots({
                     className={cn(
                       "relative grid h-10 place-items-center rounded-lg text-[13px] font-semibold transition",
                       isSelected
-                        ? "bg-[#FF5F63] text-white"
+                        ? "bg-brand text-white"
                         : hasSlots
-                          ? "text-[#374151] hover:bg-[#FFF6F0]"
-                          : "cursor-default text-[#D1D5DB]",
-                      isMuted && !isSelected && "text-[#D1D5DB]",
-                      isToday && !isSelected && "ring-1 ring-[#FF5F63]",
+                          ? "text-ink-body hover:bg-surface-blush"
+                          : "cursor-default text-ink-faint",
+                      isMuted && !isSelected && "text-ink-faint",
+                      isToday && !isSelected && "ring-1 ring-brand",
                     )}
                   >
                     {cell.day}
@@ -255,7 +255,7 @@ export function StepSlots({
                       <span
                         className={cn(
                           "absolute bottom-1 size-1 rounded-full",
-                          isSelected ? "bg-white" : "bg-[#FF5F63]",
+                          isSelected ? "bg-surface-card" : "bg-brand",
                         )}
                       />
                     ) : null}
@@ -264,15 +264,15 @@ export function StepSlots({
               })}
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-[#EEE7DF] pt-3 text-[11.5px] text-[#6B7280]">
+            <div className="mt-4 flex items-center justify-between border-t border-line-cream pt-3 text-[11.5px] text-ink-soft">
               <p className="flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-[#FF5F63]" />
+                <span className="size-1.5 rounded-full bg-brand" />
                 Slots available
               </p>
               <button
                 type="button"
                 onClick={nextAvailableDate}
-                className="font-bold text-[#FF5F63] hover:underline"
+                className="font-bold text-brand hover:underline"
               >
                 Next available →
               </button>
@@ -287,8 +287,8 @@ export function StepSlots({
                   ? formatFullDateKey(selectedDate)
                   : "Pick a date"}
               </p>
-              <p className="text-[12px] text-[#6B7280]">
-                <span className="font-bold tabular-nums text-[#0B1220]">
+              <p className="text-[12px] text-ink-soft">
+                <span className="font-bold tabular-nums text-ink-strong">
                   {slots.length}
                 </span>{" "}
                 {slots.length === 1 ? "slot" : "slots"} available
@@ -318,28 +318,28 @@ export function StepSlots({
             />
 
             {slots.length === 0 && selectedDate ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-[#EEE7DF] bg-[#FFFBF7] p-6 text-center text-[13px] text-[#6B7280]">
+              <div className="mt-4 rounded-2xl border border-dashed border-line-cream bg-surface-page p-6 text-center text-[13px] text-ink-soft">
                 No times left for this date — try another day on the calendar.
               </div>
             ) : null}
 
             {selectedSlot && selectedEndIso ? (
-              <div className="mt-6 rounded-2xl border border-[#EEE7DF] bg-white p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              <div className="mt-6 rounded-2xl border border-line-cream bg-surface-card p-5 shadow-[0_12px_32px_-16px_rgba(17,24,39,0.08)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
                   Selected appointment
                 </p>
                 <p className="mt-1.5 text-[19px] font-bold">
                   {formatFullDateKey(selectedDate)} —{" "}
                   {formatGuestTime(selectedSlot.startTimeUtc, timezone)}
                 </p>
-                <p className="text-[12.5px] text-[#6B7280]">
+                <p className="text-[12.5px] text-ink-soft">
                   {durationMinutes} minutes · Ends at{" "}
                   {formatGuestTime(selectedEndIso, timezone)}
                 </p>
                 <button
                   type="button"
                   onClick={onContinue}
-                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] hover:brightness-105"
+                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-5 text-[15px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(255,95,99,0.5)] hover:brightness-105"
                 >
                   Continue to your details →
                 </button>
@@ -368,7 +368,7 @@ function BucketBlock({
   if (slots.length === 0) return null;
   return (
     <>
-      <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+      <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
         {label}
       </p>
       <div className="mt-2 grid grid-cols-3 gap-2.5">
@@ -382,8 +382,8 @@ function BucketBlock({
               className={cn(
                 "grid h-12 place-items-center rounded-xl border text-[14px] font-bold transition",
                 isSelected
-                  ? "border-transparent bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] text-white shadow-[0_6px_16px_-8px_rgba(255,95,99,0.55)]"
-                  : "border-[#EEE7DF] bg-white text-[#0B1220] hover:border-[#FF5F63] hover:text-[#FF5F63]",
+                  ? "border-transparent bg-gradient-to-r from-brand-coral to-brand-orange text-white shadow-[0_6px_16px_-8px_rgba(255,95,99,0.55)]"
+                  : "border-line-cream bg-surface-card text-ink-strong hover:border-brand hover:text-brand",
               )}
             >
               {formatGuestTime(slot.startTimeUtc, timezone)}

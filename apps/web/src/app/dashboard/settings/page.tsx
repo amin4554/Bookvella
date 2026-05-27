@@ -147,7 +147,7 @@ export default function SettingsPage() {
 function SettingsPageFallback() {
   return (
     <AppShell active="Settings" title="Settings">
-      <div className="flex items-center gap-2 text-[13px] text-[#6B7280]">
+      <div className="flex items-center gap-2 text-[13px] text-ink-soft">
         <Loader2 className="size-4 animate-spin" /> Loading settings…
       </div>
     </AppShell>
@@ -407,7 +407,7 @@ function SettingsPageContent() {
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-ink-muted">
             Settings
           </p>
           <h1
@@ -416,12 +416,12 @@ function SettingsPageContent() {
           >
             Account &amp; product settings
           </h1>
-          <p className="mt-2 max-w-[640px] text-[14px] text-[#6B7280]">
+          <p className="mt-2 max-w-[640px] text-[14px] text-ink-soft">
             Manage your account, security, notifications, calendar sync, and
             business defaults. Profile editing has moved to{" "}
             <Link
               href="/dashboard/profile"
-              className="font-bold text-[#FF5F63] hover:underline"
+              className="font-bold text-brand hover:underline"
             >
               Profile
             </Link>
@@ -432,7 +432,7 @@ function SettingsPageContent() {
       </div>
 
       {error ? (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-6 rounded-2xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
           {error}
         </div>
       ) : null}
@@ -538,13 +538,13 @@ function LeftRail({
             onClick={(event) => handleClick(event, section.id)}
             className={
               on
-                ? "flex items-center gap-3 rounded-xl border border-[#EEE7DF] bg-white px-3.5 py-2.5 text-[13px] font-bold text-[#0B1220] shadow-[0_1px_0_rgba(17,24,39,0.04)]"
-                : "flex items-center gap-3 rounded-xl border border-transparent px-3.5 py-2.5 text-[13px] font-semibold text-[#374151] hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+                ? "flex items-center gap-3 rounded-xl border border-line-cream bg-surface-card px-3.5 py-2.5 text-[13px] font-bold text-ink-strong shadow-[0_1px_0_rgba(17,24,39,0.04)]"
+                : "flex items-center gap-3 rounded-xl border border-transparent px-3.5 py-2.5 text-[13px] font-semibold text-ink-body hover:bg-surface-page hover:text-ink-strong"
             }
           >
             <Icon
               className={
-                on ? "size-4 text-[#FF5F63]" : "size-4 text-[#9CA3AF]"
+                on ? "size-4 text-brand" : "size-4 text-ink-muted"
               }
             />
             <span className="flex-1">{section.label}</span>
@@ -557,9 +557,9 @@ function LeftRail({
 
 function SavedPill({ dirty, saving }: { dirty: boolean; saving: boolean }) {
   const tone = dirty
-    ? "border-amber-200 bg-amber-50 text-amber-800"
-    : "border-emerald-200 bg-emerald-50 text-emerald-800";
-  const dot = dirty ? "bg-amber-500" : "bg-emerald-500";
+    ? "border-warning-border bg-warning-tint text-warning-strong"
+    : "border-success-border bg-success-tint text-success-deep";
+  const dot = dirty ? "bg-warning-amber" : "bg-success-bright";
   const label = saving
     ? "Saving…"
     : dirty
@@ -590,7 +590,7 @@ function SectionHeader({
     <div>
       <p
         className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
-          tone === "danger" ? "text-[#DC2626]" : "text-[#9CA3AF]"
+          tone === "danger" ? "text-danger-strong" : "text-ink-muted"
         }`}
       >
         {eyebrow}
@@ -602,7 +602,7 @@ function SectionHeader({
         {title}
       </h2>
       {description ? (
-        <p className="mt-2 max-w-[640px] text-[13px] text-[#6B7280]">
+        <p className="mt-2 max-w-[640px] text-[13px] text-ink-soft">
           {description}
         </p>
       ) : null}
@@ -612,7 +612,7 @@ function SectionHeader({
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 divide-y divide-[#EEE7DF] rounded-2xl border border-[#EEE7DF] bg-white">
+    <div className="mt-4 divide-y divide-line-cream rounded-2xl border border-line-cream bg-surface-card">
       {children}
     </div>
   );
@@ -636,9 +636,9 @@ function Row({
       } justify-between`}
     >
       <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] font-bold text-[#0B1220]">{title}</p>
+        <p className="text-[13.5px] font-bold text-ink-strong">{title}</p>
         {sub ? (
-          <p className="mt-0.5 text-[12px] leading-[1.5] text-[#6B7280]">
+          <p className="mt-0.5 text-[12px] leading-[1.5] text-ink-soft">
             {sub}
           </p>
         ) : null}
@@ -656,11 +656,11 @@ function Pill({
   tone: "green" | "grey" | "amber" | "red" | "blue";
 }) {
   const tones: Record<typeof tone, string> = {
-    green: "bg-[#DCFCE7] text-[#15803D]",
-    grey: "bg-[#F3F4F6] text-[#6B7280]",
-    amber: "bg-[#FEF3C7] text-[#B45309]",
-    red: "bg-[#FEE2E2] text-[#DC2626]",
-    blue: "bg-[#DBEAFE] text-[#1D4ED8]",
+    green: "bg-success-tint-strong text-success-strong",
+    grey: "bg-line-subtle text-ink-soft",
+    amber: "bg-warning-tint text-warning",
+    red: "bg-danger-tint-strong text-danger-strong",
+    blue: "bg-info-tint text-info",
   };
   return (
     <span
@@ -689,11 +689,11 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`relative h-5 w-9 rounded-full transition disabled:opacity-50 ${
-        on ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]" : "bg-[#E5E7EB]"
+        on ? "bg-gradient-to-r from-brand-coral to-brand-orange" : "bg-line-soft"
       }`}
     >
       <span
-        className={`absolute top-[2px] size-4 rounded-full bg-white shadow-sm transition-all ${
+        className={`absolute top-[2px] size-4 rounded-full bg-surface-card shadow-sm transition-all ${
           on ? "left-[18px]" : "left-[2px]"
         }`}
       />
@@ -720,7 +720,7 @@ function Input({
       onChange={(e) => onChange?.(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
-      className={`h-11 ${maxWidth} w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[14px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:cursor-not-allowed disabled:bg-[#F9FAFB] disabled:text-[#6B7280]`}
+      className={`h-11 ${maxWidth} w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-[14px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-ink-soft`}
     />
   );
 }
@@ -744,7 +744,7 @@ function Select({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className={`h-10 ${minWidth} appearance-none rounded-xl border border-[#E5E7EB] bg-white pl-3.5 pr-9 text-[13px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:cursor-not-allowed disabled:bg-[#F9FAFB] disabled:text-[#9CA3AF]`}
+        className={`h-10 ${minWidth} appearance-none rounded-xl border border-line-soft bg-surface-card pl-3.5 pr-9 text-[13px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)] disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-ink-muted`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -752,14 +752,14 @@ function Select({
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#9CA3AF]" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
     </div>
   );
 }
 
 function GoogleGlyph() {
   return (
-    <span className="flex size-10 items-center justify-center rounded-xl bg-[#F3F4F6]">
+    <span className="flex size-10 items-center justify-center rounded-xl bg-line-subtle">
       <svg viewBox="0 0 48 48" className="size-5">
         <path
           fill="#FFC107"
@@ -812,16 +812,16 @@ function ModalShell({
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidth} rounded-2xl border border-[#EEE7DF] bg-white shadow-xl`}
+        className={`w-full ${maxWidth} rounded-2xl border border-line-cream bg-surface-card shadow-xl`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#EEE7DF] px-5 py-4">
-          <h3 className="text-[16px] font-bold text-[#0B1220]">{title}</h3>
+        <div className="flex items-center justify-between border-b border-line-cream px-5 py-4">
+          <h3 className="text-[16px] font-bold text-ink-strong">{title}</h3>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#F3F4F6]"
+            className="rounded-lg p-1.5 text-ink-soft hover:bg-line-subtle"
           >
             <X className="size-4" />
           </button>
@@ -906,7 +906,7 @@ function AccountSection({
           sub="Used inside the dashboard and on receipts. Not shown publicly unless you choose to."
         >
           {loading || !user ? (
-            <span className="text-[12px] text-[#9CA3AF]">Loading…</span>
+            <span className="text-[12px] text-ink-muted">Loading…</span>
           ) : (
             <Input value={draftName} onChange={onDraftName} />
           )}
@@ -916,7 +916,7 @@ function AccountSection({
           sub="Shown on your public page and in booking emails when set. Leave empty to use your full name."
         >
           {loading || !user ? (
-            <span className="text-[12px] text-[#9CA3AF]">Loading…</span>
+            <span className="text-[12px] text-ink-muted">Loading…</span>
           ) : (
             <Input
               value={draftBusinessDisplayName}
@@ -930,7 +930,7 @@ function AccountSection({
           sub={
             <>
               Used to sign in and receive booking notifications.{" "}
-              <span className="font-semibold text-[#16A34A]">Verified</span>
+              <span className="font-semibold text-success">Verified</span>
             </>
           }
         >
@@ -939,7 +939,7 @@ function AccountSection({
             type="button"
             onClick={() => setEmailModalOpen(true)}
             disabled={!user}
-            className="text-[13px] font-bold text-[#FF5F63] hover:underline disabled:text-[#9CA3AF] disabled:no-underline"
+            className="text-[13px] font-bold text-brand hover:underline disabled:text-ink-muted disabled:no-underline"
           >
             Change
           </button>
@@ -948,7 +948,7 @@ function AccountSection({
           <button
             type="button"
             onClick={() => setShowPasswordForm((v) => !v)}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             {showPasswordForm
               ? "Close"
@@ -991,7 +991,7 @@ function AccountSection({
                   ? undefined
                   : "Add a password first so you can still sign in"
               }
-              className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#9CA3AF] disabled:hover:bg-white"
+              className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-surface-card"
             >
               {disconnectingGoogle ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -1000,7 +1000,7 @@ function AccountSection({
               )}
             </button>
           ) : (
-            <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-bold text-[#6B7280]">
+            <span className="rounded-full bg-line-subtle px-2 py-0.5 text-[11px] font-bold text-ink-soft">
               Not linked
             </span>
           )}
@@ -1164,15 +1164,15 @@ function EmailChangeModal({
     <ModalShell title="Change email address" onClose={onClose}>
       {step === "request" ? (
         <form className="space-y-4" onSubmit={requestCurrentOtp}>
-          <p className="text-[13px] text-[#6B7280]">
+          <p className="text-[13px] text-ink-soft">
             For your security we&apos;ll first send a 6-digit code to your
             current email{" "}
-            <span className="font-semibold text-[#0B1220]">{currentEmail}</span>{" "}
+            <span className="font-semibold text-ink-strong">{currentEmail}</span>{" "}
             to confirm it&apos;s you. Then we&apos;ll send a second code to the
             new address.
           </p>
           <label className="block">
-            <span className="text-[13px] font-bold text-[#0B1220]">
+            <span className="text-[13px] font-bold text-ink-strong">
               New email address
             </span>
             <input
@@ -1181,11 +1181,11 @@ function EmailChangeModal({
               value={newEmail}
               onChange={(event) => setNewEmail(event.target.value)}
               placeholder="new@example.com"
-              className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[14px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+              className="mt-1.5 h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-[14px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
             />
           </label>
           {errorMessage ? (
-            <p className="text-[13px] font-bold text-[#B91C1C]">
+            <p className="text-[13px] font-bold text-danger">
               {errorMessage}
             </p>
           ) : null}
@@ -1193,14 +1193,14 @@ function EmailChangeModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
               {submitting ? "Sending…" : "Send code to current email"}
@@ -1249,13 +1249,13 @@ function EmailChangeModal({
         />
       ) : (
         <div className="space-y-3 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success-tint-strong text-success">
             <Check className="size-6" />
           </div>
-          <p className="text-[15px] font-bold text-[#0B1220]">
+          <p className="text-[15px] font-bold text-ink-strong">
             Email updated.
           </p>
-          <p className="text-[13px] text-[#6B7280]">
+          <p className="text-[13px] text-ink-soft">
             We signed you out of every device. Redirecting you to sign in…
           </p>
         </div>
@@ -1390,7 +1390,7 @@ function PasswordForm({
 
   if (otpStep) {
     return (
-      <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
+      <div className="rounded-xl border border-line-cream bg-surface-page p-4">
         <OtpStep
           title="Confirm this password change"
           recipient={user.email}
@@ -1416,7 +1416,7 @@ function PasswordForm({
   return (
     <form
       ref={formRef}
-      className="space-y-4 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-4"
+      className="space-y-4 rounded-xl border border-line-cream bg-surface-page p-4"
       onSubmit={submit}
     >
       {hasPassword ? (
@@ -1445,7 +1445,7 @@ function PasswordForm({
         <button
           type="button"
           onClick={() => setShowPasswords((value) => !value)}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[12px] font-bold text-[#374151] hover:bg-[#F9FAFB]"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-line-soft bg-surface-card px-2.5 text-[12px] font-bold text-ink-body hover:bg-surface-soft"
         >
           {showPasswords ? (
             <EyeOff className="size-3.5" />
@@ -1457,7 +1457,7 @@ function PasswordForm({
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
         >
           {saving ? (
             <Loader2 className="size-4 animate-spin" />
@@ -1490,13 +1490,13 @@ function PasswordField({
 }) {
   return (
     <label className="block">
-      <span className="text-[13px] font-bold text-[#0B1220]">{label}</span>
+      <span className="text-[13px] font-bold text-ink-strong">{label}</span>
       <input
         name={name}
         type={show ? "text" : "password"}
         autoComplete={autoComplete}
         minLength={8}
-        className="mt-1.5 h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[14px] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+        className="mt-1.5 h-11 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-[14px] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
       />
     </label>
   );
@@ -1635,7 +1635,7 @@ function SecuritySection({
               <button
                 type="button"
                 onClick={() => setTotpModal("disable")}
-                className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+                className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
               >
                 Disable
               </button>
@@ -1650,7 +1650,7 @@ function SecuritySection({
                   ? undefined
                   : "Add a password before enabling two-factor authentication"
               }
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               Set up 2FA
             </button>
@@ -1659,11 +1659,11 @@ function SecuritySection({
         <Row title="Active sessions" align="start">
           <div className="w-full space-y-2 lg:min-w-[420px]">
             {sessionsLoading ? (
-              <div className="flex items-center gap-2 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3 text-[13px] text-[#6B7280]">
+              <div className="flex items-center gap-2 rounded-xl border border-line-cream bg-surface-page p-3 text-[13px] text-ink-soft">
                 <Loader2 className="size-4 animate-spin" /> Loading sessions…
               </div>
             ) : sessionsError ? (
-              <p className="text-[13px] text-[#B91C1C]">{sessionsError}</p>
+              <p className="text-[13px] text-danger">{sessionsError}</p>
             ) : sessions && sessions.length > 0 ? (
               sessions.map((session) => (
                 <SessionRow
@@ -1674,7 +1674,7 @@ function SecuritySection({
                 />
               ))
             ) : (
-              <p className="text-[13px] text-[#6B7280]">
+              <p className="text-[13px] text-ink-soft">
                 No active sessions found.
               </p>
             )}
@@ -1682,7 +1682,7 @@ function SecuritySection({
               type="button"
               onClick={revokeOthers}
               disabled={revokingOthers || otherSessions.length === 0}
-              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-[#FF5F63] hover:underline disabled:cursor-not-allowed disabled:text-[#9CA3AF] disabled:no-underline"
+              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-brand hover:underline disabled:cursor-not-allowed disabled:text-ink-muted disabled:no-underline"
             >
               {revokingOthers ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -1701,9 +1701,9 @@ function SecuritySection({
         </Row>
       </Card>
       {!user?.hasPassword ? (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
-          <ShieldCheck className="mt-0.5 size-4 text-amber-600" />
-          <p className="text-[13px] leading-[1.6] text-[#92400E]">
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning-border bg-surface-amber p-4">
+          <ShieldCheck className="mt-0.5 size-4 text-warning" />
+          <p className="text-[13px] leading-[1.6] text-warning-strong">
             You sign in with Google only. Add a password from the Account
             section to also sign in by email and to enable two-factor
             authentication.
@@ -1745,15 +1745,15 @@ function SessionRow({
   const isMobile = /iOS|Android/.test(session.os);
   const Icon = isMobile ? Smartphone : Laptop;
   const colorClass = session.isCurrent
-    ? "bg-white text-[#FF5F63]"
-    : "bg-[#F4EAFF] text-[#7C3AED]";
+    ? "bg-surface-card text-brand"
+    : "bg-purple-tint text-purple-strong";
 
   return (
     <div
       className={`flex items-center gap-3 rounded-xl border p-3 ${
         session.isCurrent
-          ? "border-[#EEE7DF] bg-[#FFFBF7]"
-          : "border-[#EEE7DF] bg-white"
+          ? "border-line-cream bg-surface-page"
+          : "border-line-cream bg-surface-card"
       }`}
     >
       <div
@@ -1765,12 +1765,12 @@ function SessionRow({
         <p className="text-[13px] font-bold">
           {session.deviceLabel}
           {session.isCurrent ? (
-            <span className="ml-1 inline-flex align-middle items-center gap-1 rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]">
+            <span className="ml-1 inline-flex align-middle items-center gap-1 rounded-full bg-success-tint-strong px-1.5 py-0.5 text-[10px] font-bold text-success-strong">
               This device
             </span>
           ) : null}
         </p>
-        <p className="text-[12px] text-[#6B7280]">
+        <p className="text-[12px] text-ink-soft">
           {session.ipRegion ?? session.ipAddress ?? "Unknown location"} ·{" "}
           Active {formatRelativeDate(session.lastUsedAt)}
         </p>
@@ -1780,7 +1780,7 @@ function SessionRow({
           type="button"
           onClick={onRevoke}
           disabled={revoking}
-          className="text-[12px] font-bold text-[#FF5F63] hover:underline disabled:text-[#9CA3AF]"
+          className="text-[12px] font-bold text-brand hover:underline disabled:text-ink-muted"
         >
           {revoking ? "Revoking…" : "Sign out"}
         </button>
@@ -1885,27 +1885,27 @@ function TotpEnrollmentModal({
   return (
     <ModalShell title="Set up two-factor authentication" onClose={onClose}>
       {stage === "loading" ? (
-        <div className="flex items-center gap-2 py-6 text-[13px] text-[#6B7280]">
+        <div className="flex items-center gap-2 py-6 text-[13px] text-ink-soft">
           <Loader2 className="size-4 animate-spin" /> Generating secret…
         </div>
       ) : stage === "error" ? (
         <div className="space-y-3">
-          <p className="text-[13px] text-[#B91C1C]">{errorMessage}</p>
+          <p className="text-[13px] text-danger">{errorMessage}</p>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             Close
           </button>
         </div>
       ) : stage === "scan" && enrollment ? (
         <div className="space-y-4">
-          <p className="text-[13px] text-[#6B7280]">
+          <p className="text-[13px] text-ink-soft">
             Scan this QR code in your authenticator app (Google Authenticator,
             1Password, Authy…). Or enter the secret manually.
           </p>
-          <div className="flex justify-center rounded-xl border border-[#EEE7DF] bg-white p-4">
+          <div className="flex justify-center rounded-xl border border-line-cream bg-surface-card p-4">
             <img
               alt="Authenticator QR code"
               width={196}
@@ -1914,25 +1914,25 @@ function TotpEnrollmentModal({
               className="rounded"
             />
           </div>
-          <div className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#6B7280]">
+          <div className="rounded-xl border border-line-cream bg-surface-page p-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-soft">
               Secret
             </p>
-            <p className="mt-1 break-all font-mono text-[13px] text-[#0B1220]">
+            <p className="mt-1 break-all font-mono text-[13px] text-ink-strong">
               {enrollment.secret}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setStage("verify")}
-            className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
           >
             Continue
           </button>
         </div>
       ) : stage === "verify" ? (
         <form className="space-y-4" onSubmit={verify}>
-          <p className="text-[13px] text-[#6B7280]">
+          <p className="text-[13px] text-ink-soft">
             Enter the 6-digit code from your authenticator app to confirm
             setup.
           </p>
@@ -1946,10 +1946,10 @@ function TotpEnrollmentModal({
               setCode(event.target.value.replace(/[^0-9]/g, ""))
             }
             placeholder="123456"
-            className="h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+            className="h-12 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-center text-[20px] font-bold tracking-[0.4em] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
           />
           {errorMessage ? (
-            <p className="text-[13px] font-bold text-[#B91C1C]">
+            <p className="text-[13px] font-bold text-danger">
               {errorMessage}
             </p>
           ) : null}
@@ -1957,14 +1957,14 @@ function TotpEnrollmentModal({
             <button
               type="button"
               onClick={() => setStage("scan")}
-              className="text-[13px] font-bold text-[#6B7280] hover:text-[#0B1220]"
+              className="text-[13px] font-bold text-ink-soft hover:text-ink-strong"
             >
               ← Back
             </button>
             <button
               type="submit"
               disabled={submitting || code.length !== 6}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
               Verify and enable
@@ -1973,7 +1973,7 @@ function TotpEnrollmentModal({
         </form>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 text-[12px] text-[#92400E]">
+          <div className="rounded-xl border border-warning-border bg-surface-amber p-3 text-[12px] text-warning-strong">
             <p className="font-bold">Save these backup codes.</p>
             <p className="mt-1">
               Each code can be used once if you lose access to your
@@ -1981,11 +1981,11 @@ function TotpEnrollmentModal({
               again.
             </p>
           </div>
-          <ul className="grid grid-cols-2 gap-2 rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3">
+          <ul className="grid grid-cols-2 gap-2 rounded-xl border border-line-cream bg-surface-page p-3">
             {backupCodes.map((codeValue) => (
               <li
                 key={codeValue}
-                className="rounded-md bg-white px-2 py-1.5 text-center font-mono text-[13px] font-bold tracking-[0.1em] text-[#0B1220]"
+                className="rounded-md bg-surface-card px-2 py-1.5 text-center font-mono text-[13px] font-bold tracking-[0.1em] text-ink-strong"
               >
                 {codeValue}
               </li>
@@ -1995,14 +1995,14 @@ function TotpEnrollmentModal({
             <button
               type="button"
               onClick={downloadBackupCodes}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-soft bg-surface-card px-3 text-[12px] font-bold text-ink-strong hover:bg-surface-soft"
             >
               <Download className="size-3.5" /> Download as .txt
             </button>
             <button
               type="button"
               onClick={finish}
-              className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
+              className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105"
             >
               Done
             </button>
@@ -2050,7 +2050,7 @@ function TotpDisableModal({
   return (
     <ModalShell title="Disable two-factor authentication" onClose={onClose}>
       <form className="space-y-4" onSubmit={disable}>
-        <p className="text-[13px] text-[#6B7280]">
+        <p className="text-[13px] text-ink-soft">
           Enter a current 6-digit code or one of your backup codes to confirm.
         </p>
         <input
@@ -2059,23 +2059,23 @@ function TotpDisableModal({
           value={code}
           onChange={(event) => setCode(event.target.value)}
           placeholder="123456 or backup code"
-          className="h-12 w-full rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[15px] font-bold tracking-[0.2em] outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
+          className="h-12 w-full rounded-xl border border-line-soft bg-surface-card px-3.5 text-[15px] font-bold tracking-[0.2em] outline-none focus:border-brand focus:shadow-[0_0_0_4px_rgba(255,95,99,0.15)]"
         />
         {errorMessage ? (
-          <p className="text-[13px] font-bold text-[#B91C1C]">{errorMessage}</p>
+          <p className="text-[13px] font-bold text-danger">{errorMessage}</p>
         ) : null}
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting || code.trim().length < 6}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#EF4444] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-danger-strong px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
             Disable 2FA
@@ -2471,7 +2471,7 @@ function CalendarSection() {
       />
 
       {error ? (
-        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-4 rounded-2xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
           {error}
         </div>
       ) : null}
@@ -2495,8 +2495,8 @@ function CalendarSection() {
         <CalendarProviderRow
           label="Outlook / Microsoft 365"
           glyph={
-            <span className="flex size-10 items-center justify-center rounded-xl bg-[#DBEAFE]">
-              <CalendarIcon className="size-5 text-[#1D4ED8]" />
+            <span className="flex size-10 items-center justify-center rounded-xl bg-info-tint">
+              <CalendarIcon className="size-5 text-info" />
             </span>
           }
           description="Pull busy times and write new bookings to Outlook."
@@ -2514,8 +2514,8 @@ function CalendarSection() {
         <Row
           title={
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-[#F3F4F6]">
-                <Apple className="size-5 text-[#0B1220]" />
+              <span className="flex size-10 items-center justify-center rounded-xl bg-line-subtle">
+                <Apple className="size-5 text-ink-strong" />
               </span>
               <span>
                 Apple iCloud <Pill tone="amber">Later this year</Pill>
@@ -2527,22 +2527,22 @@ function CalendarSection() {
           <button
             type="button"
             disabled
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#9CA3AF]"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-muted"
           >
             Notify me
           </button>
         </Row>
       </Card>
 
-      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-white text-[#0D9488]">
+      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line-cream bg-surface-page p-4">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-surface-card text-success-teal">
           <ShieldCheck className="size-4" />
         </div>
         <div>
           <p className="text-[13px] font-bold">
             Guests never see your private calendar
           </p>
-          <p className="mt-1 text-[12px] leading-snug text-[#6B7280]">
+          <p className="mt-1 text-[12px] leading-snug text-ink-soft">
             Conflicting times are hidden. Guests see &ldquo;no longer
             available&rdquo; — never event titles, locations, or attendees.
           </p>
@@ -2602,7 +2602,7 @@ function CalendarProviderRow({
         <div className="flex min-w-0 flex-1 items-start gap-3">
           {glyph}
           <div className="min-w-0">
-            <p className="text-[13.5px] font-bold text-[#0B1220]">
+            <p className="text-[13.5px] font-bold text-ink-strong">
               {label}
               {connected ? (
                 <span className="ml-2 align-middle">
@@ -2610,7 +2610,7 @@ function CalendarProviderRow({
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5 text-[12px] leading-[1.5] text-[#6B7280]">
+            <p className="mt-0.5 text-[12px] leading-[1.5] text-ink-soft">
               {description}
             </p>
           </div>
@@ -2621,8 +2621,8 @@ function CalendarProviderRow({
           disabled={loading || connecting}
           className={
             connected
-              ? "inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
-              : "inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+              ? "inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
+              : "inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           }
         >
           {connecting ? (
@@ -2644,14 +2644,14 @@ function CalendarProviderRow({
           {calendars.map((calendar) => (
             <div
               key={calendar.id}
-              className="rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3"
+              className="rounded-xl border border-line-cream bg-surface-page p-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-[#0B1220]">
+                  <p className="text-[13px] font-bold text-ink-strong">
                     {calendar.accountEmail}
                   </p>
-                  <p className="text-[11px] text-[#6B7280]">
+                  <p className="text-[11px] text-ink-soft">
                     Last synced{" "}
                     {calendar.lastSyncedAt
                       ? formatRelativeDate(calendar.lastSyncedAt)
@@ -2663,7 +2663,7 @@ function CalendarProviderRow({
                 <CalendarStateChip state={calendar.state} />
               </div>
               {calendar.lastSyncError ? (
-                <p className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[11px] text-[#B91C1C]">
+                <p className="mt-2 rounded-md bg-danger-tint px-2 py-1.5 text-[11px] text-danger">
                   {calendar.lastSyncError}
                 </p>
               ) : null}
@@ -2672,20 +2672,20 @@ function CalendarProviderRow({
                   {calendar.conflictCalendars.map((conflict) => (
                     <li
                       key={conflict.id}
-                      className="flex items-center gap-2 text-[12px] text-[#374151]"
+                      className="flex items-center gap-2 text-[12px] text-ink-body"
                     >
                       <span
                         className="size-2 rounded-full"
                         style={{
-                          background: conflict.color ?? "#9CA3AF",
+                          background: conflict.color ?? "var(--color-ink-muted)",
                         }}
                       />
                       <span className="flex-1 truncate">{conflict.name}</span>
                       <span
                         className={
                           conflict.enabled
-                            ? "rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]"
-                            : "rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-bold text-[#6B7280]"
+                            ? "rounded-full bg-success-tint-strong px-1.5 py-0.5 text-[10px] font-bold text-success-strong"
+                            : "rounded-full bg-line-subtle px-1.5 py-0.5 text-[10px] font-bold text-ink-soft"
                         }
                       >
                         {conflict.enabled ? "Blocks" : "Ignored"}
@@ -2705,7 +2705,7 @@ function CalendarProviderRow({
               />
             </div>
           ))}
-          <p className="text-[11px] text-[#9CA3AF]">
+          <p className="text-[11px] text-ink-muted">
             Refresh pulls calendar-list changes. Reconnect refreshes provider tokens.
           </p>
         </div>
@@ -2771,7 +2771,7 @@ function CalendarAccountControls({
   ];
 
   return (
-    <div className="mt-3 space-y-3 border-t border-[#EEE7DF] pt-3">
+    <div className="mt-3 space-y-3 border-t border-line-cream pt-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <CalendarToggleRow
           label="Account sync"
@@ -2803,12 +2803,12 @@ function CalendarAccountControls({
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#EEE7DF] bg-white px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-cream bg-surface-card px-3 py-2.5">
         <div>
-          <p className="text-[12px] font-bold text-[#0B1220]">
+          <p className="text-[12px] font-bold text-ink-strong">
             Write bookings to
           </p>
-          <p className="text-[11px] text-[#6B7280]">
+          <p className="text-[11px] text-ink-soft">
             New confirmed bookings are added here.
           </p>
         </div>
@@ -2824,23 +2824,23 @@ function CalendarAccountControls({
       </div>
 
       {calendar.conflictCalendars.length > 0 ? (
-        <div className="rounded-lg border border-[#EEE7DF] bg-white p-3">
-          <p className="text-[12px] font-bold text-[#0B1220]">
+        <div className="rounded-lg border border-line-cream bg-surface-card p-3">
+          <p className="text-[12px] font-bold text-ink-strong">
             Calendars that block availability
           </p>
           <ul className="mt-2 space-y-1.5">
             {calendar.conflictCalendars.map((conflict) => (
               <li
                 key={conflict.id}
-                className="flex items-center gap-2 rounded-md bg-[#FFFBF7] px-2.5 py-2 text-[12px] text-[#374151]"
+                className="flex items-center gap-2 rounded-md bg-surface-page px-2.5 py-2 text-[12px] text-ink-body"
               >
                 <span
                   className="size-2 rounded-full"
-                  style={{ background: conflict.color ?? "#9CA3AF" }}
+                  style={{ background: conflict.color ?? "var(--color-ink-muted)" }}
                 />
                 <span className="min-w-0 flex-1 truncate">{conflict.name}</span>
                 {busyConflictId === conflict.id ? (
-                  <Loader2 className="size-3.5 animate-spin text-[#9CA3AF]" />
+                  <Loader2 className="size-3.5 animate-spin text-ink-muted" />
                 ) : null}
                 <Toggle
                   on={conflict.enabled}
@@ -2852,8 +2852,8 @@ function CalendarAccountControls({
                 <span
                   className={
                     conflict.enabled
-                      ? "w-12 text-right text-[10px] font-bold text-[#15803D]"
-                      : "w-12 text-right text-[10px] font-bold text-[#6B7280]"
+                      ? "w-12 text-right text-[10px] font-bold text-success-strong"
+                      : "w-12 text-right text-[10px] font-bold text-ink-soft"
                   }
                 >
                   {conflict.enabled ? "Blocks" : "Ignored"}
@@ -2863,7 +2863,7 @@ function CalendarAccountControls({
           </ul>
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-[#EEE7DF] bg-white px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+        <p className="rounded-lg border border-dashed border-line-cream bg-surface-card px-3 py-3 text-center text-[12px] text-ink-muted">
           Refresh calendars or reconnect if this account needs a new token.
         </p>
       )}
@@ -2873,7 +2873,7 @@ function CalendarAccountControls({
           type="button"
           onClick={() => onRefresh(calendar)}
           disabled={busy}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-soft bg-surface-card px-3 text-[12px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
         >
           {busy ? (
             <Loader2 className="size-3.5 animate-spin" />
@@ -2886,7 +2886,7 @@ function CalendarAccountControls({
           type="button"
           onClick={() => onDisconnect(calendar)}
           disabled={busy}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-[12px] font-bold text-[#B91C1C] hover:bg-red-50 disabled:opacity-60"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-danger-border bg-surface-card px-3 text-[12px] font-bold text-danger hover:bg-danger-tint disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
           Disconnect
@@ -2910,10 +2910,10 @@ function CalendarToggleRow({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-[#EEE7DF] bg-white px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-line-cream bg-surface-card px-3 py-2.5">
       <div className="min-w-0">
-        <p className="text-[12px] font-bold text-[#0B1220]">{label}</p>
-        <p className="text-[11px] leading-snug text-[#6B7280]">{note}</p>
+        <p className="text-[12px] font-bold text-ink-strong">{label}</p>
+        <p className="text-[11px] leading-snug text-ink-soft">{note}</p>
       </div>
       <Toggle on={checked} disabled={disabled} onChange={onChange} />
     </div>
@@ -2991,7 +2991,7 @@ function BusinessSection({
           align="start"
         >
           {loading ? (
-            <span className="text-[12px] text-[#9CA3AF]">Loading…</span>
+            <span className="text-[12px] text-ink-muted">Loading…</span>
           ) : (
             <div className="min-w-[260px]">
               <TimezoneCombobox
@@ -2999,15 +2999,15 @@ function BusinessSection({
                 onChange={onTimezone}
                 detectedTimezone={detectedTimezone}
               />
-              <p className="mt-1.5 text-[11px] text-[#9CA3AF]">
+              <p className="mt-1.5 text-[11px] text-ink-muted">
                 {isDetected ? (
                   <>
                     Auto-detected from your browser (
-                    <span className="font-semibold text-[#374151]">
+                    <span className="font-semibold text-ink-body">
                       {timezoneCity(detectedTimezone)}
                     </span>
                     ,{" "}
-                    <span className="font-semibold tabular-nums text-[#374151]">
+                    <span className="font-semibold tabular-nums text-ink-body">
                       {formatOffset(detectedTimezone)}
                     </span>
                     ).
@@ -3018,7 +3018,7 @@ function BusinessSection({
                     <button
                       type="button"
                       onClick={() => onTimezone(detectedTimezone)}
-                      className="font-semibold text-[#FF5F63] underline-offset-2 hover:underline"
+                      className="font-semibold text-brand underline-offset-2 hover:underline"
                     >
                       {timezoneCity(detectedTimezone)} (
                       {formatOffset(detectedTimezone)})
@@ -3045,7 +3045,7 @@ function BusinessSection({
           sub="Your public page lives here. Changing this breaks links you've already shared."
         >
           <div className="flex max-w-[420px] items-center gap-2">
-            <span className="text-[13px] whitespace-nowrap text-[#9CA3AF]">
+            <span className="text-[13px] whitespace-nowrap text-ink-muted">
               bookvella.com /
             </span>
             <Input
@@ -3057,19 +3057,19 @@ function BusinessSection({
               type="button"
               aria-label="Copy booking link"
               onClick={copyBookingLink}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-3 hover:bg-[#F9FAFB]"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-line-soft bg-surface-card px-3 hover:bg-surface-soft"
             >
-              <Copy className="size-4 text-[#6B7280]" />
+              <Copy className="size-4 text-ink-soft" />
             </button>
           </div>
           {slugStatus.kind === "checking" ? (
-            <span className="text-[12px] text-[#9CA3AF]">Checking…</span>
+            <span className="text-[12px] text-ink-muted">Checking…</span>
           ) : slugStatus.kind === "ok" ? (
-            <span className="inline-flex items-center gap-1 text-[12px] font-bold text-[#15803D]">
+            <span className="inline-flex items-center gap-1 text-[12px] font-bold text-success-strong">
               <Check className="size-3.5" /> Available
             </span>
           ) : slugStatus.kind === "error" ? (
-            <span className="text-[12px] font-bold text-[#B91C1C]">
+            <span className="text-[12px] font-bold text-danger">
               {slugStatus.message}
             </span>
           ) : null}
@@ -3196,7 +3196,7 @@ function DataSection() {
             type="button"
             onClick={exportBookings}
             disabled={exporting}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
           >
             {exporting ? (
               <Loader2 className="size-4 animate-spin" />
@@ -3214,7 +3214,7 @@ function DataSection() {
             type="button"
             onClick={exportCustomers}
             disabled={exportingCustomers}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
           >
             {exportingCustomers ? (
               <Loader2 className="size-4 animate-spin" />
@@ -3240,7 +3240,7 @@ function DataSection() {
               type="button"
               onClick={copyFeedUrl}
               disabled={!feedUrl || feedBusy !== null}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
             >
               {feedBusy === "copy" ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -3253,7 +3253,7 @@ function DataSection() {
               type="button"
               onClick={rotateFeedUrl}
               disabled={!feedUrl || feedBusy !== null}
-              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#6B7280] hover:text-[#0B1220] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-soft hover:text-ink-strong disabled:opacity-60"
             >
               {feedBusy === "rotate" ? (
                 <Loader2 className="size-3.5 animate-spin" />
@@ -3387,13 +3387,13 @@ function DangerSection({
         description="Deactivation is reversible; deletion anonymizes your account permanently."
         tone="danger"
       />
-      <div className="mt-4 rounded-2xl border border-[#FCC9C5] bg-[#FFF5F4]">
+      <div className="mt-4 rounded-2xl border border-brand-tint-300 bg-danger-warm-tint">
         <div className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div className="max-w-[480px]">
             <p className="text-[14px] font-bold">
               {isActive ? "Deactivate account" : "Account is deactivated"}
             </p>
-            <p className="mt-1 text-[12.5px] text-[#6B7280]">
+            <p className="mt-1 text-[12.5px] text-ink-soft">
               {isActive
                 ? "Your public page will show a 'currently unavailable' notice. Existing bookings stay. You can reactivate any time."
                 : "Your public page is hidden and new bookings are blocked. Reactivate to make your services bookable again."}
@@ -3405,8 +3405,8 @@ function DangerSection({
             disabled={deactivating || !user}
             className={
               isActive
-                ? "inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
-                : "inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+                ? "inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
+                : "inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
             }
           >
             {deactivating ? (
@@ -3418,24 +3418,24 @@ function DangerSection({
             )}
           </button>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#FCC9C5] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-brand-tint-300 p-5">
           <div className="max-w-[480px]">
-            <p className="text-[14px] font-bold text-[#B91C1C]">
+            <p className="text-[14px] font-bold text-danger">
               Delete account permanently
             </p>
-            <p className="mt-1 text-[12.5px] text-[#6B7280]">
+            <p className="mt-1 text-[12.5px] text-ink-soft">
               We&apos;ll email a confirmation link. Clicking it anonymizes your
               account, hides bookings, services, reviews, and your public page.
               This cannot be undone.
             </p>
             {pendingDeleteExpiresAt ? (
-              <p className="mt-1 text-[12px] font-bold text-amber-700">
+              <p className="mt-1 text-[12px] font-bold text-warning">
                 Confirmation link sent. Expires{" "}
                 {formatRelativeDate(pendingDeleteExpiresAt)}.
               </p>
             ) : null}
             {confirmingDelete ? (
-              <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-[#B91C1C]">
+              <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-bold text-danger">
                 <Loader2 className="size-3.5 animate-spin" /> Confirming
                 deletion…
               </p>
@@ -3445,7 +3445,7 @@ function DangerSection({
             type="button"
             onClick={requestDelete}
             disabled={requestingDelete || !user || confirmingDelete}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#EF4444] px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-danger-strong px-3.5 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             {requestingDelete ? (
               <Loader2 className="size-4 animate-spin" />
@@ -3474,9 +3474,9 @@ function StickySaveFooter({
   if (!dirty) return null;
   return (
     <div className="sticky bottom-4 z-20 mt-6 lg:ml-[256px]">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE7DF] bg-white p-3 pl-5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16),0_8px_24px_-12px_rgba(17,24,39,0.10)]">
-        <p className="text-[13px] text-[#6B7280]">
-          <span className="font-bold text-amber-600">●</span> You have unsaved
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-cream bg-surface-card p-3 pl-5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16),0_8px_24px_-12px_rgba(17,24,39,0.10)]">
+        <p className="text-[13px] text-ink-soft">
+          <span className="font-bold text-warning">●</span> You have unsaved
           changes.
         </p>
         <div className="flex items-center gap-2">
@@ -3484,7 +3484,7 @@ function StickySaveFooter({
             type="button"
             onClick={onDiscard}
             disabled={saving}
-            className="inline-flex h-10 items-center rounded-xl border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-bold text-[#0B1220] hover:bg-[#F9FAFB] disabled:opacity-60"
+            className="inline-flex h-10 items-center rounded-xl border border-line-soft bg-surface-card px-3.5 text-[13px] font-bold text-ink-strong hover:bg-surface-soft disabled:opacity-60"
           >
             Discard
           </button>
@@ -3492,7 +3492,7 @@ function StickySaveFooter({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60"
           >
             {saving ? (
               <>

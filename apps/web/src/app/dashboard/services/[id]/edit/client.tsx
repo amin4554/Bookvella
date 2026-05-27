@@ -51,11 +51,11 @@ export function EditServiceClient({ id }: { id: string }) {
       userInitial={user?.name.charAt(0).toUpperCase() ?? "B"}
     >
       {loading ? (
-        <div className="mt-6 rounded-xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
-          <p className="text-sm text-[#6B7280]">Loading service…</p>
+        <div className="mt-6 rounded-xl border border-line-cream bg-surface-card p-6 shadow-sm">
+          <p className="text-sm text-ink-soft">Loading service…</p>
         </div>
       ) : error ? (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-4 rounded-xl border border-danger-border bg-danger-tint px-4 py-3 text-sm text-danger">
           {error}
         </div>
       ) : user && event ? (

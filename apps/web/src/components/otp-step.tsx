@@ -106,13 +106,13 @@ export function OtpStep({
 
   const submitButtonClass =
     accent === "register"
-      ? "bg-gradient-to-r from-[#14B8A6] via-[#7C4DFF] to-[#C026D3]"
-      : "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]";
+      ? "bg-gradient-to-r from-success-teal-bright via-purple-strong to-purple-magenta"
+      : "bg-gradient-to-r from-brand-coral to-brand-orange";
 
   const infoBannerClass =
     theme === "card"
-      ? "rounded-2xl border border-[#EEE7DF] bg-[#FFFBF7] p-4 text-[13px] text-[#374151]"
-      : "rounded-xl border border-[#EEE7DF] bg-[#FFFBF7] p-3.5 text-[13px] text-[#374151]";
+      ? "rounded-2xl border border-line-cream bg-surface-page p-4 text-[13px] text-ink-body"
+      : "rounded-xl border border-line-cream bg-surface-page p-3.5 text-[13px] text-ink-body";
 
   return (
     <form
@@ -123,15 +123,15 @@ export function OtpStep({
       }}
     >
       <div className={infoBannerClass}>
-        <p className="font-bold text-[#0B1220]">{title}</p>
+        <p className="font-bold text-ink-strong">{title}</p>
         <p className="mt-1">
           Enter the 6-digit code we sent to{" "}
-          <span className="font-semibold text-[#0B1220]">{recipient}</span>.
+          <span className="font-semibold text-ink-strong">{recipient}</span>.
           {expiresAt ? (
             <>
               {" "}
               The code expires at{" "}
-              <span className="font-semibold text-[#0B1220]">
+              <span className="font-semibold text-ink-strong">
                 {formatExpiresClock(expiresAt)}
               </span>
               .
@@ -156,12 +156,12 @@ export function OtpStep({
       />
 
       {helper ? (
-        <p className="text-[12px] text-[#6B7280]">{helper}</p>
+        <p className="text-[12px] text-ink-soft">{helper}</p>
       ) : null}
 
       {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-[13px] text-red-800">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
+        <div className="flex items-start gap-3 rounded-2xl border border-danger-border bg-danger-tint p-3.5 text-[13px] text-danger-deep">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
           <p>{error}</p>
         </div>
       ) : null}
@@ -181,7 +181,7 @@ export function OtpStep({
             type="button"
             onClick={onBack}
             disabled={submitting}
-            className="text-[#6B7280] hover:text-[#0B1220] disabled:opacity-60"
+            className="text-ink-soft hover:text-ink-strong disabled:opacity-60"
           >
             {backLabel}
           </button>
@@ -195,8 +195,8 @@ export function OtpStep({
             disabled={cooldown > 0 || resending || submitting}
             className={
               accent === "register"
-                ? "text-[#14B8A6] hover:underline disabled:text-[#9CA3AF] disabled:no-underline"
-                : "text-[#FF5F63] hover:underline disabled:text-[#9CA3AF] disabled:no-underline"
+                ? "text-success-teal-bright hover:underline disabled:text-ink-muted disabled:no-underline"
+                : "text-brand hover:underline disabled:text-ink-muted disabled:no-underline"
             }
           >
             {resending

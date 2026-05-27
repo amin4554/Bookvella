@@ -40,16 +40,16 @@ export function CookiePreferences() {
   return (
     <section
       id="prefs"
-      className="mt-12 rounded-2xl border border-[#EEE7DF] bg-white shadow-sm"
+      className="mt-12 rounded-2xl border border-line-cream bg-surface-card shadow-sm"
     >
-      <div className="border-b border-[#EEE7DF] p-5">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
+      <div className="border-b border-line-cream p-5">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
           Your preferences
         </p>
         <h2 className="mt-1 text-[22px] font-bold tracking-[-0.02em]">
           Cookie settings
         </h2>
-        <p className="mt-1 text-[13px] text-[#6B7280]">
+        <p className="mt-1 text-[13px] text-ink-soft">
           Strictly necessary cookies are always on. Non-essential categories are
           off by default and only turn on if Bookvella adds those tools and you
           choose to allow them.
@@ -76,17 +76,17 @@ export function CookiePreferences() {
         onToggle={() => save({ ...prefs, marketing: !prefs.marketing })}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#EEE7DF] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-cream p-5">
         <button
           type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold hover:bg-[#F9FAFB]"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-line-soft bg-surface-card px-4 text-[13px] font-bold hover:bg-surface-soft"
           onClick={() => save(DEFAULT_PREFS)}
         >
           Reject all non-essential
         </button>
         <button
           type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-4 text-[13px] font-bold text-white shadow-sm"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-coral to-brand-orange px-4 text-[13px] font-bold text-white shadow-sm"
           onClick={() => save(prefs)}
         >
           <Check className="size-4" /> Save preferences
@@ -94,7 +94,7 @@ export function CookiePreferences() {
       </div>
 
       {saved ? (
-        <div className="border-t border-[#A7F3D0] bg-[#ECFDF5] px-5 py-3 text-[12.5px] font-bold text-[#065F46]">
+        <div className="border-t border-success-border bg-success-tint px-5 py-3 text-[12.5px] font-bold text-success-deep">
           Saved. Your preferences will apply on future page loads.
         </div>
       ) : null}
@@ -118,20 +118,20 @@ function PreferenceRow({
   onToggle?: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3.5 border-t border-[#EEE7DF] px-5 py-4 first:border-t-0">
+    <div className="flex items-start gap-3.5 border-t border-line-cream px-5 py-4 first:border-t-0">
       <button
         type="button"
         disabled={locked}
         onClick={onToggle}
         className={`relative mt-0.5 h-[22px] w-[38px] shrink-0 rounded-full transition ${
           enabled
-            ? "bg-gradient-to-r from-[#FF6267] to-[#FF8A4C]"
-            : "bg-[#E5E7EB]"
+            ? "bg-gradient-to-r from-brand-coral to-brand-orange"
+            : "bg-line-soft"
         } ${locked ? "cursor-not-allowed opacity-60" : ""}`}
         aria-pressed={enabled}
       >
         <span
-          className={`absolute top-0.5 size-[18px] rounded-full bg-white shadow transition ${
+          className={`absolute top-0.5 size-[18px] rounded-full bg-surface-card shadow transition ${
             enabled ? "left-[18px]" : "left-0.5"
           }`}
         />
@@ -140,12 +140,12 @@ function PreferenceRow({
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[14px] font-bold">{title}</p>
           {badge ? (
-            <span className="rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-bold text-[#16A34A]">
+            <span className="rounded-full bg-success-mint px-2 py-0.5 text-[10px] font-bold text-success">
               {badge}
             </span>
           ) : null}
         </div>
-        <p className="mt-1 text-[13px] leading-snug text-[#6B7280]">{text}</p>
+        <p className="mt-1 text-[13px] leading-snug text-ink-soft">{text}</p>
       </div>
     </div>
   );
