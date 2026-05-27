@@ -9,3 +9,9 @@ export type UpdateConnectedCalendarDto = {
 export type UpdateConflictCalendarDto = {
   enabled?: boolean;
 };
+
+export type UpdateEventBufferDto = {
+  bufferBeforeMinutes?: number;
+  bufferAfterMinutes?: number;
+  providerCalendarId?: string;
+};

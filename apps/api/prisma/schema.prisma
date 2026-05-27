@@ -128,6 +128,7 @@ model User {
   reviews                Review[]
   dailyAgendaDeliveries  DailyAgendaDelivery[]
   connectedCalendars     ConnectedCalendar[]
+  externalEventBuffers   ExternalEventBuffer[]
   bookingFeed            BookingFeed?
   accountDeletionRequest AccountDeletionRequest?
   publicLinkRedirects    PublicLinkRedirect[]
@@ -463,9 +464,10 @@ model ConnectedCalendar {
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   conflictCalendars ConflictCalendar[]
   eventSyncs        CalendarEventSync[]
+  eventBuffers      ExternalEventBuffer[]
 
   @@unique([userId, provider, accountEmail])
   @@index([userId, provider])
@@ -505,6 +507,25 @@ model CalendarEventSync {
   @@unique([bookingId, connectedCalendarId])
   @@index([connectedCalendarId])
   @@map("calendar_event_syncs")
+}
+
+model ExternalEventBuffer {
+  id                    String   @id @default(uuid())
+  userId                String   @map("user_id")
+  connectedCalendarId   String   @map("connected_calendar_id")
+  providerCalendarId    String   @map("provider_calendar_id")
+  providerEventId       String   @map("provider_event_id")
+  bufferBeforeMinutes   Int      @default(0) @map("buffer_before_minutes")
+  bufferAfterMinutes    Int      @default(0) @map("buffer_after_minutes")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedCalendar ConnectedCalendar @relation(fields: [connectedCalendarId], references: [id], onDelete: Cascade)
+
+  @@unique([connectedCalendarId, providerEventId], map: "external_event_buffers_calendar_event_key")
+  @@index([userId], map: "external_event_buffers_user_id_idx")
+  @@map("external_event_buffers")
 }
 
 model BookingFeed {

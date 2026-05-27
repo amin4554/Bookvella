@@ -28,6 +28,7 @@ import {
   type EventTypeAvailabilityMode,
   type EventType,
   type HostBooking,
+  type HostBusyEvent,
   type PublicUser,
 } from "@/lib/api";
 import { SchedulesTab } from "@/components/schedules-tab";
@@ -155,6 +156,16 @@ function parseTimeParts(hourText: string, minuteText: string): number | null {
   if (hour < 0 || hour > 24 || minute < 0 || minute > 59) return null;
   if (hour === 24 && minute !== 0) return null;
   return hour * 60 + minute;
+}
+
+// Mirrors the API-side clampBufferMinutes so the local draft never holds a
+// value that the server would reject. Max 4h matches the backend cap.
+function clampLocalBuffer(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  const rounded = Math.round(value);
+  if (rounded < 0) return 0;
+  if (rounded > 240) return 240;
+  return rounded;
 }
 
 // Stable YYYY-MM-DD key for a local Date.
@@ -322,6 +333,13 @@ export default function AvailabilityPage() {
     Record<string, EventTypeAvailability>
   >({});
   const [calendars, setCalendars] = useState<ConnectedCalendar[]>([]);
+  const [busyEvents, setBusyEvents] = useState<HostBusyEvent[]>([]);
+  const [busyEventsLoading, setBusyEventsLoading] = useState(false);
+  // Local per-event buffer drafts so the inputs feel responsive while the
+  // PATCH is in flight. Keyed by HostBusyEvent.id.
+  const [bufferDrafts, setBufferDrafts] = useState<
+    Record<string, { before: number; after: number; saving: boolean }>
+  >({});
   // null = "All services". Otherwise the EventType.id we want to filter by.
   const [activeServiceId, setActiveServiceId] = useState<string | null>(null);
   const [serviceModeDraft, setServiceModeDraft] =
@@ -438,6 +456,71 @@ export default function AvailabilityPage() {
     };
   }, []);
 
+  // Whether any connected calendar is currently producing busy intervals.
+  // Derived so the fetch effect can short-circuit without setting state
+  // synchronously on every calendar update.
+  const hasActiveBlockingCalendar = useMemo(
+    () =>
+      calendars.some(
+        (calendar) =>
+          calendar.state === "ACTIVE" &&
+          calendar.conflictsOn &&
+          calendar.conflictCalendars.some((conflict) => conflict.enabled),
+      ),
+    [calendars],
+  );
+
+  // Fetch external calendar events for the visible month + one week padding
+  // either side, so dragging the selection across month boundaries doesn't
+  // momentarily lose context. Refreshes whenever the month view shifts or
+  // any connected calendar becomes ACTIVE (e.g. after a reconnect).
+  useEffect(() => {
+    if (!hasActiveBlockingCalendar) {
+      return;
+    }
+
+    const start = new Date(viewYear, viewMonth, 1);
+    start.setDate(start.getDate() - 7);
+    const end = new Date(viewYear, viewMonth + 1, 1);
+    end.setDate(end.getDate() + 7);
+
+    let alive = true;
+    // Defer the loading flag to a microtask so it doesn't run synchronously
+    // inside the effect body (react-hooks/set-state-in-effect).
+    queueMicrotask(() => {
+      if (alive) setBusyEventsLoading(true);
+    });
+    authedApiRequest<HostBusyEvent[]>(
+      `/auth/calendars/busy?start=${encodeURIComponent(
+        start.toISOString(),
+      )}&end=${encodeURIComponent(end.toISOString())}`,
+    )
+      .then((events) => {
+        if (!alive) return;
+        setBusyEvents(events);
+      })
+      .catch(() => {
+        // Calendar sync failures are surfaced through the pill already; don't
+        // spam toasts. Just drop the list.
+        if (!alive) return;
+        setBusyEvents([]);
+      })
+      .finally(() => {
+        if (alive) setBusyEventsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [viewYear, viewMonth, hasActiveBlockingCalendar]);
+
+  // Hide already-loaded events when no calendar is active (e.g. after the host
+  // disconnects every account). Pure derivation — no setState in an effect.
+  const visibleBusyEvents = useMemo(
+    () => (hasActiveBlockingCalendar ? busyEvents : []),
+    [hasActiveBlockingCalendar, busyEvents],
+  );
+
   const activeService = useMemo(
     () =>
       activeServiceId
@@ -535,6 +618,22 @@ export default function AvailabilityPage() {
     }
     return m;
   }, [filteredBookings]);
+
+  // External calendar events bucketed by host-local date so the calendar and
+  // day editor can render them next to Bookvella bookings.
+  const busyEventsByDateKey = useMemo(() => {
+    const m = new Map<string, HostBusyEvent[]>();
+    for (const event of visibleBusyEvents) {
+      const k = dateKey(new Date(event.startTimeUtc));
+      const list = m.get(k) ?? [];
+      list.push(event);
+      m.set(k, list);
+    }
+    for (const list of m.values()) {
+      list.sort((a, b) => a.startTimeUtc.localeCompare(b.startTimeUtc));
+    }
+    return m;
+  }, [visibleBusyEvents]);
 
   const monthGrid = useMemo(
     () => buildMonthGrid(viewYear, viewMonth),
@@ -1203,6 +1302,97 @@ export default function AvailabilityPage() {
 
   const selectedKey = dateKey(selectedDate);
   const selectedDayBookings = bookingsByDateKey.get(selectedKey) ?? [];
+  const selectedDayBusyEvents =
+    busyEventsByDateKey.get(selectedKey) ?? [];
+
+  // Local-only update of a buffer input — the network call happens on blur via
+  // onBufferCommit so we don't fire a PATCH per keystroke.
+  function updateBufferDraft(
+    eventId: string,
+    next: { before?: number; after?: number },
+  ) {
+    setBufferDrafts((prev) => {
+      const existing = prev[eventId];
+      const fallback = visibleBusyEvents.find((event) => event.id === eventId);
+      const base = existing ?? {
+        before: fallback?.bufferBeforeMinutes ?? 0,
+        after: fallback?.bufferAfterMinutes ?? 0,
+        saving: false,
+      };
+      return {
+        ...prev,
+        [eventId]: {
+          before:
+            next.before !== undefined ? clampLocalBuffer(next.before) : base.before,
+          after:
+            next.after !== undefined ? clampLocalBuffer(next.after) : base.after,
+          saving: base.saving,
+        },
+      };
+    });
+  }
+
+  async function commitEventBuffer(event: HostBusyEvent) {
+    const draft = bufferDrafts[event.id];
+    const before = draft?.before ?? event.bufferBeforeMinutes;
+    const after = draft?.after ?? event.bufferAfterMinutes;
+    if (
+      before === event.bufferBeforeMinutes &&
+      after === event.bufferAfterMinutes
+    ) {
+      return;
+    }
+
+    setBufferDrafts((prev) => ({
+      ...prev,
+      [event.id]: { before, after, saving: true },
+    }));
+
+    try {
+      const updated = await authedApiRequest<{
+        bufferBeforeMinutes: number;
+        bufferAfterMinutes: number;
+      }>(
+        `/auth/calendars/${event.connectedCalendarId}/events/${encodeURIComponent(
+          event.providerEventId,
+        )}/buffer`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            bufferBeforeMinutes: before,
+            bufferAfterMinutes: after,
+            providerCalendarId: event.providerCalendarId,
+          }),
+        },
+      );
+      setBusyEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id
+            ? {
+                ...e,
+                bufferBeforeMinutes: updated.bufferBeforeMinutes,
+                bufferAfterMinutes: updated.bufferAfterMinutes,
+              }
+            : e,
+        ),
+      );
+      setBufferDrafts((prev) => {
+        const next = { ...prev };
+        delete next[event.id];
+        return next;
+      });
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : "Could not update event buffer",
+      );
+      setBufferDrafts((prev) => ({
+        ...prev,
+        [event.id]: { before, after, saving: false },
+      }));
+    }
+  }
   const totalWeekHours = useMemo(
     () =>
       weekDraft.reduce(
@@ -1359,6 +1549,9 @@ export default function AvailabilityPage() {
         <span className="inline-flex items-center gap-1.5 text-[#374151]">
           <span className="size-2 rounded-sm bg-[#9CA3AF]" /> Blocked date
         </span>
+        <span className="inline-flex items-center gap-1.5 text-[#374151]">
+          <span className="size-2 rounded-sm bg-[#3B82F6]" /> External calendar event
+        </span>
         <span className="ml-auto inline-flex items-center gap-1.5 text-[#6B7280]">
           <Lock className="size-3" /> Private event details aren&apos;t shown.
         </span>
@@ -1384,6 +1577,7 @@ export default function AvailabilityPage() {
               rules={previewRules}
               overridesByKey={overridesByKey}
               bookingsByDateKey={bookingsByDateKey}
+              busyEventsByDateKey={busyEventsByDateKey}
               rangeMode={rangeMode}
               rangeStart={rangeStart}
               rangeEnd={rangeEnd}
@@ -1410,12 +1604,17 @@ export default function AvailabilityPage() {
                 today={today}
                 draft={dayDraft}
                 bookings={selectedDayBookings}
+                busyEvents={selectedDayBusyEvents}
+                bufferDrafts={bufferDrafts}
+                busyEventsLoading={busyEventsLoading}
                 onStatus={setDayStatus}
                 onBlockChange={setDayBlock}
                 onRemoveBlock={removeDayBlock}
                 onAddBlock={addDayBlock}
                 onReset={resetDayToWeekly}
                 onNote={setDayNote}
+                onBufferDraftChange={updateBufferDraft}
+                onBufferCommit={commitEventBuffer}
               />
             )}
           </section>
@@ -1527,6 +1726,7 @@ function CalendarCard({
   rules,
   overridesByKey,
   bookingsByDateKey,
+  busyEventsByDateKey,
   rangeMode,
   rangeStart,
   rangeEnd,
@@ -1544,6 +1744,7 @@ function CalendarCard({
   rules: WeeklyRuleLike[];
   overridesByKey: Map<string, AvailabilityOverride>;
   bookingsByDateKey: Map<string, HostBooking[]>;
+  busyEventsByDateKey: Map<string, HostBusyEvent[]>;
   rangeMode: boolean;
   rangeStart: Date | null;
   rangeEnd: Date | null;
@@ -1645,6 +1846,7 @@ function CalendarCard({
 
           const dayRules = rulesForDay(rules, date.getDay());
           const bookingsHere = bookingsByDateKey.get(k) ?? [];
+          const externalHere = busyEventsByDateKey.get(k) ?? [];
 
           let state: "outside" | "past" | "bookable" | "dayoff" | "blocked" | "fully";
           if (outside) {
@@ -1679,6 +1881,7 @@ function CalendarCard({
               today={isToday}
               selected={isSelected}
               bookingsCount={used}
+              externalCount={externalHere.length}
               note={override?.note ?? null}
               inRange={inRange}
               isRangeEdge={isRangeEdge}
@@ -1702,6 +1905,9 @@ function CalendarCard({
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-[#9CA3AF]" /> Day off
           </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-[#3B82F6]" /> External event
+          </span>
         </div>
         <button
           type="button"
@@ -1722,6 +1928,7 @@ function CalendarCell({
   today,
   selected,
   bookingsCount,
+  externalCount,
   note,
   inRange = false,
   isRangeEdge = false,
@@ -1732,6 +1939,7 @@ function CalendarCell({
   today: boolean;
   selected: boolean;
   bookingsCount: number;
+  externalCount: number;
   note: string | null;
   inRange?: boolean;
   isRangeEdge?: boolean;
@@ -1834,6 +2042,21 @@ function CalendarCell({
           </span>
         </span>
       ) : null}
+
+      {externalCount > 0 ? (
+        <span
+          title={`${externalCount} external calendar ${
+            externalCount === 1 ? "event" : "events"
+          }`}
+          className={`absolute top-1.5 right-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ${
+            selected || isRangeEdge
+              ? "bg-white/30 text-white"
+              : "bg-[#DBEAFE] text-[#1D4ED8]"
+          }`}
+        >
+          {externalCount}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -1843,23 +2066,36 @@ function DayEditor({
   today,
   draft,
   bookings,
+  busyEvents,
+  bufferDrafts,
+  busyEventsLoading,
   onStatus,
   onBlockChange,
   onRemoveBlock,
   onAddBlock,
   onReset,
   onNote,
+  onBufferDraftChange,
+  onBufferCommit,
 }: {
   selectedDate: Date;
   today: Date;
   draft: DayDraft;
   bookings: HostBooking[];
+  busyEvents: HostBusyEvent[];
+  bufferDrafts: Record<string, { before: number; after: number; saving: boolean }>;
+  busyEventsLoading: boolean;
   onStatus: (status: DayStatus) => void;
   onBlockChange: (index: number, next: Block) => void;
   onRemoveBlock: (index: number) => void;
   onAddBlock: () => void;
   onReset: () => void;
   onNote: (value: string) => void;
+  onBufferDraftChange: (
+    eventId: string,
+    next: { before?: number; after?: number },
+  ) => void;
+  onBufferCommit: (event: HostBusyEvent) => void;
 }) {
   const dow = WEEK_LABELS[selectedDate.getDay()].slice(0, 3);
   const dateLabel = `${dow}, ${selectedDate.getDate()} ${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)}`;
@@ -1875,7 +2111,11 @@ function DayEditor({
       draft.blocks.length > 0
         ? Math.max(0, totalHours(draft.blocks))
         : 0;
-    sub = `${bookings.length} booked · ${open.toFixed(1).replace(/\.0$/, "")}h open`;
+    const externalLabel =
+      busyEvents.length > 0 ? ` · ${busyEvents.length} external` : "";
+    sub = `${bookings.length} booked${externalLabel} · ${open
+      .toFixed(1)
+      .replace(/\.0$/, "")}h open`;
   }
 
   return (
@@ -1987,22 +2227,139 @@ function DayEditor({
         </>
       )}
 
-      {/* Existing bookings on this day */}
+      {/* Combined Bookvella + external calendar events on this day */}
       <div className="mt-5 border-t border-[#EEE7DF] pt-4">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
-          Booked on this day
-        </p>
-        <div className="mt-2 space-y-2">
-          {bookings.length === 0 ? (
-            <p className="rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
-              No bookings yet on this date.
-            </p>
-          ) : (
-            bookings.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} />
-            ))
-          )}
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#9CA3AF]">
+            Calendar events
+          </p>
+          {busyEventsLoading ? (
+            <span className="text-[10px] text-[#9CA3AF]">Syncing…</span>
+          ) : null}
         </div>
+        <div className="mt-2 space-y-2">
+          {bookings.length === 0 && busyEvents.length === 0 ? (
+            <p className="rounded-lg border border-[#EEE7DF] bg-[#FFFBF7] px-3 py-3 text-center text-[12px] text-[#9CA3AF]">
+              {busyEventsLoading
+                ? "Loading external events…"
+                : "Nothing scheduled on this date."}
+            </p>
+          ) : null}
+          {bookings.map((booking) => (
+            <BookingRow key={booking.id} booking={booking} />
+          ))}
+          {busyEvents.map((event) => {
+            const localDraft = bufferDrafts[event.id];
+            const before = localDraft?.before ?? event.bufferBeforeMinutes;
+            const after = localDraft?.after ?? event.bufferAfterMinutes;
+            const saving = localDraft?.saving ?? false;
+            return (
+              <ExternalEventRow
+                key={event.id}
+                event={event}
+                bufferBefore={before}
+                bufferAfter={after}
+                saving={saving}
+                onChange={(next) => onBufferDraftChange(event.id, next)}
+                onCommit={() => onBufferCommit(event)}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExternalEventRow({
+  event,
+  bufferBefore,
+  bufferAfter,
+  saving,
+  onChange,
+  onCommit,
+}: {
+  event: HostBusyEvent;
+  bufferBefore: number;
+  bufferAfter: number;
+  saving: boolean;
+  onChange: (next: { before?: number; after?: number }) => void;
+  onCommit: () => void;
+}) {
+  const start = new Date(event.startTimeUtc);
+  const end = new Date(event.endTimeUtc);
+  const timeLabel = `${start.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}–${end.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}`;
+  const providerLabel =
+    event.provider === "GOOGLE" ? "Google" : "Outlook";
+  const calendarLabel = event.calendarName ?? providerLabel;
+
+  return (
+    <div className="rounded-lg border border-[#EEE7DF] bg-white p-2.5">
+      <div className="flex items-center gap-3">
+        <span
+          className="size-2 rounded-full"
+          style={{ background: event.calendarColor ?? "#6B7280" }}
+        />
+        <span className="w-24 text-[11px] font-bold tabular-nums text-[#6B7280]">
+          {timeLabel}
+        </span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-[12px] font-bold text-[#0B1220]">Busy</p>
+          <p className="truncate text-[10px] text-[#6B7280]">
+            {providerLabel} · {calendarLabel}
+          </p>
+        </div>
+        <span className="rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[9px] font-bold text-[#374151]">
+          External
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#F3F4F6] pt-2">
+        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">
+          Block also
+        </span>
+        <label className="inline-flex items-center gap-1.5 text-[11px] text-[#374151]">
+          <input
+            type="number"
+            min={0}
+            max={240}
+            step={5}
+            value={bufferBefore}
+            disabled={saving}
+            onChange={(e) =>
+              onChange({ before: Number(e.target.value) })
+            }
+            onBlur={onCommit}
+            className="h-7 w-14 rounded-md border border-[#E5E7EB] bg-white px-1.5 text-right text-[11px] tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_3px_rgba(255,95,99,0.18)] disabled:opacity-60"
+          />
+          <span className="text-[10px] text-[#6B7280]">min before</span>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-[11px] text-[#374151]">
+          <input
+            type="number"
+            min={0}
+            max={240}
+            step={5}
+            value={bufferAfter}
+            disabled={saving}
+            onChange={(e) =>
+              onChange({ after: Number(e.target.value) })
+            }
+            onBlur={onCommit}
+            className="h-7 w-14 rounded-md border border-[#E5E7EB] bg-white px-1.5 text-right text-[11px] tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_3px_rgba(255,95,99,0.18)] disabled:opacity-60"
+          />
+          <span className="text-[10px] text-[#6B7280]">min after</span>
+        </label>
+        {saving ? (
+          <span className="text-[10px] text-[#9CA3AF]">Saving…</span>
+        ) : null}
       </div>
     </div>
   );

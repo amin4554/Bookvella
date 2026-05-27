@@ -34,7 +34,8 @@ export function ContactReportForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const values = {
       topic,
       name: readText(form, "name"),
@@ -63,7 +64,7 @@ export function ContactReportForm() {
         body: JSON.stringify(values),
       });
       setSent(true);
-      event.currentTarget.reset();
+      formElement.reset();
       setAgreed(false);
       setTopic("general");
     } catch (caught) {

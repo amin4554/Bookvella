@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import { CalendarService, calendarSettingsRedirect } from './calendar.service';
 import type {
   UpdateConnectedCalendarDto,
   UpdateConflictCalendarDto,
+  UpdateEventBufferDto,
 } from './dto';
 
 @Controller('auth')
@@ -116,4 +118,55 @@ export class CalendarController {
   ) {
     return this.calendarService.refreshCalendarList(request.user!.sub, id);
   }
+
+  @Get('calendars/busy')
+  @UseGuards(AuthGuard)
+  busyEvents(
+    @Req() request: AuthenticatedRequest,
+    @Query('start') start: string | undefined,
+    @Query('end') end: string | undefined,
+  ) {
+    const startDate = parseRangeBoundary(start, 'start');
+    const endDate = parseRangeBoundary(end, 'end');
+    return this.calendarService.listBusyEventsForRange(
+      request.user!.sub,
+      startDate,
+      endDate,
+    );
+  }
+
+  @Patch('calendars/:id/events/:eventId/buffer')
+  @UseGuards(AuthGuard)
+  updateEventBuffer(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('eventId') eventId: string,
+    @Body() dto: UpdateEventBufferDto,
+  ) {
+    const before =
+      typeof dto.bufferBeforeMinutes === 'number'
+        ? dto.bufferBeforeMinutes
+        : 0;
+    const after =
+      typeof dto.bufferAfterMinutes === 'number' ? dto.bufferAfterMinutes : 0;
+    return this.calendarService.updateEventBuffer(
+      request.user!.sub,
+      id,
+      eventId,
+      before,
+      after,
+      dto.providerCalendarId,
+    );
+  }
+}
+
+function parseRangeBoundary(value: string | undefined, field: string): Date {
+  if (!value) {
+    throw new BadRequestException(`${field} is required`);
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`${field} must be a valid ISO date`);
+  }
+  return parsed;
 }

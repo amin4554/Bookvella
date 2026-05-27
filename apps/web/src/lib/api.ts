@@ -406,6 +406,21 @@ export type CalendarAuthorizationResponse = {
   authorizationUrl: string;
 };
 
+export type HostBusyEvent = {
+  id: string;
+  connectedCalendarId: string;
+  provider: CalendarProvider;
+  accountEmail: string;
+  providerCalendarId: string;
+  providerEventId: string;
+  calendarName: string | null;
+  calendarColor: string | null;
+  startTimeUtc: string;
+  endTimeUtc: string;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+};
+
 export async function checkSlugAvailability(
   slug: string,
 ): Promise<SlugAvailability> {

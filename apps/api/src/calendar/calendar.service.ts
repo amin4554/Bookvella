@@ -59,8 +59,36 @@ type GoogleCalendarList = {
   }[];
 };
 
-type GoogleFreeBusyResponse = {
-  calendars?: Record<string, { busy?: { start: string; end: string }[] }>;
+type GoogleEventListResponse = {
+  items?: {
+    id?: string;
+    status?: string;
+    transparency?: string;
+    start?: { dateTime?: string; date?: string };
+    end?: { dateTime?: string; date?: string };
+  }[];
+};
+
+type ProviderEvent = {
+  providerCalendarId: string;
+  providerEventId: string;
+  startMs: number;
+  endMs: number;
+};
+
+export type HostBusyEvent = {
+  id: string;
+  connectedCalendarId: string;
+  provider: CalendarProvider;
+  accountEmail: string;
+  providerCalendarId: string;
+  providerEventId: string;
+  calendarName: string | null;
+  calendarColor: string | null;
+  startTimeUtc: string;
+  endTimeUtc: string;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
 };
 
 type OutlookUserInfo = {
@@ -79,6 +107,7 @@ type OutlookCalendarList = {
 
 type OutlookCalendarView = {
   value?: {
+    id?: string;
     showAs?: string;
     start?: { dateTime?: string; timeZone?: string };
     end?: { dateTime?: string; timeZone?: string };
@@ -438,7 +467,166 @@ export class CalendarService {
     return calendar;
   }
 
+  // Used by the public booking scheduler. Returns busy windows already widened
+  // by any per-event buffer the host configured in /dashboard/availability so
+  // the slot generator can stay buffer-agnostic.
   async getBusyIntervals(userId: string, start: Date, end: Date) {
+    const events = await this.collectProviderEvents(userId, start, end);
+    if (events.length === 0) {
+      return [];
+    }
+
+    const buffers = await this.loadEventBuffers(
+      userId,
+      events.map((event) => ({
+        connectedCalendarId: event.connectedCalendarId,
+        providerEventId: event.providerEventId,
+      })),
+    );
+
+    return events.map((event) => {
+      const buffer = buffers.get(
+        bufferKey(event.connectedCalendarId, event.providerEventId),
+      );
+      const before = (buffer?.bufferBeforeMinutes ?? 0) * 60_000;
+      const after = (buffer?.bufferAfterMinutes ?? 0) * 60_000;
+      return {
+        startMs: event.startMs - before,
+        endMs: event.endMs + after,
+      };
+    });
+  }
+
+  // Used by the host UI. Returns each upcoming external event in the window
+  // with the saved buffer (or zero) so the host can edit the buffer per event.
+  async listBusyEventsForRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<HostBusyEvent[]> {
+    const events = await this.collectProviderEvents(userId, start, end);
+    if (events.length === 0) {
+      return [];
+    }
+
+    const buffers = await this.loadEventBuffers(
+      userId,
+      events.map((event) => ({
+        connectedCalendarId: event.connectedCalendarId,
+        providerEventId: event.providerEventId,
+      })),
+    );
+
+    return events
+      .map((event): HostBusyEvent => {
+        const buffer = buffers.get(
+          bufferKey(event.connectedCalendarId, event.providerEventId),
+        );
+        return {
+          id: `${event.connectedCalendarId}:${event.providerEventId}`,
+          connectedCalendarId: event.connectedCalendarId,
+          provider: event.provider,
+          accountEmail: event.accountEmail,
+          providerCalendarId: event.providerCalendarId,
+          providerEventId: event.providerEventId,
+          calendarName: event.calendarName,
+          calendarColor: event.calendarColor,
+          startTimeUtc: new Date(event.startMs).toISOString(),
+          endTimeUtc: new Date(event.endMs).toISOString(),
+          bufferBeforeMinutes: buffer?.bufferBeforeMinutes ?? 0,
+          bufferAfterMinutes: buffer?.bufferAfterMinutes ?? 0,
+        };
+      })
+      .sort((a, b) => a.startTimeUtc.localeCompare(b.startTimeUtc));
+  }
+
+  async updateEventBuffer(
+    userId: string,
+    connectedCalendarId: string,
+    providerEventId: string,
+    bufferBeforeMinutes: number,
+    bufferAfterMinutes: number,
+    providerCalendarId?: string,
+  ) {
+    const calendar = await this.prisma.connectedCalendar.findFirst({
+      where: { id: connectedCalendarId, userId },
+      select: { id: true },
+    });
+
+    if (!calendar) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    const safeBefore = clampBufferMinutes(bufferBeforeMinutes);
+    const safeAfter = clampBufferMinutes(bufferAfterMinutes);
+
+    // No row needed when both buffers are zero — drop any existing row so we
+    // don't keep noise around.
+    if (safeBefore === 0 && safeAfter === 0) {
+      await this.prisma.externalEventBuffer.deleteMany({
+        where: {
+          connectedCalendarId,
+          providerEventId,
+        },
+      });
+      return { bufferBeforeMinutes: 0, bufferAfterMinutes: 0 };
+    }
+
+    const resolvedProviderCalendarId =
+      providerCalendarId?.trim() ||
+      (await this.prisma.externalEventBuffer.findUnique({
+        where: {
+          connectedCalendarId_providerEventId: {
+            connectedCalendarId,
+            providerEventId,
+          },
+        },
+        select: { providerCalendarId: true },
+      }))?.providerCalendarId ||
+      '';
+
+    if (!resolvedProviderCalendarId) {
+      throw new BadRequestException('providerCalendarId is required');
+    }
+
+    const row = await this.prisma.externalEventBuffer.upsert({
+      where: {
+        connectedCalendarId_providerEventId: {
+          connectedCalendarId,
+          providerEventId,
+        },
+      },
+      create: {
+        userId,
+        connectedCalendarId,
+        providerCalendarId: resolvedProviderCalendarId,
+        providerEventId,
+        bufferBeforeMinutes: safeBefore,
+        bufferAfterMinutes: safeAfter,
+      },
+      update: {
+        bufferBeforeMinutes: safeBefore,
+        bufferAfterMinutes: safeAfter,
+      },
+      select: { bufferBeforeMinutes: true, bufferAfterMinutes: true },
+    });
+
+    return row;
+  }
+
+  private async collectProviderEvents(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<
+    (ProviderEvent & {
+      connectedCalendarId: string;
+      provider: CalendarProvider;
+      accountEmail: string;
+      calendarName: string | null;
+      calendarColor: string | null;
+    })[]
+  > {
     const calendars = await this.prisma.connectedCalendar.findMany({
       where: {
         userId,
@@ -451,36 +639,52 @@ export class CalendarService {
         },
       },
     });
-    const intervals: { startMs: number; endMs: number }[] = [];
+
+    const collected: (ProviderEvent & {
+      connectedCalendarId: string;
+      provider: CalendarProvider;
+      accountEmail: string;
+      calendarName: string | null;
+      calendarColor: string | null;
+    })[] = [];
 
     for (const calendar of calendars) {
-      const calendarIds = calendar.conflictCalendars.map(
-        (conflictCalendar) => conflictCalendar.providerCalendarId,
-      );
+      const enabledConflicts = calendar.conflictCalendars;
 
-      if (calendarIds.length === 0) {
+      if (enabledConflicts.length === 0) {
         continue;
       }
 
       try {
-        if (calendar.provider === CalendarProvider.GOOGLE) {
-          intervals.push(
-            ...(await this.googleBusyIntervals(
-              calendar.id,
-              calendarIds,
-              start,
-              end,
-            )),
-          );
-        } else if (calendar.provider === CalendarProvider.OUTLOOK) {
-          intervals.push(
-            ...(await this.outlookBusyIntervals(
-              calendar.id,
-              calendarIds,
-              start,
-              end,
-            )),
-          );
+        const events =
+          calendar.provider === CalendarProvider.GOOGLE
+            ? await this.googleBusyEvents(
+                calendar.id,
+                enabledConflicts.map((c) => c.providerCalendarId),
+                start,
+                end,
+              )
+            : await this.outlookBusyEvents(
+                calendar.id,
+                enabledConflicts.map((c) => c.providerCalendarId),
+                start,
+                end,
+              );
+
+        const nameByCalendarId = new Map(
+          enabledConflicts.map((c) => [c.providerCalendarId, c]),
+        );
+
+        for (const event of events) {
+          const conflict = nameByCalendarId.get(event.providerCalendarId);
+          collected.push({
+            ...event,
+            connectedCalendarId: calendar.id,
+            provider: calendar.provider,
+            accountEmail: calendar.accountEmail,
+            calendarName: conflict?.name ?? null,
+            calendarColor: conflict?.color ?? null,
+          });
         }
 
         await this.prisma.connectedCalendar.update({
@@ -492,7 +696,47 @@ export class CalendarService {
       }
     }
 
-    return intervals;
+    return collected;
+  }
+
+  private async loadEventBuffers(
+    userId: string,
+    keys: { connectedCalendarId: string; providerEventId: string }[],
+  ) {
+    if (keys.length === 0) {
+      return new Map<
+        string,
+        { bufferBeforeMinutes: number; bufferAfterMinutes: number }
+      >();
+    }
+
+    const rows = await this.prisma.externalEventBuffer.findMany({
+      where: {
+        userId,
+        OR: keys.map((key) => ({
+          connectedCalendarId: key.connectedCalendarId,
+          providerEventId: key.providerEventId,
+        })),
+      },
+      select: {
+        connectedCalendarId: true,
+        providerEventId: true,
+        bufferBeforeMinutes: true,
+        bufferAfterMinutes: true,
+      },
+    });
+
+    const map = new Map<
+      string,
+      { bufferBeforeMinutes: number; bufferAfterMinutes: number }
+    >();
+    for (const row of rows) {
+      map.set(bufferKey(row.connectedCalendarId, row.providerEventId), {
+        bufferBeforeMinutes: row.bufferBeforeMinutes,
+        bufferAfterMinutes: row.bufferAfterMinutes,
+      });
+    }
+    return map;
   }
 
   async writeBookingCreated(bookingId: string) {
@@ -626,47 +870,65 @@ export class CalendarService {
     }
   }
 
-  private async googleBusyIntervals(
+  private async googleBusyEvents(
     connectedCalendarId: string,
     calendarIds: string[],
     start: Date,
     end: Date,
-  ) {
+  ): Promise<ProviderEvent[]> {
     const accessToken = await this.googleAccessToken(connectedCalendarId);
-    const response = await googleJson<GoogleFreeBusyResponse>(
-      'https://www.googleapis.com/calendar/v3/freeBusy',
-      accessToken,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          timeMin: start.toISOString(),
-          timeMax: end.toISOString(),
-          items: calendarIds.map((id) => ({ id })),
-        }),
-      },
-    );
-    const intervals: { startMs: number; endMs: number }[] = [];
+    const events: ProviderEvent[] = [];
 
-    for (const value of Object.values(response.calendars ?? {})) {
-      for (const busy of value.busy ?? []) {
-        intervals.push({
-          startMs: new Date(busy.start).getTime(),
-          endMs: new Date(busy.end).getTime(),
+    for (const calendarId of calendarIds) {
+      const url = new URL(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      );
+      url.searchParams.set('timeMin', start.toISOString());
+      url.searchParams.set('timeMax', end.toISOString());
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('maxResults', '250');
+      url.searchParams.set(
+        'fields',
+        'items(id,status,transparency,start(dateTime,date),end(dateTime,date))',
+      );
+
+      const response = await googleJson<GoogleEventListResponse>(
+        url.toString(),
+        accessToken,
+      );
+
+      for (const item of response.items ?? []) {
+        if (!item.id) continue;
+        if (item.status === 'cancelled') continue;
+        // Transparent events (visible "available" in Google) shouldn't block.
+        if (item.transparency === 'transparent') continue;
+
+        const startMs = parseGoogleEventDate(item.start);
+        const endMs = parseGoogleEventDate(item.end);
+        if (startMs === null || endMs === null) continue;
+        if (endMs <= startMs) continue;
+
+        events.push({
+          providerCalendarId: calendarId,
+          providerEventId: item.id,
+          startMs,
+          endMs,
         });
       }
     }
 
-    return intervals;
+    return events;
   }
 
-  private async outlookBusyIntervals(
+  private async outlookBusyEvents(
     connectedCalendarId: string,
     calendarIds: string[],
     start: Date,
     end: Date,
-  ) {
+  ): Promise<ProviderEvent[]> {
     const accessToken = await this.outlookAccessToken(connectedCalendarId);
-    const intervals: { startMs: number; endMs: number }[] = [];
+    const events: ProviderEvent[] = [];
 
     for (const calendarId of calendarIds) {
       const url = new URL(
@@ -674,7 +936,8 @@ export class CalendarService {
       );
       url.searchParams.set('startDateTime', start.toISOString());
       url.searchParams.set('endDateTime', end.toISOString());
-      url.searchParams.set('$select', 'start,end,showAs');
+      url.searchParams.set('$select', 'id,start,end,showAs');
+      url.searchParams.set('$top', '250');
       const response = await graphJson<OutlookCalendarView>(
         url.toString(),
         accessToken,
@@ -683,16 +946,23 @@ export class CalendarService {
 
       for (const event of response.value ?? []) {
         if (event.showAs === 'free') continue;
+        if (!event.id) continue;
         if (!event.start?.dateTime || !event.end?.dateTime) continue;
 
-        intervals.push({
-          startMs: parseProviderDateTime(event.start.dateTime).getTime(),
-          endMs: parseProviderDateTime(event.end.dateTime).getTime(),
+        const startMs = parseProviderDateTime(event.start.dateTime).getTime();
+        const endMs = parseProviderDateTime(event.end.dateTime).getTime();
+        if (endMs <= startMs) continue;
+
+        events.push({
+          providerCalendarId: calendarId,
+          providerEventId: event.id,
+          startMs,
+          endMs,
         });
       }
     }
 
-    return intervals;
+    return events;
   }
 
   private async createGoogleEvent(
@@ -1300,4 +1570,37 @@ function errorMessage(error: unknown) {
 
 function parseProviderDateTime(value: string) {
   return new Date(/[zZ]$|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`);
+}
+
+function parseGoogleEventDate(
+  value: { dateTime?: string; date?: string } | undefined,
+): number | null {
+  if (!value) return null;
+  if (value.dateTime) {
+    const ms = new Date(value.dateTime).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (value.date) {
+    // All-day event — Google sends YYYY-MM-DD which is midnight in the calendar
+    // timezone. We treat it as UTC midnight for blocking purposes; this is
+    // good enough since the slot generator also operates in UTC and the host
+    // timezone is applied per-day. Worst case the all-day event blocks an
+    // adjacent hour or two — acceptable for now and configurable via per-event
+    // buffer.
+    const ms = Date.parse(`${value.date}T00:00:00.000Z`);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
+}
+
+function bufferKey(connectedCalendarId: string, providerEventId: string) {
+  return `${connectedCalendarId} ${providerEventId}`;
+}
+
+function clampBufferMinutes(value: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  const rounded = Math.round(value);
+  if (rounded < 0) return 0;
+  if (rounded > 240) return 240;
+  return rounded;
 }
