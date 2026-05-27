@@ -128,6 +128,11 @@ export default function PrivacyPage() {
           providers to run the project. The exact providers depend on production
           configuration.
         </p>
+        <p>
+          Bookvella&apos;s use and transfer of information received from Google
+          APIs will adhere to the Google API Services User Data Policy, including
+          the Limited Use requirements.
+        </p>
         <LegalTable
           headers={["Provider/category", "Role", "Data involved"]}
           rows={[
@@ -171,7 +176,7 @@ export default function PrivacyPage() {
         </p>
 
         <p className="mt-12 text-[12px] text-[#9CA3AF]">
-          Version 1.1. Last updated May 26, 2026. Effective May 26, 2026.
+          Version 1.2. Last updated May 27, 2026. Effective May 27, 2026.
         </p>
       </LegalProse>
     </LegalPage>
