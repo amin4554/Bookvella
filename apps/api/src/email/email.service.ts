@@ -37,6 +37,7 @@ export class EmailService {
         process.env.SMTP_USER ??
         'Bookvella <no-reply@bookvella.local>',
       to: input.to,
+      replyTo: input.replyTo,
       subject: input.subject,
       text: input.text,
       html: input.html,
@@ -55,6 +56,7 @@ async function sendSmtpMail(options: {
   password?: string;
   from: string;
   to: string;
+  replyTo?: string;
   subject: string;
   text: string;
   html?: string;
@@ -209,6 +211,7 @@ class SmtpClient {
 function buildMessage(options: {
   from: string;
   to: string;
+  replyTo?: string;
   subject: string;
   text: string;
   html?: string;
@@ -224,6 +227,7 @@ function buildMessage(options: {
   const headers = [
     `From: ${options.from}`,
     `To: ${options.to}`,
+    ...(options.replyTo ? [`Reply-To: ${options.replyTo}`] : []),
     `Subject: ${encodeHeader(options.subject)}`,
     'MIME-Version: 1.0',
   ];
@@ -307,7 +311,10 @@ function escapeMessageBody(value: string) {
   // RFC 2822 requires CRLF line endings throughout the message body.
   // Normalize any bare LF or lone CR to CRLF before dot-stuffing so that
   // lines starting with '.' are correctly escaped even after normalisation.
-  const crlf = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+  const crlf = value
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n/g, '\r\n');
   return crlf.replace(/^\./gm, '..');
 }
 

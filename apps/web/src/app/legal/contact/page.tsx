@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, Flag, Mail, Shield } from "lucide-react";
+import { ContactReportForm } from "@/components/contact-report-form";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
@@ -59,35 +60,8 @@ export default function ContactPage() {
         />
       </section>
 
-      <section className="mt-12 grid gap-8 lg:grid-cols-[1.25fr_1fr]">
-        <div className="rounded-2xl border border-[#EEE7DF] bg-white p-6 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">
-            What to include
-          </p>
-          <h2
-            className="mt-1 text-[28px] font-extrabold"
-            style={{ letterSpacing: "-0.03em", lineHeight: 1.05 }}
-          >
-            Send reports by email
-          </h2>
-          <p className="mt-3 text-[14px] leading-[1.65] text-[#6B7280]">
-            Email is currently the reliable contact channel for this student
-            project. For content reports, include enough detail to identify the
-            content and understand the issue.
-          </p>
-          <ul className="mt-5 space-y-3 text-[14px] leading-[1.6] text-[#374151]">
-            <li><strong className="text-[#0B1220]">1. Link:</strong> the Bookvella profile, service, image, booking, or review URL.</li>
-            <li><strong className="text-[#0B1220]">2. Reason:</strong> what law, right, or platform rule you believe is affected.</li>
-            <li><strong className="text-[#0B1220]">3. Context:</strong> screenshots or details that help explain the report.</li>
-            <li><strong className="text-[#0B1220]">4. Contact:</strong> your email address so we can acknowledge and follow up.</li>
-          </ul>
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=Bookvella%20content%20report`}
-            className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF6267] to-[#FF8A4C] px-5 text-[13.5px] font-bold text-white shadow-sm"
-          >
-            Email {CONTACT_EMAIL} <Mail className="size-4" />
-          </a>
-        </div>
+      <section className="mt-12 grid gap-8 lg:grid-cols-[1.35fr_1fr]">
+        <ContactReportForm />
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-[#EEE7DF] bg-white p-5">

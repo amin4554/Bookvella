@@ -66,6 +66,7 @@ async function bootstrap() {
         '/auth/password/forgot',
         '/auth/password/reset',
         '/auth/password/change',
+        '/contact/report',
         '/auth/totp/enroll',
         '/auth/totp/verify',
         '/auth/totp/disable',

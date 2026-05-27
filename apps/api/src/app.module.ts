@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 import { MediaModule } from './media/media.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MediaModule } from './media/media.module';
     BookingsModule,
     ReviewsModule,
     MediaModule,
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [AppService],
