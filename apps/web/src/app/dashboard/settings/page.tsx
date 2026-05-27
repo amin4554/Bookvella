@@ -180,7 +180,16 @@ function SettingsPageContent() {
     | { kind: "error"; message: string }
   >({ kind: "idle" });
 
-  const [activeSection, setActiveSection] = useState<SectionId>("account");
+  // Initialize from the URL hash so a deep link like /dashboard/settings#calendar
+  // highlights the right rail item on the very first paint. Falls back to
+  // "account" on the server (where window is undefined) and for empty hashes.
+  const [activeSection, setActiveSection] = useState<SectionId>(() => {
+    if (typeof window === "undefined") return "account";
+    const hash = window.location.hash.replace(/^#/, "");
+    return SECTIONS.some((s) => s.id === hash)
+      ? (hash as SectionId)
+      : "account";
+  });
 
   const applyUser = useCallback(
     (next: PublicUser) => {
@@ -218,19 +227,33 @@ function SettingsPageContent() {
     };
   }, [applyUser]);
 
+  // Track whether the initial hash-scroll has finished landing. The scrollspy
+  // below only starts updating active state once this flips true, otherwise a
+  // mount-time sync (at scrollY≈0) would race the hash-scroll and snap the
+  // rail back to the first section before we've moved.
+  const hashScrollSettledRef = useRef(false);
+
   // Initial scroll to the section in the URL hash so the dashboard "Calendar
   // sync" link continues to land directly on the calendar section.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
-    if (!hash) return;
-    if (!SECTIONS.some((s) => s.id === hash)) return;
+    if (!hash || !SECTIONS.some((s) => s.id === hash)) {
+      hashScrollSettledRef.current = true;
+      return;
+    }
     const target = document.getElementById(hash);
-    if (!target) return;
-    // Wait one frame so layout settles before scrolling.
+    if (!target) {
+      hashScrollSettledRef.current = true;
+      return;
+    }
+    // Wait one frame so layout settles before scrolling. Use "auto" (instant)
+    // so the scrollspy below sees the correct scroll position on its first
+    // sync and doesn't snap us back to "account".
     requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.scrollIntoView({ behavior: "auto", block: "start" });
       setActiveSection(hash as SectionId);
+      hashScrollSettledRef.current = true;
     });
   }, []);
 
@@ -243,6 +266,9 @@ function SettingsPageContent() {
 
     function syncActiveSection() {
       frame = 0;
+      // Don't override the hash-driven active section until the initial scroll
+      // has actually landed.
+      if (!hashScrollSettledRef.current) return;
       const anchorY = Math.min(window.innerHeight * 0.28, 220);
       let next: SectionId = SECTIONS[0].id;
 

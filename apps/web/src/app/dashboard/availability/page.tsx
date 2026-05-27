@@ -1332,6 +1332,63 @@ export default function AvailabilityPage() {
     });
   }
 
+  async function toggleEventIgnored(event: HostBusyEvent) {
+    const nextIgnored = !event.ignored;
+    // Optimistic: flip the flag locally so the row shows the new state
+    // immediately. We'll revert on error.
+    setBusyEvents((prev) =>
+      prev.map((e) =>
+        e.id === event.id ? { ...e, ignored: nextIgnored } : e,
+      ),
+    );
+
+    try {
+      const updated = await authedApiRequest<{
+        bufferBeforeMinutes: number;
+        bufferAfterMinutes: number;
+        ignored: boolean;
+      }>(
+        `/auth/calendars/${event.connectedCalendarId}/events/${encodeURIComponent(
+          event.providerEventId,
+        )}/ignored`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            ignored: nextIgnored,
+            providerCalendarId: event.providerCalendarId,
+          }),
+        },
+      );
+      setBusyEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id
+            ? {
+                ...e,
+                bufferBeforeMinutes: updated.bufferBeforeMinutes,
+                bufferAfterMinutes: updated.bufferAfterMinutes,
+                ignored: updated.ignored,
+              }
+            : e,
+        ),
+      );
+      toast.success(
+        nextIgnored
+          ? "Event won’t block bookings"
+          : "Event will block bookings again",
+      );
+    } catch (caught) {
+      // Revert the optimistic flip.
+      setBusyEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, ignored: event.ignored } : e,
+        ),
+      );
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not update event",
+      );
+    }
+  }
+
   async function commitEventBuffer(event: HostBusyEvent) {
     const draft = bufferDrafts[event.id];
     const before = draft?.before ?? event.bufferBeforeMinutes;
@@ -1401,6 +1458,81 @@ export default function AvailabilityPage() {
       ),
     [weekDraft],
   );
+
+  const [syncRefreshing, setSyncRefreshing] = useState(false);
+
+  // Re-fetch the list of connected calendars and the current busy-event window.
+  // Used by the inline "Calendar synced X" pill so the host can pull updates on
+  // demand without opening Settings. We also re-fetch the connected calendar
+  // list (no per-calendar refresh call) so any state change (paused, errored,
+  // newly active) shows up in the pill.
+  async function refreshCalendarsAndBusy() {
+    if (syncRefreshing) return;
+    setSyncRefreshing(true);
+    setBusyEventsLoading(true);
+    try {
+      const start = new Date(viewYear, viewMonth, 1);
+      start.setDate(start.getDate() - 7);
+      const end = new Date(viewYear, viewMonth + 1, 1);
+      end.setDate(end.getDate() + 7);
+
+      // Trigger a remote refresh on each connected calendar first so the
+      // subsequent busy fetch reflects whatever has changed on the provider
+      // side since the last sync.
+      const refreshed = await Promise.all(
+        calendars
+          .filter(
+            (calendar) =>
+              calendar.state === "ACTIVE" || calendar.state === "PAUSED",
+          )
+          .map((calendar) =>
+            authedApiRequest<ConnectedCalendar>(
+              `/auth/calendars/${calendar.id}/refresh`,
+              { method: "PATCH" },
+            ).catch(() => null),
+          ),
+      );
+
+      const freshList = await authedApiRequest<ConnectedCalendar[]>(
+        "/auth/calendars",
+      );
+      setCalendars(freshList);
+
+      if (
+        freshList.some(
+          (calendar) =>
+            calendar.state === "ACTIVE" &&
+            calendar.conflictsOn &&
+            calendar.conflictCalendars.some((conflict) => conflict.enabled),
+        )
+      ) {
+        const events = await authedApiRequest<HostBusyEvent[]>(
+          `/auth/calendars/busy?start=${encodeURIComponent(
+            start.toISOString(),
+          )}&end=${encodeURIComponent(end.toISOString())}`,
+        );
+        setBusyEvents(events);
+      } else {
+        setBusyEvents([]);
+      }
+
+      const succeeded = refreshed.filter(Boolean).length;
+      if (succeeded > 0) {
+        toast.success("Calendar synced");
+      } else if (calendars.length === 0) {
+        toast.error("No calendar connected");
+      } else {
+        toast.error("Could not sync calendar");
+      }
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error ? caught.message : "Could not sync calendar",
+      );
+    } finally {
+      setSyncRefreshing(false);
+      setBusyEventsLoading(false);
+    }
+  }
 
   const tzLabel = useMemo(() => {
     if (!user?.timezone) return "UTC";
@@ -1526,13 +1658,28 @@ export default function AvailabilityPage() {
           </span>{" "}
           bookable per week
         </span>
-        <span
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold ${calendarSyncPill.className}`}
+        <button
+          type="button"
+          onClick={refreshCalendarsAndBusy}
+          disabled={syncRefreshing || calendars.length === 0}
+          aria-label="Refresh calendar sync"
+          title={
+            calendars.length === 0
+              ? "Connect a calendar in Settings to sync"
+              : "Click to refresh calendar"
+          }
+          className={`group inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70 ${calendarSyncPill.className}`}
         >
-          <RefreshCw className="size-3.5" />
+          <RefreshCw
+            className={`size-3.5 transition-transform ${
+              syncRefreshing
+                ? "animate-spin"
+                : "group-hover:rotate-90"
+            }`}
+          />
           <span className={`size-1.5 rounded-full ${calendarSyncPill.dotClassName}`} />
-          {calendarSyncPill.text}
-        </span>
+          {syncRefreshing ? "Syncing…" : calendarSyncPill.text}
+        </button>
       </div>
 
       {/* Block-reason legend */}
@@ -1615,6 +1762,7 @@ export default function AvailabilityPage() {
                 onNote={setDayNote}
                 onBufferDraftChange={updateBufferDraft}
                 onBufferCommit={commitEventBuffer}
+                onToggleIgnored={toggleEventIgnored}
               />
             )}
           </section>
@@ -2077,6 +2225,7 @@ function DayEditor({
   onNote,
   onBufferDraftChange,
   onBufferCommit,
+  onToggleIgnored,
 }: {
   selectedDate: Date;
   today: Date;
@@ -2096,6 +2245,7 @@ function DayEditor({
     next: { before?: number; after?: number },
   ) => void;
   onBufferCommit: (event: HostBusyEvent) => void;
+  onToggleIgnored: (event: HostBusyEvent) => void;
 }) {
   const dow = WEEK_LABELS[selectedDate.getDay()].slice(0, 3);
   const dateLabel = `${dow}, ${selectedDate.getDate()} ${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)}`;
@@ -2262,6 +2412,7 @@ function DayEditor({
                 saving={saving}
                 onChange={(next) => onBufferDraftChange(event.id, next)}
                 onCommit={() => onBufferCommit(event)}
+                onToggleIgnored={() => onToggleIgnored(event)}
               />
             );
           })}
@@ -2278,6 +2429,7 @@ function ExternalEventRow({
   saving,
   onChange,
   onCommit,
+  onToggleIgnored,
 }: {
   event: HostBusyEvent;
   bufferBefore: number;
@@ -2285,6 +2437,7 @@ function ExternalEventRow({
   saving: boolean;
   onChange: (next: { before?: number; after?: number }) => void;
   onCommit: () => void;
+  onToggleIgnored: () => void;
 }) {
   const start = new Date(event.startTimeUtc);
   const end = new Date(event.endTimeUtc);
@@ -2300,19 +2453,36 @@ function ExternalEventRow({
   const providerLabel =
     event.provider === "GOOGLE" ? "Google" : "Outlook";
   const calendarLabel = event.calendarName ?? providerLabel;
+  const ignored = event.ignored;
 
   return (
-    <div className="rounded-lg border border-[#EEE7DF] bg-white p-2.5">
+    <div
+      className={`rounded-lg border bg-white p-2.5 transition ${
+        ignored
+          ? "border-dashed border-[#E5E7EB] bg-[#FAFAF8]"
+          : "border-[#EEE7DF]"
+      }`}
+    >
       <div className="flex items-center gap-3">
         <span
-          className="size-2 rounded-full"
+          className={`size-2 rounded-full ${ignored ? "opacity-40" : ""}`}
           style={{ background: event.calendarColor ?? "#6B7280" }}
         />
-        <span className="w-24 text-[11px] font-bold tabular-nums text-[#6B7280]">
+        <span
+          className={`w-24 text-[11px] font-bold tabular-nums ${
+            ignored ? "text-[#9CA3AF] line-through" : "text-[#6B7280]"
+          }`}
+        >
           {timeLabel}
         </span>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[12px] font-bold text-[#0B1220]">Busy</p>
+          <p
+            className={`truncate text-[12px] font-bold ${
+              ignored ? "text-[#9CA3AF] line-through" : "text-[#0B1220]"
+            }`}
+          >
+            {ignored ? "Available (ignored)" : "Busy"}
+          </p>
           <p className="truncate text-[10px] text-[#6B7280]">
             {providerLabel} · {calendarLabel}
           </p>
@@ -2320,47 +2490,137 @@ function ExternalEventRow({
         <span className="rounded-full bg-[#F3F4F6] px-1.5 py-0.5 text-[9px] font-bold text-[#374151]">
           External
         </span>
+        <button
+          type="button"
+          onClick={onToggleIgnored}
+          aria-label={
+            ignored
+              ? "Treat this event as busy again"
+              : "Stay available during this event"
+          }
+          title={
+            ignored
+              ? "Treat as busy again"
+              : "I'm actually available during this event"
+          }
+          className={`inline-flex size-6 items-center justify-center rounded-md border text-[#6B7280] transition hover:text-[#0B1220] ${
+            ignored
+              ? "border-[#10B981] bg-[#ECFDF5] text-[#047857] hover:bg-[#D1FAE5]"
+              : "border-[#E5E7EB] bg-white hover:border-[#FCC9C5] hover:bg-[#FFF7F5]"
+          }`}
+        >
+          {ignored ? (
+            <RefreshCw className="size-3.5" />
+          ) : (
+            <X className="size-3.5" />
+          )}
+        </button>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#F3F4F6] pt-2">
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">
-          Block also
-        </span>
-        <label className="inline-flex items-center gap-1.5 text-[11px] text-[#374151]">
-          <input
-            type="number"
-            min={0}
-            max={240}
-            step={5}
+      {ignored ? (
+        <p className="mt-2 border-t border-dashed border-[#E5E7EB] pt-2 text-[10.5px] italic text-[#6B7280]">
+          This event won&apos;t block bookings. Click the arrow above to treat
+          it as busy again.
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#F3F4F6] pt-2">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">
+            Block also
+          </span>
+          <BufferStepper
             value={bufferBefore}
             disabled={saving}
-            onChange={(e) =>
-              onChange({ before: Number(e.target.value) })
-            }
-            onBlur={onCommit}
-            className="h-7 w-14 rounded-md border border-[#E5E7EB] bg-white px-1.5 text-right text-[11px] tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_3px_rgba(255,95,99,0.18)] disabled:opacity-60"
+            label="min before"
+            onChange={(next) => onChange({ before: next })}
+            onCommit={onCommit}
           />
-          <span className="text-[10px] text-[#6B7280]">min before</span>
-        </label>
-        <label className="inline-flex items-center gap-1.5 text-[11px] text-[#374151]">
-          <input
-            type="number"
-            min={0}
-            max={240}
-            step={5}
+          <BufferStepper
             value={bufferAfter}
             disabled={saving}
-            onChange={(e) =>
-              onChange({ after: Number(e.target.value) })
-            }
-            onBlur={onCommit}
-            className="h-7 w-14 rounded-md border border-[#E5E7EB] bg-white px-1.5 text-right text-[11px] tabular-nums outline-none focus:border-[#FF5F63] focus:shadow-[0_0_0_3px_rgba(255,95,99,0.18)] disabled:opacity-60"
+            label="min after"
+            onChange={(next) => onChange({ after: next })}
+            onCommit={onCommit}
           />
-          <span className="text-[10px] text-[#6B7280]">min after</span>
-        </label>
-        {saving ? (
-          <span className="text-[10px] text-[#9CA3AF]">Saving…</span>
-        ) : null}
+          {saving ? (
+            <span className="text-[10px] text-[#9CA3AF]">Saving…</span>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BufferStepper({
+  value,
+  disabled,
+  label,
+  onChange,
+  onCommit,
+}: {
+  value: number;
+  disabled: boolean;
+  label: string;
+  onChange: (next: number) => void;
+  onCommit: () => void;
+}) {
+  const step = 5;
+  const max = 240;
+  const clamp = (next: number) => Math.max(0, Math.min(max, next));
+
+  function bump(delta: number) {
+    if (disabled) return;
+    const next = clamp(value + delta);
+    if (next === value) return;
+    onChange(next);
+    // Persist immediately on stepper bump — there's no blur event when the
+    // user just keeps clicking the chevrons.
+    queueMicrotask(onCommit);
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <div
+        className={`inline-flex h-8 items-stretch overflow-hidden rounded-md border border-[#E5E7EB] bg-white ${
+          disabled ? "opacity-60" : ""
+        }`}
+      >
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Decrease ${label}`}
+          disabled={disabled || value <= 0}
+          onClick={() => bump(-step)}
+          className="flex w-6 items-center justify-center text-[14px] font-bold text-[#6B7280] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={max}
+          step={step}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => {
+            const raw = event.target.value;
+            const next = raw === "" ? 0 : Number(raw);
+            if (Number.isFinite(next)) onChange(clamp(next));
+          }}
+          onBlur={onCommit}
+          className="w-10 border-x border-[#E5E7EB] bg-white text-center text-[11px] font-bold tabular-nums text-[#0B1220] outline-none focus:bg-[#FFFBF7] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Increase ${label}`}
+          disabled={disabled || value >= max}
+          onClick={() => bump(step)}
+          className="flex w-6 items-center justify-center text-[14px] font-bold text-[#6B7280] hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:text-[#D1D5DB]"
+        >
+          +
+        </button>
       </div>
+      <span className="text-[10px] text-[#6B7280]">{label}</span>
     </div>
   );
 }

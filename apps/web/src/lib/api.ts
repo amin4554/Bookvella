@@ -419,6 +419,7 @@ export type HostBusyEvent = {
   endTimeUtc: string;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
+  ignored: boolean;
 };
 
 export async function checkSlugAvailability(

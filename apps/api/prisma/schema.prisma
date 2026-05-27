@@ -517,6 +517,7 @@ model ExternalEventBuffer {
   providerEventId       String   @map("provider_event_id")
   bufferBeforeMinutes   Int      @default(0) @map("buffer_before_minutes")
   bufferAfterMinutes    Int      @default(0) @map("buffer_after_minutes")
+  ignored               Boolean  @default(false) @map("ignored")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

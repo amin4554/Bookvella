@@ -19,6 +19,7 @@ import type {
   UpdateConnectedCalendarDto,
   UpdateConflictCalendarDto,
   UpdateEventBufferDto,
+  UpdateEventIgnoredDto,
 } from './dto';
 
 @Controller('auth')
@@ -155,6 +156,26 @@ export class CalendarController {
       eventId,
       before,
       after,
+      dto.providerCalendarId,
+    );
+  }
+
+  @Patch('calendars/:id/events/:eventId/ignored')
+  @UseGuards(AuthGuard)
+  updateEventIgnored(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('eventId') eventId: string,
+    @Body() dto: UpdateEventIgnoredDto,
+  ) {
+    if (typeof dto.ignored !== 'boolean') {
+      throw new BadRequestException('ignored must be a boolean');
+    }
+    return this.calendarService.setEventIgnored(
+      request.user!.sub,
+      id,
+      eventId,
+      dto.ignored,
       dto.providerCalendarId,
     );
   }

@@ -15,3 +15,8 @@ export type UpdateEventBufferDto = {
   bufferAfterMinutes?: number;
   providerCalendarId?: string;
 };
+
+export type UpdateEventIgnoredDto = {
+  ignored?: boolean;
+  providerCalendarId?: string;
+};

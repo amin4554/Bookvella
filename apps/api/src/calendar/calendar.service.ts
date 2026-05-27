@@ -89,6 +89,7 @@ export type HostBusyEvent = {
   endTimeUtc: string;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
+  ignored: boolean;
 };
 
 type OutlookUserInfo = {
@@ -469,7 +470,8 @@ export class CalendarService {
 
   // Used by the public booking scheduler. Returns busy windows already widened
   // by any per-event buffer the host configured in /dashboard/availability so
-  // the slot generator can stay buffer-agnostic.
+  // the slot generator can stay buffer-agnostic. Events the host has explicitly
+  // marked as ignored are dropped so they don't block public slots.
   async getBusyIntervals(userId: string, start: Date, end: Date) {
     const events = await this.collectProviderEvents(userId, start, end);
     if (events.length === 0) {
@@ -484,16 +486,19 @@ export class CalendarService {
       })),
     );
 
-    return events.map((event) => {
+    return events.flatMap((event) => {
       const buffer = buffers.get(
         bufferKey(event.connectedCalendarId, event.providerEventId),
       );
+      if (buffer?.ignored) return [];
       const before = (buffer?.bufferBeforeMinutes ?? 0) * 60_000;
       const after = (buffer?.bufferAfterMinutes ?? 0) * 60_000;
-      return {
-        startMs: event.startMs - before,
-        endMs: event.endMs + after,
-      };
+      return [
+        {
+          startMs: event.startMs - before,
+          endMs: event.endMs + after,
+        },
+      ];
     });
   }
 
@@ -535,6 +540,7 @@ export class CalendarService {
           endTimeUtc: new Date(event.endMs).toISOString(),
           bufferBeforeMinutes: buffer?.bufferBeforeMinutes ?? 0,
           bufferAfterMinutes: buffer?.bufferAfterMinutes ?? 0,
+          ignored: buffer?.ignored ?? false,
         };
       })
       .sort((a, b) => a.startTimeUtc.localeCompare(b.startTimeUtc));
@@ -548,41 +554,35 @@ export class CalendarService {
     bufferAfterMinutes: number,
     providerCalendarId?: string,
   ) {
-    const calendar = await this.prisma.connectedCalendar.findFirst({
-      where: { id: connectedCalendarId, userId },
-      select: { id: true },
-    });
-
-    if (!calendar) {
-      throw new NotFoundException('Connected calendar not found');
-    }
+    const existing = await this.requireBufferRowContext(
+      userId,
+      connectedCalendarId,
+      providerEventId,
+    );
 
     const safeBefore = clampBufferMinutes(bufferBeforeMinutes);
     const safeAfter = clampBufferMinutes(bufferAfterMinutes);
+    const stillIgnored = existing.current?.ignored ?? false;
 
-    // No row needed when both buffers are zero — drop any existing row so we
-    // don't keep noise around.
-    if (safeBefore === 0 && safeAfter === 0) {
+    // No row needed when both buffers are zero and the event isn't ignored —
+    // drop any existing row so we don't keep noise around.
+    if (safeBefore === 0 && safeAfter === 0 && !stillIgnored) {
       await this.prisma.externalEventBuffer.deleteMany({
         where: {
           connectedCalendarId,
           providerEventId,
         },
       });
-      return { bufferBeforeMinutes: 0, bufferAfterMinutes: 0 };
+      return {
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+        ignored: false,
+      };
     }
 
     const resolvedProviderCalendarId =
       providerCalendarId?.trim() ||
-      (await this.prisma.externalEventBuffer.findUnique({
-        where: {
-          connectedCalendarId_providerEventId: {
-            connectedCalendarId,
-            providerEventId,
-          },
-        },
-        select: { providerCalendarId: true },
-      }))?.providerCalendarId ||
+      existing.current?.providerCalendarId ||
       '';
 
     if (!resolvedProviderCalendarId) {
@@ -603,15 +603,118 @@ export class CalendarService {
         providerEventId,
         bufferBeforeMinutes: safeBefore,
         bufferAfterMinutes: safeAfter,
+        ignored: stillIgnored,
       },
       update: {
         bufferBeforeMinutes: safeBefore,
         bufferAfterMinutes: safeAfter,
       },
-      select: { bufferBeforeMinutes: true, bufferAfterMinutes: true },
+      select: {
+        bufferBeforeMinutes: true,
+        bufferAfterMinutes: true,
+        ignored: true,
+      },
     });
 
     return row;
+  }
+
+  async setEventIgnored(
+    userId: string,
+    connectedCalendarId: string,
+    providerEventId: string,
+    ignored: boolean,
+    providerCalendarId?: string,
+  ) {
+    const existing = await this.requireBufferRowContext(
+      userId,
+      connectedCalendarId,
+      providerEventId,
+    );
+
+    const currentBefore = existing.current?.bufferBeforeMinutes ?? 0;
+    const currentAfter = existing.current?.bufferAfterMinutes ?? 0;
+
+    // Going back to "not ignored" with no buffers? Drop the row entirely.
+    if (!ignored && currentBefore === 0 && currentAfter === 0) {
+      await this.prisma.externalEventBuffer.deleteMany({
+        where: { connectedCalendarId, providerEventId },
+      });
+      return {
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+        ignored: false,
+      };
+    }
+
+    const resolvedProviderCalendarId =
+      providerCalendarId?.trim() ||
+      existing.current?.providerCalendarId ||
+      '';
+
+    if (!resolvedProviderCalendarId) {
+      throw new BadRequestException('providerCalendarId is required');
+    }
+
+    const row = await this.prisma.externalEventBuffer.upsert({
+      where: {
+        connectedCalendarId_providerEventId: {
+          connectedCalendarId,
+          providerEventId,
+        },
+      },
+      create: {
+        userId,
+        connectedCalendarId,
+        providerCalendarId: resolvedProviderCalendarId,
+        providerEventId,
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+        ignored,
+      },
+      update: {
+        ignored,
+      },
+      select: {
+        bufferBeforeMinutes: true,
+        bufferAfterMinutes: true,
+        ignored: true,
+      },
+    });
+
+    return row;
+  }
+
+  private async requireBufferRowContext(
+    userId: string,
+    connectedCalendarId: string,
+    providerEventId: string,
+  ) {
+    const calendar = await this.prisma.connectedCalendar.findFirst({
+      where: { id: connectedCalendarId, userId },
+      select: { id: true },
+    });
+
+    if (!calendar) {
+      throw new NotFoundException('Connected calendar not found');
+    }
+
+    const current = await this.prisma.externalEventBuffer.findUnique({
+      where: {
+        connectedCalendarId_providerEventId: {
+          connectedCalendarId,
+          providerEventId,
+        },
+      },
+      select: {
+        providerCalendarId: true,
+        bufferBeforeMinutes: true,
+        bufferAfterMinutes: true,
+        ignored: true,
+      },
+    });
+
+    return { calendar, current };
   }
 
   private async collectProviderEvents(
@@ -706,7 +809,11 @@ export class CalendarService {
     if (keys.length === 0) {
       return new Map<
         string,
-        { bufferBeforeMinutes: number; bufferAfterMinutes: number }
+        {
+          bufferBeforeMinutes: number;
+          bufferAfterMinutes: number;
+          ignored: boolean;
+        }
       >();
     }
 
@@ -723,17 +830,23 @@ export class CalendarService {
         providerEventId: true,
         bufferBeforeMinutes: true,
         bufferAfterMinutes: true,
+        ignored: true,
       },
     });
 
     const map = new Map<
       string,
-      { bufferBeforeMinutes: number; bufferAfterMinutes: number }
+      {
+        bufferBeforeMinutes: number;
+        bufferAfterMinutes: number;
+        ignored: boolean;
+      }
     >();
     for (const row of rows) {
       map.set(bufferKey(row.connectedCalendarId, row.providerEventId), {
         bufferBeforeMinutes: row.bufferBeforeMinutes,
         bufferAfterMinutes: row.bufferAfterMinutes,
+        ignored: row.ignored,
       });
     }
     return map;

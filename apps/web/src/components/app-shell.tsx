@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowLeft,
   CalendarCheck2,
   CalendarClock,
   CalendarSync,
@@ -22,7 +23,6 @@ import {
   Layers,
   LifeBuoy,
   LogOut,
-  MessageSquareText,
   Moon,
   Settings,
   Sun,
@@ -33,8 +33,10 @@ import { LegalFooter } from "@/components/legal-footer";
 import {
   authedApiRequest,
   clearAuthSession,
+  type EventType,
   getAuthSession,
   logoutAuthSession,
+  publicBookingUrl,
   type PublicUser,
   updateStoredUser,
 } from "@/lib/api";
@@ -416,6 +418,16 @@ function UserMenuItems({
   onLogout: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  // Which sub-view the menu is showing. "pick-service" is the inline
+  // popover that swaps in when the host has 2+ active services and clicks
+  // "Copy booking link" — they can then pick which service link to copy.
+  const [view, setView] = useState<"main" | "pick-service">("main");
+  // Cache of the host's services for the picker. We load them lazily the
+  // first time the menu opens so the dropdown stays cheap on routes that
+  // never need it.
+  const [services, setServices] = useState<EventType[] | null>(null);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState<string | null>(null);
 
   // Tailwind 4 themes via `:root.dark`, set via the `dark` class on <html>.
   // The lazy initializer is SSR-safe (returns false on the server, reads
@@ -429,14 +441,75 @@ function UserMenuItems({
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  async function copyLink() {
+  // Pull the host's services as soon as the menu mounts so "Copy booking
+  // link" can dispatch synchronously (1 service → copy direct, 2+ → swap
+  // to the picker). Mount-time is fine because the menu is unmounted when
+  // closed.
+  useEffect(() => {
+    let alive = true;
+    setServicesLoading(true);
+    setServicesError(null);
+    authedApiRequest<EventType[]>("/event-types")
+      .then((next) => {
+        if (!alive) return;
+        setServices(next);
+      })
+      .catch((caught) => {
+        if (!alive) return;
+        setServicesError(
+          caught instanceof Error ? caught.message : "Could not load services",
+        );
+      })
+      .finally(() => {
+        if (alive) setServicesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Services we surface in the picker: only the active ones, since inactive
+  // services aren't bookable and the link would 404 for guests.
+  const bookableServices = (services ?? []).filter((service) => service.isActive);
+
+  async function copyToClipboard(text: string) {
     try {
-      await navigator.clipboard.writeText(bookingLink);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+      window.setTimeout(() => setCopied(false), 1200);
     } catch {
-      // ignored
+      // ignored — clipboard may be blocked in insecure contexts
     }
+  }
+
+  function handleCopyClicked() {
+    // While services are loading we just fall back to the host page link so
+    // the click is never a no-op.
+    if (servicesLoading || !services) {
+      void copyToClipboard(bookingLink);
+      return;
+    }
+    if (bookableServices.length === 1) {
+      void copyToClipboard(
+        publicBookingUrl(userSlug, bookableServices[0].slug),
+      );
+      return;
+    }
+    if (bookableServices.length >= 2) {
+      setView("pick-service");
+      return;
+    }
+    // 0 active services → copy the public host page so the link still works.
+    void copyToClipboard(bookingLink);
+  }
+
+  function copyServiceLink(service: EventType) {
+    void copyToClipboard(publicBookingUrl(userSlug, service.slug));
+    // Close the menu shortly after so the host sees the "Copied!" flash but
+    // doesn't have to dismiss the dropdown manually.
+    window.setTimeout(() => {
+      onClose();
+    }, 700);
   }
 
   function toggleTheme() {
@@ -454,6 +527,60 @@ function UserMenuItems({
     placement === "above"
       ? "bottom-[calc(100%+8px)] left-0 right-0"
       : "right-0 top-[calc(100%+8px)] w-[260px]";
+
+  if (view === "pick-service") {
+    return (
+      <div
+        role="menu"
+        className={cn(
+          "absolute z-40 rounded-xl border border-[#EEE7DF] bg-white p-1.5 shadow-[0_24px_48px_-20px_rgba(17,24,39,0.16)]",
+          positionClass,
+        )}
+      >
+        <div className="flex items-center gap-1.5 px-1 pb-1.5 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setView("main")}
+            aria-label="Back to account menu"
+            className="inline-flex size-7 items-center justify-center rounded-md text-[#6B7280] transition hover:bg-[#FFFBF7] hover:text-[#0B1220]"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">
+              Copy booking link
+            </p>
+            <p className="truncate text-[12px] font-bold text-[#0B1220]">
+              Pick a service
+            </p>
+          </div>
+        </div>
+        <div className="my-1 h-px bg-[#EEE7DF]" />
+        <div className="max-h-[260px] overflow-y-auto py-0.5">
+          {bookableServices.map((service) => (
+            <MenuRow
+              key={service.id}
+              as="button"
+              type="button"
+              onClick={() => copyServiceLink(service)}
+              icon={
+                <Copy className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
+              }
+            >
+              <span className="block min-w-0 flex-1 truncate">
+                {service.title}
+              </span>
+            </MenuRow>
+          ))}
+        </div>
+        {copied ? (
+          <p className="mt-1 px-3 pb-1 text-[11px] font-bold text-[#16A34A]">
+            Link copied to clipboard
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -478,7 +605,7 @@ function UserMenuItems({
       <MenuRow
         as="button"
         type="button"
-        onClick={copyLink}
+        onClick={handleCopyClicked}
         icon={
           copied ? (
             <Check className="size-4 shrink-0 text-[#16A34A]" />
@@ -547,16 +674,6 @@ function UserMenuItems({
       >
         Help &amp; support
       </MenuRow>
-      <MenuRow
-        as="a"
-        href="mailto:feedback@bookvella.com"
-        onClick={onClose}
-        icon={
-          <MessageSquareText className="size-4 shrink-0 text-[#9CA3AF] group-hover:text-[#FF5F63]" />
-        }
-      >
-        Send feedback
-      </MenuRow>
       <div className="my-1 h-px bg-[#EEE7DF]" />
       <MenuRow
         as="button"
@@ -570,6 +687,14 @@ function UserMenuItems({
       >
         Sign out
       </MenuRow>
+      {servicesError ? (
+        <p
+          role="alert"
+          className="mt-1 px-3 pb-1 text-[10.5px] text-[#B91C1C]"
+        >
+          Couldn&apos;t load your services for the booking link picker.
+        </p>
+      ) : null}
     </div>
   );
 }
