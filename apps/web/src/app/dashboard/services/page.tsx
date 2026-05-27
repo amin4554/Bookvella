@@ -846,7 +846,7 @@ function PricePillText({
         priceAmount,
         priceMaxAmount,
         priceCurrency,
-      }) ?? "Price on request"}
+      }) ?? "No price tag"}
     </span>
   );
 }

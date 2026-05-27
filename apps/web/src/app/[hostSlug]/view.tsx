@@ -10,6 +10,7 @@ import {
   CalendarCheck2,
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   AtSign,
@@ -17,6 +18,7 @@ import {
   Link as LinkIcon,
   ListChecks,
   MapPin,
+  Maximize2,
   Phone as PhoneIcon,
   Scissors,
   Share2,
@@ -424,8 +426,10 @@ export function PublicHostProfileView({ data }: { data: PublicHostProfile }) {
                       <div className="leading-tight">
                         <p className="text-[13px] font-bold">{service.title}</p>
                         <p className="text-[11px] tabular-nums text-[#6B7280]">
-                          {service.durationMinutes} min ·{" "}
-                          {formatPriceLabel(service) ?? "Free / on request"}
+                          {service.durationMinutes} min
+                          {formatPriceLabel(service) ? (
+                            <> · {formatPriceLabel(service)}</>
+                          ) : null}
                         </p>
                       </div>
                       <ChevronRight
@@ -543,12 +547,6 @@ const REVIEW_TINTS = [
   "linear-gradient(135deg,#EC4899,#A855F7)",
 ];
 
-const GALLERY_FALLBACK_TINTS = [
-  "linear-gradient(135deg,#F4EAFF 0%,#E1CFFA 60%,#D7CDF8 100%)",
-  "linear-gradient(135deg,#D7F2EA 0%,#B6E4F2 60%,#CFE9E0 100%)",
-  "linear-gradient(135deg,#FFE9C7 0%,#FFD08A 60%,#FFC9C2 100%)",
-];
-
 function ServiceDetailModal({
   hostSlug,
   service,
@@ -565,6 +563,7 @@ function ServiceDetailModal({
   const [slotState, setSlotState] = useState<"loading" | "ready" | "none">(
     "loading",
   );
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Lock body scroll while the sheet is open.
   useEffect(() => {
@@ -575,14 +574,40 @@ function ServiceDetailModal({
     };
   }, []);
 
-  // ESC to close.
+  const galleryImages = useMemo(() => servicePhotoUrls(service), [service]);
+  const lightboxImage =
+    lightboxIndex === null ? null : (galleryImages[lightboxIndex] ?? null);
+
+  // ESC closes the photo viewer first, then the service modal.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        if (lightboxIndex !== null) {
+          setLightboxIndex(null);
+          return;
+        }
+        onClose();
+      }
+
+      if (lightboxIndex === null || galleryImages.length < 2) return;
+
+      if (event.key === "ArrowLeft") {
+        setLightboxIndex((index) =>
+          index === null
+            ? index
+            : (index - 1 + galleryImages.length) % galleryImages.length,
+        );
+      }
+
+      if (event.key === "ArrowRight") {
+        setLightboxIndex((index) =>
+          index === null ? index : (index + 1) % galleryImages.length,
+        );
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [galleryImages.length, lightboxIndex, onClose]);
 
   // Pull the next available slot inside the booking horizon so guests see a
   // concrete "Next available" line before committing to the booking flow.
@@ -624,17 +649,12 @@ function ServiceDetailModal({
   }, [hostSlug, service.slug]);
 
   const initialFromTitle = (service.title || "?").charAt(0).toUpperCase();
-  const galleryImages = service.galleryImageUrls.slice(0, 3);
   const includedLines = useMemo(
     () => splitIntoLines(service.whatIncluded),
     [service.whatIncluded],
   );
   const priceLabel = formatPriceLabel(service);
   const bookHref = `/${encodeURIComponent(hostSlug)}/${encodeURIComponent(service.slug)}`;
-
-  const heroBackground = service.imageUrl
-    ? `url(${service.imageUrl}) center/cover`
-    : "linear-gradient(135deg,#FFE0DA 0%,#FFD3A6 60%,#FFC9C2 100%)";
 
   return (
     <div
@@ -674,43 +694,23 @@ function ServiceDetailModal({
         <div className="flex-1 overflow-y-auto">
           {/* Hero + gallery */}
           <div className="px-5 pt-5 md:px-7 md:pt-7">
-            <div className="grid gap-2 md:grid-cols-[1.4fr_1fr]">
+            {galleryImages.length > 0 ? (
+              <ServicePhotoGallery
+                images={galleryImages}
+                title={service.title}
+                onOpen={setLightboxIndex}
+              />
+            ) : (
               <div
-                className="relative h-[200px] overflow-hidden rounded-[14px] md:h-[300px]"
-                style={{ background: heroBackground }}
+                className="relative h-[220px] overflow-hidden rounded-[14px] bg-[linear-gradient(135deg,#FFE0DA_0%,#FFD3A6_60%,#FFC9C2_100%)] md:h-[320px]"
+                role="img"
+                aria-label={`${service.title} photo placeholder`}
               >
-                {!service.imageUrl ? (
-                  <div className="absolute inset-0 flex items-center justify-center text-[40px] font-extrabold text-[#FF5F63]">
-                    {initialFromTitle}
-                  </div>
-                ) : null}
+                <div className="absolute inset-0 flex items-center justify-center text-[40px] font-extrabold text-[#FF5F63]">
+                  {initialFromTitle}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:grid-rows-2">
-                {galleryImages.length > 0
-                  ? galleryImages.slice(0, 2).map((url, idx) => (
-                      <div
-                        key={url + idx}
-                        className="h-[95px] rounded-[14px] md:h-auto"
-                        style={{ background: `url(${url}) center/cover` }}
-                      />
-                    ))
-                  : [0, 1].map((idx) => (
-                      <div
-                        key={idx}
-                        className="h-[95px] rounded-[14px] md:h-auto"
-                        style={{
-                          background: GALLERY_FALLBACK_TINTS[idx],
-                        }}
-                      />
-                    ))}
-                {galleryImages.length === 1 ? (
-                  <div
-                    className="h-[95px] rounded-[14px] border border-dashed border-[#EEE7DF] bg-[#FFFBF7] md:h-auto"
-                    aria-hidden
-                  />
-                ) : null}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Title row */}
@@ -754,21 +754,23 @@ function ServiceDetailModal({
                   ) : null}
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
-                  Price
-                </p>
-                <p
-                  className="text-[28px] font-extrabold md:text-[32px]"
-                  style={{
-                    color: "#FF5F63",
-                    letterSpacing: "-0.03em",
-                    lineHeight: "1",
-                  }}
-                >
-                  {priceLabel ?? "Free"}
-                </p>
-              </div>
+              {priceLabel ? (
+                <div className="text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                    Price
+                  </p>
+                  <p
+                    className="text-[28px] font-extrabold md:text-[32px]"
+                    style={{
+                      color: "#FF5F63",
+                      letterSpacing: "-0.03em",
+                      lineHeight: "1",
+                    }}
+                  >
+                    {priceLabel}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -905,7 +907,233 @@ function ServiceDetailModal({
             Continue to book <ArrowRight className="size-4" />
           </Link>
         </div>
+
+        {lightboxImage ? (
+          <PhotoLightbox
+            images={galleryImages}
+            activeIndex={lightboxIndex ?? 0}
+            title={service.title}
+            onClose={() => setLightboxIndex(null)}
+            onChange={setLightboxIndex}
+          />
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function ServicePhotoGallery({
+  images,
+  title,
+  onOpen,
+}: {
+  images: string[];
+  title: string;
+  onOpen: (index: number) => void;
+}) {
+  if (images.length === 1) {
+    return (
+      <GalleryPhotoButton
+        url={images[0]}
+        title={title}
+        index={0}
+        variant="single"
+        onOpen={onOpen}
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-2 md:grid-cols-[1.45fr_1fr]">
+      <GalleryPhotoButton
+        url={images[0]}
+        title={title}
+        index={0}
+        variant="hero"
+        onOpen={onOpen}
+      />
+      <div
+        className={
+          images.length > 2
+            ? "grid grid-cols-2 gap-2 md:grid-cols-1 md:grid-rows-2"
+            : "grid gap-2"
+        }
+      >
+        {images.slice(1, 3).map((url, offset) => {
+          const index = offset + 1;
+          return (
+            <GalleryPhotoButton
+              key={`${url}-${index}`}
+              url={url}
+              title={title}
+              index={index}
+              variant="thumb"
+              showViewAll={index === 2 && images.length > 3}
+              total={images.length}
+              onOpen={onOpen}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GalleryPhotoButton({
+  url,
+  title,
+  index,
+  variant,
+  showViewAll = false,
+  total = 0,
+  onOpen,
+}: {
+  url: string;
+  title: string;
+  index: number;
+  variant: "single" | "hero" | "thumb";
+  showViewAll?: boolean;
+  total?: number;
+  onOpen: (index: number) => void;
+}) {
+  const isLarge = variant !== "thumb";
+
+  return (
+    <button
+      type="button"
+      aria-label={`Open ${title} photo ${index + 1}`}
+      onClick={() => onOpen(index)}
+      className={`group relative overflow-hidden rounded-[14px] bg-[#F3F4F6] text-left shadow-[0_1px_0_rgba(17,24,39,0.04)] outline-none ring-offset-2 ring-offset-white transition focus-visible:ring-2 focus-visible:ring-[#FF5F63] ${
+        variant === "single"
+          ? "h-[240px] w-full md:h-[360px]"
+          : isLarge
+            ? "h-[220px] md:h-[320px]"
+            : "h-[112px] min-h-[112px] md:h-full"
+      }`}
+    >
+      <span
+        className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
+        style={{ backgroundImage: `url(${url})` }}
+        role="img"
+        aria-label={`${title} photo ${index + 1}`}
+      />
+      <span className="absolute inset-0 bg-gradient-to-t from-[#0B1220]/35 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      {isLarge ? (
+        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-2 text-[12px] font-bold text-[#0B1220] shadow-sm backdrop-blur">
+          <Maximize2 className="size-3.5" />
+          Open photo
+        </span>
+      ) : null}
+      {showViewAll ? (
+        <span className="absolute inset-0 grid place-items-center bg-[#0B1220]/45 text-[12px] font-bold text-white backdrop-blur-[1px]">
+          View all {total} photos
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function PhotoLightbox({
+  images,
+  activeIndex,
+  title,
+  onClose,
+  onChange,
+}: {
+  images: string[];
+  activeIndex: number;
+  title: string;
+  onClose: () => void;
+  onChange: (index: number) => void;
+}) {
+  const activeImage = images[activeIndex];
+  const hasMany = images.length > 1;
+
+  function move(delta: number) {
+    onChange((activeIndex + delta + images.length) % images.length);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex flex-col bg-[#0B1220]/95 p-4 text-white md:p-6"
+      onClick={onClose}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-bold">{title}</p>
+          <p className="text-[12px] text-white/60">
+            Photo {activeIndex + 1} of {images.length}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="Close photo viewer"
+          onClick={onClose}
+          className="inline-flex size-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/15"
+        >
+          <X className="size-5" />
+        </button>
+      </div>
+
+      <div className="relative mt-4 flex flex-1 items-center justify-center overflow-hidden">
+        {hasMany ? (
+          <button
+            type="button"
+            aria-label="Previous photo"
+            onClick={(event) => {
+              event.stopPropagation();
+              move(-1);
+            }}
+            className="absolute left-0 z-10 inline-flex size-11 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur hover:bg-white/20 md:left-2"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+        ) : null}
+
+        <div
+          className="h-full max-h-full w-full rounded-2xl bg-contain bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${activeImage})` }}
+          role="img"
+          aria-label={`${title} photo ${activeIndex + 1}`}
+          onClick={(event) => event.stopPropagation()}
+        />
+
+        {hasMany ? (
+          <button
+            type="button"
+            aria-label="Next photo"
+            onClick={(event) => {
+              event.stopPropagation();
+              move(1);
+            }}
+            className="absolute right-0 z-10 inline-flex size-11 items-center justify-center rounded-full bg-white/12 text-white backdrop-blur hover:bg-white/20 md:right-2"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        ) : null}
+      </div>
+
+      {hasMany ? (
+        <div
+          className="mt-4 flex justify-center gap-2 overflow-x-auto pb-1"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {images.map((url, index) => (
+            <button
+              key={`${url}-${index}`}
+              type="button"
+              aria-label={`Show photo ${index + 1}`}
+              onClick={() => onChange(index)}
+              className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border bg-cover bg-center transition ${
+                index === activeIndex
+                  ? "border-white opacity-100"
+                  : "border-white/20 opacity-60 hover:opacity-90"
+              }`}
+              style={{ backgroundImage: `url(${url})` }}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -927,6 +1155,17 @@ function splitIntoLines(text: string | null): string[] {
     .split(/\r?\n/)
     .map((l) => l.trim().replace(/^[-*•]\s*/, ""))
     .filter(Boolean);
+}
+
+function servicePhotoUrls(service: ServiceItem): string[] {
+  const seen = new Set<string>();
+  return [service.imageUrl, ...service.galleryImageUrls].filter(
+    (url): url is string => {
+      if (!url || seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    },
+  );
 }
 
 function formatSlotLabel(slot: AvailableSlot): string {
@@ -1009,12 +1248,7 @@ function ServiceRow({
                 <Banknote className="size-3.5 text-[#9CA3AF]" />
                 {formatPriceLabel(service)}
               </Chip>
-            ) : (
-              <Chip>
-                <Banknote className="size-3.5 text-[#9CA3AF]" />
-                Free / on request
-              </Chip>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="flex flex-col items-stretch justify-center gap-2 p-5 sm:items-end">

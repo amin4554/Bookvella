@@ -16,6 +16,8 @@ export function setAuthCookies(
     rememberMe?: boolean;
   },
 ) {
+  clearLegacyCookieDomain(response);
+
   // When the user opts out of "Keep me signed in" we hand out session-scope
   // cookies (no Max-Age) so they evaporate when the browser quits. The server-
   // side session still has a 12-hour ceiling on top of that, so an attacker
@@ -30,6 +32,7 @@ export function setAuthCookies(
     buildCookie(ACCESS_TOKEN_COOKIE, input.accessToken, {
       httpOnly: true,
       maxAge: ACCESS_TOKEN_MAX_AGE_SECONDS,
+      domain: getAuthCookieDomain(),
     }),
   );
   appendCookie(
@@ -39,34 +42,51 @@ export function setAuthCookies(
       // Omit Max-Age entirely for session cookies so the browser deletes them
       // on close.
       maxAge: rememberMe ? refreshMaxAge : null,
+      domain: getAuthCookieDomain(),
     }),
   );
   // SESSION_COOKIE is intentionally NOT httpOnly: it's a low-trust "is anyone
   // logged in?" flag the client can read to decide whether to even attempt an
-  // authed call. The actual auth lives in the httpOnly access/refresh cookies.
+  // authed call. The actual auth lives in the httpOnly access/refresh cookies,
+  // which can be scoped separately to the API host.
   appendCookie(
     response,
     buildCookie(SESSION_COOKIE, 'active', {
       httpOnly: false,
       maxAge: rememberMe ? refreshMaxAge : null,
+      domain: getSessionCookieDomain(),
     }),
   );
 }
 
 export function clearAuthCookies(response: Response) {
+  clearLegacyCookieDomain(response);
+
   appendCookie(
     response,
-    buildCookie(ACCESS_TOKEN_COOKIE, '', { maxAge: 0, httpOnly: true }),
+    buildCookie(ACCESS_TOKEN_COOKIE, '', {
+      maxAge: 0,
+      httpOnly: true,
+      domain: getAuthCookieDomain(),
+    }),
   );
   appendCookie(
     response,
-    buildCookie(REFRESH_TOKEN_COOKIE, '', { maxAge: 0, httpOnly: true }),
+    buildCookie(REFRESH_TOKEN_COOKIE, '', {
+      maxAge: 0,
+      httpOnly: true,
+      domain: getAuthCookieDomain(),
+    }),
   );
   // Mirror the original httpOnly:false flag for the session marker so the
   // delete header lines up with the cookie that was actually set on the way in.
   appendCookie(
     response,
-    buildCookie(SESSION_COOKIE, '', { maxAge: 0, httpOnly: false }),
+    buildCookie(SESSION_COOKIE, '', {
+      maxAge: 0,
+      httpOnly: false,
+      domain: getSessionCookieDomain(),
+    }),
   );
 }
 
@@ -108,7 +128,11 @@ function appendCookie(response: Response, cookie: string) {
 function buildCookie(
   name: string,
   value: string,
-  options: { httpOnly?: boolean; maxAge: number | null },
+  options: {
+    httpOnly?: boolean;
+    maxAge: number | null;
+    domain?: string | null;
+  },
 ) {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
@@ -121,10 +145,8 @@ function buildCookie(
     parts.push(`Max-Age=${options.maxAge}`);
   }
 
-  const domain = process.env.AUTH_COOKIE_DOMAIN?.trim();
-
-  if (domain) {
-    parts.push(`Domain=${domain}`);
+  if (options.domain) {
+    parts.push(`Domain=${options.domain}`);
   }
 
   if (options.httpOnly) {
@@ -136,6 +158,63 @@ function buildCookie(
   }
 
   return parts.join('; ');
+}
+
+function clearLegacyCookieDomain(response: Response) {
+  const legacyDomain = getCookieDomain('AUTH_COOKIE_LEGACY_DOMAIN');
+
+  if (!legacyDomain) {
+    return;
+  }
+
+  const authDomain = getAuthCookieDomain();
+  const sessionDomain = getSessionCookieDomain();
+
+  if (legacyDomain !== authDomain) {
+    appendCookie(
+      response,
+      buildCookie(ACCESS_TOKEN_COOKIE, '', {
+        maxAge: 0,
+        httpOnly: true,
+        domain: legacyDomain,
+      }),
+    );
+    appendCookie(
+      response,
+      buildCookie(REFRESH_TOKEN_COOKIE, '', {
+        maxAge: 0,
+        httpOnly: true,
+        domain: legacyDomain,
+      }),
+    );
+  }
+
+  if (legacyDomain !== sessionDomain) {
+    appendCookie(
+      response,
+      buildCookie(SESSION_COOKIE, '', {
+        maxAge: 0,
+        httpOnly: false,
+        domain: legacyDomain,
+      }),
+    );
+  }
+}
+
+function getAuthCookieDomain() {
+  return getCookieDomain('AUTH_COOKIE_DOMAIN');
+}
+
+function getSessionCookieDomain() {
+  return (
+    getCookieDomain('SESSION_COOKIE_DOMAIN') ??
+    getCookieDomain('AUTH_COOKIE_DOMAIN')
+  );
+}
+
+function getCookieDomain(name: string) {
+  const domain = process.env[name]?.trim();
+  return domain || null;
 }
 
 function isSecureCookie() {

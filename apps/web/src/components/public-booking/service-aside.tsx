@@ -68,7 +68,11 @@ export function ServiceAside({ data }: { data: PublicEvent }) {
           >
             {eventType.title}
           </h1>
-          <p className="text-[20px] font-bold text-[#FF5F63]">{priceLabel}</p>
+          {priceLabel ? (
+            <p className="text-[20px] font-bold text-[#FF5F63]">
+              {priceLabel}
+            </p>
+          ) : null}
         </div>
         {eventType.category ? (
           <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#E8DED7] bg-white px-2.5 py-1 text-[11.5px] font-semibold text-[#374151]">

@@ -54,8 +54,8 @@ export function buildPriceLabel(args: {
   priceAmount: number | null;
   priceMaxAmount: number | null;
   priceCurrency: string;
-}): string {
-  if (args.priceType === "FREE") return "Free";
+}): string | null {
+  if (args.priceType === "FREE") return null;
   const symbol = CURRENCY_SYMBOLS[args.priceCurrency] ?? "$";
   function money(cents: number) {
     return cents % 100 === 0
@@ -69,7 +69,7 @@ export function buildPriceLabel(args: {
   ) {
     return `${money(args.priceAmount)} – ${money(args.priceMaxAmount)}`;
   }
-  if (args.priceAmount == null) return "Price on request";
+  if (args.priceAmount == null) return null;
   if (args.priceType === "FROM") return `From ${money(args.priceAmount)}`;
   return money(args.priceAmount);
 }

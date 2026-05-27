@@ -43,6 +43,12 @@ export function StepDetails({
 }: Props) {
   const firstName = data.host.name.split(/\s+/)[0];
   const [agreed, setAgreed] = useState(true);
+  const priceLabel = buildPriceLabel({
+    priceType: data.eventType.priceType,
+    priceAmount: data.eventType.priceAmount,
+    priceMaxAmount: data.eventType.priceMaxAmount,
+    priceCurrency: data.eventType.priceCurrency,
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,15 +199,12 @@ export function StepDetails({
               {data.eventType.locationDetails ??
                 formatLocationLabel(data.eventType.locationType)}
             </li>
-            <li className="flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-[#10B981]" />
-              {buildPriceLabel({
-                priceType: data.eventType.priceType,
-                priceAmount: data.eventType.priceAmount,
-                priceMaxAmount: data.eventType.priceMaxAmount,
-                priceCurrency: data.eventType.priceCurrency,
-              })}
-            </li>
+            {priceLabel ? (
+              <li className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-[#10B981]" />
+                {priceLabel}
+              </li>
+            ) : null}
           </ul>
           <div className="my-4 h-px bg-[#EEE7DF]" />
           <p className="text-[17px] font-bold">

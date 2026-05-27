@@ -124,7 +124,7 @@ const PRICE_TYPE_OPTIONS: {
   },
   {
     value: "FREE",
-    label: "Free / on request",
+    label: "No price tag",
     hint: "Don't show a price publicly",
   },
 ];

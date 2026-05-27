@@ -150,11 +150,19 @@ The API still accepts `Authorization: Bearer ...` as a compatibility fallback fo
 Production should set:
 
 ```txt
-AUTH_COOKIE_DOMAIN=.bookvella.com
+AUTH_COOKIE_DOMAIN=api.bookvella.com
+SESSION_COOKIE_DOMAIN=.bookvella.com
+AUTH_COOKIE_LEGACY_DOMAIN=.bookvella.com
 AUTH_COOKIE_SECURE=true
 ```
 
-Local development can leave `AUTH_COOKIE_DOMAIN` empty and `AUTH_COOKIE_SECURE=false`.
+`AUTH_COOKIE_DOMAIN` scopes the httpOnly access/refresh cookies to the API
+host. `SESSION_COOKIE_DOMAIN` keeps the low-trust dashboard marker visible to
+the web app. `AUTH_COOKIE_LEGACY_DOMAIN` is optional and expires older shared
+auth cookies during the migration.
+
+Local development can leave the cookie domain variables empty and
+`AUTH_COOKIE_SECURE=false`.
 
 ## Uploads
 
